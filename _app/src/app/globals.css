@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background: #faf7f3;
+    color: #1e1a17;
+  }
+  /* Inputs respeitam tipografia do tema */
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+  /* Foco visível padrão (acessibilidade) */
+  :focus-visible {
+    outline: 2px solid #b8956a;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+/* Animações usadas no provador virtual */
+@keyframes vv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes vv-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
