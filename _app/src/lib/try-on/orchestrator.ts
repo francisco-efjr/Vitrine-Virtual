@@ -1,6 +1,7 @@
 import 'server-only'
 import { fashnProvider } from './fashn'
 import { replicateProvider } from './replicate'
+import { googleAiProvider } from './google-ai'
 import {
   TryOnProviderError,
   type TryOnProvider,
@@ -10,12 +11,18 @@ import {
 import { logger } from '@/lib/logger'
 
 /**
- * Orquestrador: tenta primário (FASHN), cai para fallback (Replicate) se necessário.
- * Estrutura permite trocar/adicionar providers sem mudar a rota /api/try-on.
+ * Orquestrador: tenta providers em sequência até um ter sucesso.
+ *
+ * Ordem padrão de prioridade:
+ *   1. FASHN.ai      — primário (melhor qualidade, mais rápido)
+ *   2. Google Gemini — secundário (bom custo-benefício, estilo fashion)
+ *   3. Replicate     — último recurso (modelo IDM-VTON, latência maior)
+ *
+ * A ordem pode ser sobrescrita no teste passando `providers` explicitamente.
  */
 export async function generateTryOn(
   input: TryOnProviderInput,
-  providers: TryOnProvider[] = [fashnProvider, replicateProvider],
+  providers: TryOnProvider[] = [fashnProvider, googleAiProvider, replicateProvider],
 ): Promise<TryOnProviderResult & { provider: TryOnProvider['name'] }> {
   let lastErr: unknown
 
@@ -29,19 +36,4 @@ export async function generateTryOn(
       logger.warn('Provider falhou, tentando próximo', {
         provider: provider.name,
         retriable: isRetriable,
-        message: err instanceof Error ? err.message : String(err),
-      })
-      if (!isRetriable) {
-        // Erro definitivo — não tenta os próximos
-        break
-      }
-    }
-  }
-
-  if (lastErr instanceof TryOnProviderError) throw lastErr
-  throw new TryOnProviderError(
-    'Todos os providers falharam',
-    'orchestrator',
-    false,
-  )
-}
+        message: err instanceof Error ? err.mes
