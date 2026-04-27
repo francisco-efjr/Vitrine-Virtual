@@ -1,0 +1,451 @@
+'use client'
+
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { Camera, Star, Trash2, Upload } from 'lucide-react'
+import imageCompression from 'browser-image-compression'
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface ExistingFoto {
+  id: string
+  storage_path: string
+  ordem: number
+  signed_url: string | null
+  is_principal: boolean
+}
+
+interface PendingFoto {
+  tempId: string
+  file: File
+  preview: string // blob URL — revogar no unmount
+  isPrincipal: boolean
+}
+
+export interface FotoUploaderHandle {
+  /**
+   * Executa todas as operações pendentes:
+   *   1. Delete fotos marcadas para remoção
+   *   2. Upload de fotos novas (via signed URL do Supabase)
+   *   3. Atualiza foto principal se mudou
+   *
+   * Deve ser chamado APÓS salvar os metadados da peça (para ter o pecaId).
+   */
+  flush(pecaId: string, currentPrincipalId: string | null): Promise<void>
+}
+
+// =============================================================================
+// FotoUploader
+// =============================================================================
+
+const ACCEPTED_MIMES = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB (limite do bucket)
+const MAX_FOTOS = 8
+
+export const FotoUploader = forwardRef<
+  FotoUploaderHandle,
+  {
+    pecaId: string | null
+    /** Fotos já existentes no banco, com signed URLs. Obtidas via GET /api/pecas/{id}/fotos */
+    initialFotos?: ExistingFoto[]
+    disabled?: boolean
+  }
+>(function FotoUploader({ pecaId, initialFotos = [], disabled = false }, ref) {
+  const [existing, setExisting] = useState<(ExistingFoto & { toDelete: boolean })[]>(() =>
+    initialFotos.map((f) => ({ ...f, toDelete: false })),
+  )
+  const [pending, setPending] = useState<PendingFoto[]>([])
+  const [dragging, setDragging] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Carregar fotos quando pecaId muda (modo edição)
+  useEffect(() => {
+    if (!pecaId || initialFotos.length > 0) return
+    fetch(`/api/pecas/${pecaId}/fotos`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.ok === false) return
+        const fotos = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
+        setExisting(fotos.map((f: ExistingFoto) => ({ ...f, toDelete: false })))
+      })
+      .catch(() => {/* silencia — não bloqueia o fluxo */})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pecaId])
+
+  // Sincroniza quando initialFotos muda (reabre modal com peca diferente)
+  useEffect(() => {
+    setExisting(initialFotos.map((f) => ({ ...f, toDelete: false })))
+    setPending([])
+    setErrors([])
+  }, [initialFotos])
+
+  // Revoga blob URLs ao desmontar
+  useEffect(() => {
+    return () => {
+      pending.forEach((p) => URL.revokeObjectURL(p.preview))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ---- Imperativo: flush é chamado pelo pai no momento do save ----
+  useImperativeHandle(ref, () => ({
+    async flush(targetPecaId: string, currentPrincipalId: string | null): Promise<void> {
+      const tasks: Promise<void>[] = []
+
+      // 1. Deletar fotos marcadas
+      const toDelete = existing.filter((f) => f.toDelete)
+      for (const foto of toDelete) {
+        tasks.push(
+          fetch(`/api/pecas/${targetPecaId}/fotos?foto_id=${foto.id}`, { method: 'DELETE' })
+            .then(() => {/* void */}),
+        )
+      }
+      await Promise.all(tasks)
+      tasks.length = 0
+
+      // 2. Upload de fotos novas
+      const remaining = existing.filter((f) => !f.toDelete)
+      const startOrdem = remaining.length
+
+      for (let i = 0; i < pending.length; i++) {
+        const pf = pending[i]
+        await uploadFoto(targetPecaId, pf.file, startOrdem + i)
+      }
+
+      // 3. Ajustar foto principal
+      const newPrincipalExisting = existing.find((f) => !f.toDelete && f.is_principal)
+      const newPrincipalPending = pending.find((p) => p.isPrincipal)
+
+      // Se o principal mudou para um existente diferente do atual, atualiza
+      if (
+        newPrincipalExisting &&
+        newPrincipalExisting.id !== currentPrincipalId &&
+        !newPrincipalPending
+      ) {
+        await fetch(`/api/pecas/${targetPecaId}/fotos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'set_principal', foto_id: newPrincipalExisting.id }),
+        })
+      }
+      // Se o principal é uma foto nova, foi definido como principal pelo confirmFotoUploaded
+      // automaticamente se for a primeira — caso contrário o uploadFoto precisa marcar.
+      // (A lógica de "primeira foto vira principal" já existe no backend.)
+    },
+  }))
+
+  // ---- Handlers de arquivo ----
+
+  function totalFotos() {
+    return existing.filter((f) => !f.toDelete).length + pending.length
+  }
+
+  async function handleFiles(files: FileList | File[]) {
+    const errs: string[] = []
+    const accepted: File[] = []
+
+    for (const file of Array.from(files)) {
+      if (!ACCEPTED_MIMES.includes(file.type)) {
+        errs.push(`"${file.name}" — formato não aceito (use JPEG, PNG ou WebP)`)
+        continue
+      }
+      if (file.size > MAX_SIZE_BYTES) {
+        errs.push(`"${file.name}" — maior que 5 MB`)
+        continue
+      }
+      accepted.push(file)
+    }
+
+    const available = MAX_FOTOS - totalFotos()
+    if (accepted.length > available) {
+      errs.push(`Só é possível adicionar mais ${available} foto(s). Limite: ${MAX_FOTOS}.`)
+      accepted.splice(available)
+    }
+
+    setErrors(errs)
+
+    const newPending: PendingFoto[] = await Promise.all(
+      accepted.map(async (file) => {
+        // Comprime client-side antes de mostrar preview e antes do upload
+        const compressed = await imageCompression(file, {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1600,
+          useWebWorker: true,
+        }).catch(() => file) // se falhar, usa original
+        return {
+          tempId: crypto.randomUUID(),
+          file: compressed,
+          preview: URL.createObjectURL(compressed),
+          isPrincipal: false,
+        }
+      }),
+    )
+
+    setPending((prev) => {
+      const updated = [...prev, ...newPending]
+      // Primeira foto da lista vira principal se não há existentes
+      if (existing.filter((f) => !f.toDelete).length === 0 && updated.length > 0) {
+        updated[0] = { ...updated[0], isPrincipal: true }
+      }
+      return updated
+    })
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragging(false)
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files)
+  }
+
+  function toggleDeleteExisting(id: string) {
+    setExisting((prev) =>
+      prev.map((f) => {
+        if (f.id !== id) return f
+        const nowDeleted = !f.toDelete
+        // Se estava como principal e vai ser deletada, remove flag
+        return { ...f, toDelete: nowDeleted, is_principal: nowDeleted ? false : f.is_principal }
+      }),
+    )
+  }
+
+  function setPrincipalExisting(id: string) {
+    setExisting((prev) => prev.map((f) => ({ ...f, is_principal: f.id === id })))
+    setPending((prev) => prev.map((p) => ({ ...p, isPrincipal: false })))
+  }
+
+  function removePending(tempId: string) {
+    setPending((prev) => {
+      const removed = prev.find((p) => p.tempId === tempId)
+      if (removed) URL.revokeObjectURL(removed.preview)
+      const updated = prev.filter((p) => p.tempId !== tempId)
+      // Se removeu o principal e ainda há fotos, promove a primeira
+      const wasPrincipal = removed?.isPrincipal
+      if (wasPrincipal && updated.length > 0) {
+        updated[0] = { ...updated[0], isPrincipal: true }
+      }
+      return updated
+    })
+  }
+
+  function setPrincipalPending(tempId: string) {
+    setExisting((prev) => prev.map((f) => ({ ...f, is_principal: false })))
+    setPending((prev) => prev.map((p) => ({ ...p, isPrincipal: p.tempId === tempId })))
+  }
+
+  const isAtLimit = totalFotos() >= MAX_FOTOS
+
+  return (
+    <div>
+      <label className="mb-2 block text-[13px] font-medium text-ink-2">Fotos da peça</label>
+
+      {/* Área de drop */}
+      {!isAtLimit && !disabled && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          onClick={() => inputRef.current?.click()}
+          className={`mb-3 cursor-pointer rounded-[10px] border-2 border-dashed p-6 text-center transition-colors ${
+            dragging ? 'border-accent bg-accent-light' : 'border-border bg-surface-2 hover:border-accent'
+          }`}
+        >
+          <Upload size={24} className="mx-auto mb-2 text-ink-3" />
+          <div className="mb-1 text-sm font-medium text-ink-2">
+            Arraste fotos ou clique para selecionar
+          </div>
+          <div className="text-xs text-ink-3">
+            JPEG, PNG ou WebP · Máx 5 MB · Até {MAX_FOTOS} fotos ({totalFotos()}/{MAX_FOTOS})
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPTED_MIMES.join(',')}
+            multiple
+            hidden
+            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+          />
+        </div>
+      )}
+
+      {/* Erros */}
+      {errors.length > 0 && (
+        <ul className="mb-3 space-y-1">
+          {errors.map((e, i) => (
+            <li key={i} className="text-xs text-danger">
+              {e}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Grade de fotos */}
+      {(existing.length > 0 || pending.length > 0) && (
+        <div className="grid grid-cols-4 gap-2">
+          {/* Existentes */}
+          {existing.map((foto) => (
+            <FotoThumbnail
+              key={foto.id}
+              src={foto.signed_url}
+              isPrincipal={foto.is_principal}
+              isDeleted={foto.toDelete}
+              onSetPrincipal={() => setPrincipalExisting(foto.id)}
+              onToggleDelete={() => toggleDeleteExisting(foto.id)}
+              disabled={disabled}
+            />
+          ))}
+
+          {/* Pendentes */}
+          {pending.map((pf) => (
+            <FotoThumbnail
+              key={pf.tempId}
+              src={pf.preview}
+              isPrincipal={pf.isPrincipal}
+              isDeleted={false}
+              isPending
+              onSetPrincipal={() => setPrincipalPending(pf.tempId)}
+              onToggleDelete={() => removePending(pf.tempId)}
+              disabled={disabled}
+            />
+          ))}
+        </div>
+      )}
+
+      {totalFotos() === 0 && (
+        <div className="flex h-[80px] items-center justify-center rounded-[10px] bg-surface-2">
+          <div className="flex items-center gap-2 text-sm text-ink-3">
+            <Camera size={16} />
+            Nenhuma foto adicionada
+          </div>
+        </div>
+      )}
+
+      <p className="mt-2 text-[11px] text-ink-3">
+        ⭐ Estrela = foto principal (aparece na listagem e no provador IA)
+      </p>
+    </div>
+  )
+})
+
+// =============================================================================
+// FotoThumbnail — item da grade
+// =============================================================================
+
+function FotoThumbnail({
+  src,
+  isPrincipal,
+  isDeleted,
+  isPending = false,
+  onSetPrincipal,
+  onToggleDelete,
+  disabled = false,
+}: {
+  src: string | null
+  isPrincipal: boolean
+  isDeleted: boolean
+  isPending?: boolean
+  onSetPrincipal: () => void
+  onToggleDelete: () => void
+  disabled?: boolean
+}) {
+  return (
+    <div
+      className={`group relative aspect-square overflow-hidden rounded-lg border-2 transition-all ${
+        isPrincipal
+          ? 'border-accent'
+          : isDeleted
+            ? 'border-danger opacity-50'
+            : 'border-border'
+      }`}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="h-full w-full bg-[#f0ebe3]" />
+      )}
+
+      {/* Badge: pending */}
+      {isPending && (
+        <span className="absolute left-1 top-1 rounded bg-accent px-1 text-[9px] font-semibold text-white">
+          NOVA
+        </span>
+      )}
+
+      {/* Badge: principal */}
+      {isPrincipal && (
+        <span className="absolute bottom-1 left-1 flex items-center gap-0.5 rounded bg-accent px-1 py-0.5 text-[9px] font-semibold text-white">
+          <Star size={8} fill="currentColor" />
+          CAPA
+        </span>
+      )}
+
+      {/* Overlay de ações (aparecem no hover) */}
+      {!disabled && (
+        <div className="absolute inset-0 flex items-center justify-center gap-1.5 bg-[rgba(20,16,14,0.55)] opacity-0 transition-opacity group-hover:opacity-100">
+          {!isPrincipal && !isDeleted && (
+            <button
+              type="button"
+              title="Definir como foto principal"
+              onClick={onSetPrincipal}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-accent hover:bg-accent hover:text-white"
+            >
+              <Star size={13} />
+            </button>
+          )}
+          <button
+            type="button"
+            title={isDeleted ? 'Restaurar foto' : 'Remover foto'}
+            onClick={onToggleDelete}
+            className={`flex h-7 w-7 items-center justify-center rounded-full ${
+              isDeleted
+                ? 'bg-white text-success hover:bg-success hover:text-white'
+                : 'bg-white text-danger hover:bg-danger hover:text-white'
+            }`}
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
+// Upload helper — fluxo: sign → PUT → confirm
+// =============================================================================
+
+async function uploadFoto(pecaId: string, file: File, ordem: number): Promise<void> {
+  // 1. Pede URL assinada ao servidor
+  const signRes = await fetch(`/api/pecas/${pecaId}/fotos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+    }),
+  })
+  if (!signRes.ok) throw new Error('Falha ao obter URL de upload')
+  const { data } = await signRes.json()
+  const { path, token } = data as { path: string; token: string; ordem: number }
+
+  // 2. Upload direto para o Supabase Storage
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const uploadUrl = `${supabaseUrl}/storage/v1/object/pecas-fotos/${path}?token=${token}`
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  })
+  if (!uploadRes.ok) throw new Error('Falha no upload para o storage')
+
+  // 3. Confirma upload no banco
+  const confirmRes = await fetch(`/api/pecas/${pecaId}/fotos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'confirm', storage_path: path, ordem }),
+  })
+  if (!confirmRes.ok) throw new Error('Falha ao confirmar upload')
+}

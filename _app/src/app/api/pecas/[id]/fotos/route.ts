@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { handleRoute } from '@/lib/api/response'
 import { requireLojista } from '@/server/auth/session'
 import { fotoUploadSchema } from '@/lib/validators/peca'
+import { createClient as createServerSupabase } from '@/lib/supabase/server'
+import { getOwnPeca } from '@/server/pecas/crud'
 import {
   confirmFotoUploaded,
   createSignedUploadUrl,
@@ -10,39 +12,34 @@ import {
   setFotoPrincipal,
 } from '@/server/pecas/fotos'
 
-const confirmSchema = z.object({
-  storage_path: z.string().min(1),
-  ordem: z.number().int().min(0),
-})
-
-const principalSchema = z.object({ foto_id: z.string().uuid() })
-
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+/**
+ * Lista fotos de uma peça com signed URLs (válidas por 1 hora).
+ * Usado pelo admin panel para exibir thumbnails no modal de edição.
+ */
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   return handleRoute(async () => {
     const session = await requireLojista()
-    const body = await req.json()
-    if (body && body.action === 'confirm') {
-      const data = confirmSchema.parse(body)
-      return await confirmFotoUploaded(session.loja.id, params.id, data.storage_path, data.ordem)
-    }
-    if (body && body.action === 'set_principal') {
-      const data = principalSchema.parse(body)
-      await setFotoPrincipal(session.loja.id, params.id, data.foto_id)
-      return { ok: true }
-    }
-    // sign upload
-    const meta = fotoUploadSchema.parse(body)
-    return await createSignedUploadUrl(session.loja.id, params.id, meta)
-  })
-}
+    const supabase = createServerSupabase()
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  return handleRoute(async () => {
-    const session = await requireLojista()
-    const url = new URL(req.url)
-    const fotoId = url.searchParams.get('foto_id')
-    if (!fotoId) return { ok: false }
-    await deleteFoto(session.loja.id, params.id, fotoId)
-    return { ok: true }
-  })
-}
+    // Valida que a peça pertence à loja (getOwnPeca lança 404 se não pertencer)
+    const peca = await getOwnPeca(session.loja.id, params.id)
+
+    const { data: fotos, error } = await supabase
+      .from('pecas_fotos')
+      .select('id, storage_path, ordem')
+      .eq('peca_id', params.id)
+      .order('ordem', { ascending: true })
+
+    if (error) throw error
+
+    // Gera signed URLs (1h) para cada foto — o dono pode ler via RLS
+    const fotosComUrl = await Promise.all(
+      (fotos ?? []).map(async (foto) => {
+        const { data: signed } = await supabase.storage
+          .from('pecas-fotos')
+          .createSignedUrl(foto.storage_path, 3600)
+        return {
+          id: foto.id,
+          storage_path: foto.storage_path,
+          ordem: foto.ordem,
+          signed_url: signed?

@@ -17,7 +17,7 @@ export interface TryOnProviderResult {
 }
 
 export interface TryOnProvider {
-  readonly name: 'fashn' | 'replicate'
+  readonly name: 'fashn' | 'replicate' | 'google'
   generate(input: TryOnProviderInput): Promise<TryOnProviderResult>
 }
 
@@ -28,6 +28,4 @@ export class TryOnProviderError extends Error {
     public readonly retriable: boolean = false,
   ) {
     super(message)
-    this.name = 'TryOnProviderError'
-  }
-}
+    this.name = 'TryOnProviderEr

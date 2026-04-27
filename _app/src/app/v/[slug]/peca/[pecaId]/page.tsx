@@ -2,11 +2,15 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, MessageCircle } from 'lucide-react'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { formatPreco } from '@/lib/validators/peca'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 import { TryOnButton } from '@/components/public/try-on-button'
+import { GaleriaFotos } from '@/components/public/galeria-fotos'
 
 export const dynamic = 'force-dynamic'
+
+type FotoItem = { id: string; storage_path: string; ordem: number }
 
 export default async function PecaPublicaPage({
   params,
@@ -21,6 +25,33 @@ export default async function PecaPublicaPage({
   const loja = lojaArr?.[0]
   const peca = pecaArr?.[0]
   if (!loja || !peca) notFound()
+
+  // Gera signed URLs para as fotos (bucket privado — service role necessário)
+  const fotos: FotoItem[] = Array.isArray(peca.fotos) ? (peca.fotos as FotoItem[]) : []
+  let fotosComUrl: Array<{ id: string; url: string; storage_path: string }> = []
+
+  if (fotos.length > 0) {
+    const service = createServiceClient()
+    const results = await Promise.all(
+      fotos.map(async (foto) => {
+        const { data } = await service.storage
+          .from('pecas-fotos')
+          .createSignedUrl(foto.storage_path, 3600) // 1h para visualização
+        return { id: foto.id, url: data?.signedUrl ?? '', storage_path: foto.storage_path }
+      }),
+    )
+    fotosComUrl = results.filter((f) => f.url)
+  }
+
+  // URL de garment para o provador IA — TTL de 5 min (tempo de processamento)
+  let garmentSignedUrl: string | null = null
+  if (fotosComUrl[0]) {
+    const service = createServiceClient()
+    const { data } = await service.storage
+      .from('pecas-fotos')
+      .createSignedUrl(fotosComUrl[0].storage_path, 5 * 60)
+    garmentSignedUrl = data?.signedUrl ?? null
+  }
 
   const wa = loja.whatsapp_e164
     ? buildWhatsAppUrl(loja.whatsapp_e164, buildVitrineMessage({ pecaNome: peca.nome }))
@@ -40,45 +71,15 @@ export default async function PecaPublicaPage({
           <div className="font-serif text-sm font-semibold sm:text-base">{loja.nome}</div>
         </div>
       </header>
+
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-12">
         <div className="grid gap-8 sm:grid-cols-2">
-          <div>
-            {/* TODO: galeria de fotos com carrossel — peca.fotos[] */}
-            <div className="aspect-[4/5] w-full rounded-modal bg-[#f0ebe3]" aria-hidden="true" />
-          </div>
+          {/* Galeria de fotos da peça */}
+          <GaleriaFotos
+            fotos={fotosComUrl.map((f) => ({ id: f.id, url: f.url }))}
+            pecaNome={peca.nome}
+          />
+
+          {/* Info + CTAs */}
           <div className="flex flex-col">
-            <h1 className="font-serif text-3xl font-semibold leading-tight">{peca.nome}</h1>
-            {peca.tamanho ? (
-              <div className="mt-2 text-sm text-ink-2">Tamanho: {peca.tamanho}</div>
-            ) : null}
-            {loja.exibir_preco_publico && peca.preco_centavos != null ? (
-              <div className="mt-4 font-serif text-3xl font-semibold">
-                {formatPreco(peca.preco_centavos)}
-              </div>
-            ) : (
-              <div className="mt-4 text-sm text-ink-3">Consulte o preço com a loja</div>
-            )}
-            <div className="mt-8 flex flex-col gap-3">
-              <TryOnButton
-                pecaId={peca.peca_id}
-                pecaNome={peca.nome}
-                whatsappE164={loja.whatsapp_e164}
-              />
-              {wa ? (
-                <a
-                  href={wa}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#25d366] px-6 py-3 text-sm font-semibold text-white"
-                >
-                  <MessageCircle size={16} />
-                  Falar no WhatsApp
-                </a>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
-  )
-}
+            <h1 class

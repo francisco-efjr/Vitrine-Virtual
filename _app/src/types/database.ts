@@ -296,9 +296,7 @@ export type Database = {
     }
     Enums: {
       peca_status: 'disponivel' | 'vendida'
-      try_on_provider: 'fashn' | 'replicate'
+      try_on_provider: 'fashn' | 'replicate' | 'google'
       user_role: 'lojista' | 'super_admin'
     }
-    CompositeTypes: { [_ in never]: never }
-  }
-}
+    CompositeTypes: { [_ in never]: nev

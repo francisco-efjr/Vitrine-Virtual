@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Camera } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Spinner } from '@/components/ui/spinner'
+import { FotoUploader, type ExistingFoto, type FotoUploaderHandle } from '@/components/admin/foto-uploader'
 import {
   centavosToPrecoString,
   precoStringToCentavos,
@@ -29,20 +29,50 @@ export function PecaFormModal({
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  // Fotos existentes carregadas da API ao editar
+  const [existingFotos, setExistingFotos] = useState<ExistingFoto[]>([])
+  const [loadingFotos, setLoadingFotos] = useState(false)
+
+  const uploaderRef = useRef<FotoUploaderHandle>(null)
+
+  // Reset e carregamento ao abrir
   useEffect(() => {
-    if (open) {
-      setNome(peca?.nome ?? '')
-      setPreco(centavosToPrecoString(peca?.preco_centavos))
-      setTamanho(peca?.tamanho ?? '')
-      setErr(null)
+    if (!open) return
+    setNome(peca?.nome ?? '')
+    setPreco(centavosToPrecoString(peca?.preco_centavos))
+    setTamanho(peca?.tamanho ?? '')
+    setErr(null)
+    setExistingFotos([])
+
+    if (peca?.id) {
+      setLoadingFotos(true)
+      fetch(`/api/pecas/${peca.id}/fotos`)
+        .then((r) => r.json())
+        .then((data) => {
+          const fotos = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
+          setExistingFotos(fotos as ExistingFoto[])
+        })
+        .catch(() => {/* fotos não-críticas */})
+        .finally(() => setLoadingFotos(false))
     }
   }, [open, peca])
 
   async function handleSave() {
+    if (!nome.trim()) return
     setSaving(true)
     setErr(null)
+
     try {
-      const preco_centavos = preco ? precoStringToCentavos(preco) : null
+      // 1. Salva metadados (cria ou edita)
+      let preco_centavos: number | null = null
+      try {
+        preco_centavos = preco ? precoStringToCentavos(preco) : null
+      } catch {
+        setErr('Preço inválido')
+        setSaving(false)
+        return
+      }
+
       const url = peca ? `/api/pecas/${peca.id}` : '/api/pecas'
       const method = peca ? 'PATCH' : 'POST'
       const r = await fetch(url, {
@@ -59,9 +89,24 @@ export function PecaFormModal({
         setErr(data?.error?.message ?? 'Falha ao salvar peça')
         return
       }
+
+      // 2. Flush de fotos (deletes + uploads + set_principal)
+      const savedPecaId: string = data.data?.id ?? peca?.id
+      if (uploaderRef.current && savedPecaId) {
+        try {
+          await uploaderRef.current.flush(savedPecaId, peca?.foto_principal_id ?? null)
+        } catch (fotoErr) {
+          console.error('[PecaFormModal] Erro nas fotos:', fotoErr)
+          // Peça salva, fotos podem estar parcialmente aplicadas — avisa e continua
+          setErr('Peça salva! Porém houve um problema com as fotos — verifique e tente novamente.')
+          onSaved()
+          return
+        }
+      }
+
       onSaved()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Erro')
+      setErr(e instanceof Error ? e.message : 'Erro inesperado')
     } finally {
       setSaving(false)
     }
@@ -74,54 +119,8 @@ export function PecaFormModal({
       title={peca ? 'Editar peça' : 'Nova peça'}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
           <Button variant="dark" onClick={handleSave} disabled={!nome.trim() || saving}>
-            {saving ? <Spinner size={14} className="text-white" /> : null}
-            {saving ? 'Salvando...' : 'Salvar peça'}
-          </Button>
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        <Input
-          label="Nome da peça"
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          placeholder="Ex: Blusa de linho branca"
-          helper={`${nome.length}/100 caracteres`}
-          maxLength={100}
-        />
-        <div className="flex gap-3.5">
-          <Input
-            label="Preço"
-            value={preco}
-            onChange={(e) => setPreco(e.target.value)}
-            prefix="R$"
-            placeholder="89,90"
-            inputMode="decimal"
-            className="flex-1"
-          />
-          <Input
-            label="Tamanho(s)"
-            value={tamanho}
-            onChange={(e) => setTamanho(e.target.value)}
-            placeholder="P, M, G"
-            className="flex-1"
-          />
-        </div>
-        <div>
-          <label className="mb-2 block text-[13px] font-medium text-ink-2">Fotos da peça</label>
-          <div className="cursor-pointer rounded-[10px] border-2 border-dashed border-border bg-surface-2 p-7 text-center">
-            <Camera size={28} className="mx-auto mb-2 text-ink-3" />
-            <div className="mb-1 text-sm text-ink-2">Arraste fotos ou clique para selecionar</div>
-            <div className="text-xs text-ink-3">JPEG, PNG ou WebP · Máx 5 MB · Até 8 fotos</div>
-            {/* TODO: implementar upload via signed URL — POST /api/pecas/{id}/fotos */}
-          </div>
-        </div>
-        {err ? <p className="text-sm text-danger">{err}</p> : null}
-      </div>
-    </Modal>
-  )
-}
+            {saving ? <Spinner size={14} className="text-white" /> : null

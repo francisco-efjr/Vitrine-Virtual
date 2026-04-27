@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Camera, Image as ImageIcon, X, Check, MessageCircle } from 'lucide-react'
+import { Camera, Image as ImageIcon, X, Check, MessageCircle, ImageOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 
 type Step = 'choose' | 'preview' | 'loading' | 'result' | 'error'
 
 const STEPS: Array<{ id: Step; label: string }> = [
-  { id: 'choose', label: 'Escolher foto' },
+  { id: 'choose', label: 'Sua foto' },
   { id: 'preview', label: 'Confirmar' },
   { id: 'loading', label: 'Processando' },
   { id: 'result', label: 'Resultado' },
@@ -20,12 +20,23 @@ export function TryOnModal({
   pecaId,
   pecaNome,
   whatsappE164,
+  garmentImageUrl,
+  garmentThumbUrl,
 }: {
   open: boolean
   onClose: () => void
   pecaId: string
   pecaNome: string
   whatsappE164: string | null
+  /**
+   * URL assinada da peça (TTL 5 min) — enviada ao backend para a IA buscar.
+   * Se null, o backend usa o foto_principal_id da peça (fallback).
+   */
+  garmentImageUrl: string | null
+  /**
+   * URL assinada da peça (TTL 1h) — exibida como thumbnail no modal de preview.
+   */
+  garmentThumbUrl: string | null
 }) {
   const [step, setStep] = useState<Step>('choose')
   const [agreed, setAgreed] = useState(false)
@@ -78,6 +89,7 @@ export function TryOnModal({
     }
     setPhotoFile(f)
     setPhotoPreview(URL.createObjectURL(f))
+    setErrorMsg(null)
     setStep('preview')
   }
 
@@ -87,18 +99,18 @@ export function TryOnModal({
     setProgress(0)
     setErrorMsg(null)
 
-    // Animação de progresso enquanto a request acontece
     const interval = setInterval(() => {
-      setProgress((p) => Math.min(95, p + Math.random() * 7 + 2))
-    }, 400)
+      setProgress((p) => Math.min(92, p + Math.random() * 6 + 2))
+    }, 500)
 
     try {
       const formData = new FormData()
       formData.set('peca_id', pecaId)
       formData.set('consent', 'true')
-      // TODO: integrar Cloudflare Turnstile no front e popular este token
-      formData.set('turnstile_token', 'dev-bypass')
+      formData.set('turnstile_token', 'dev-bypass') // TODO: Cloudflare Turnstile real
       formData.set('foto', photoFile)
+      // Passa a URL da peça para o servidor usar como garment (opcional — fallback no servidor)
+      if (garmentImageUrl) formData.set('garment_url_override', garmentImageUrl)
 
       const res = await fetch('/api/try-on', { method: 'POST', body: formData })
       const data = await res.json()
@@ -112,7 +124,7 @@ export function TryOnModal({
       }
       setProgress(100)
       setResultUrl(data.data.result_url)
-      setTimeout(() => setStep('result'), 300)
+      setTimeout(() => setStep('result'), 350)
     } catch {
       clearInterval(interval)
       setErrorMsg('Erro de conexão. Tente novamente.')
@@ -133,16 +145,16 @@ export function TryOnModal({
       aria-modal="true"
       aria-label="Provador virtual"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,16,14,0.7)] p-5 backdrop-blur"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(20,16,14,0.7)] p-4 backdrop-blur sm:p-5"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-[480px] flex-col overflow-hidden rounded-modal bg-surface shadow-modal"
+        className="flex w-full max-w-[520px] flex-col overflow-hidden rounded-modal bg-surface shadow-modal"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <div className="font-serif text-xl font-semibold">Provador Virtual</div>
+            <div className="font-serif text-xl font-semibold">Provador Virtual ✦</div>
             <div className="mt-0.5 text-xs text-ink-3">{pecaNome}</div>
           </div>
           <button
@@ -190,25 +202,27 @@ export function TryOnModal({
 
         {/* Content */}
         <div className="min-h-[340px] px-6 pb-6 pt-2">
+
+          {/* ── STEP: choose ── */}
           {step === 'choose' ? (
             <div>
               <div className="mb-4">
-                <div className="text-sm font-medium">Como você quer enviar sua foto?</div>
+                <div className="text-sm font-medium">Envie uma foto sua para experimentar a peça</div>
                 <div className="mt-1 text-[13px] text-ink-3">
-                  Sua foto não será armazenada. É usada apenas para gerar a simulação.
+                  Sua foto não será armazenada — usada só para gerar a simulação.
                 </div>
               </div>
               <div className="mb-5 grid grid-cols-2 gap-3">
                 <ChoiceTile
                   label="Tirar foto"
-                  sub="Use a câmera agora"
+                  sub="Usar a câmera agora"
                   icon={<Camera size={28} />}
                   disabled={!agreed}
                   onClick={() => cameraInputRef.current?.click()}
                 />
                 <ChoiceTile
-                  label="Galeria"
-                  sub="Escolha do celular"
+                  label="Da galeria"
+                  sub="Escolher do celular"
                   icon={<ImageIcon size={28} />}
                   disabled={!agreed}
                   onClick={() => galleryInputRef.current?.click()}
@@ -243,12 +257,11 @@ export function TryOnModal({
                   {agreed ? <Check size={11} className="text-white" /> : null}
                 </span>
                 <span className="text-xs leading-relaxed text-ink-2">
-                  Concordo com o uso da minha foto para gerar a simulação. Ela não será armazenada
-                  após o processamento.
+                  Concordo que minha foto seja usada para gerar a simulação. Ela não será armazenada após o processamento.
                 </span>
               </button>
               <p className="text-center text-[11px] text-ink-3">
-                Dúvidas? Leia nossa{' '}
+                Leia nossa{' '}
                 <a href="/privacidade" className="text-accent underline" target="_blank">
                   política de privacidade
                 </a>
@@ -260,26 +273,41 @@ export function TryOnModal({
             </div>
           ) : null}
 
+          {/* ── STEP: preview ── */}
           {step === 'preview' && photoPreview ? (
             <div>
-              <div className="mb-3 text-sm text-ink-2">Foto selecionada:</div>
+              <div className="mb-3 text-sm text-ink-2">Confirme as fotos antes de gerar:</div>
               <div className="mb-5 grid grid-cols-2 gap-3">
+                {/* Foto do cliente */}
                 <div>
-                  <div className="mb-1.5 text-xs text-ink-3">Sua foto</div>
+                  <div className="mb-1.5 text-xs font-medium text-ink-3">Você</div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={photoPreview}
-                    alt="Foto enviada"
+                    alt="Sua foto"
                     className="h-[200px] w-full rounded-modal object-cover"
                   />
                 </div>
+
+                {/* Foto da peça */}
                 <div>
-                  <div className="mb-1.5 text-xs text-ink-3">Peça</div>
-                  <div className="flex h-[200px] items-center justify-center rounded-modal bg-[#f0ebe3] text-xs text-ink-3">
-                    {pecaNome}
-                  </div>
+                  <div className="mb-1.5 text-xs font-medium text-ink-3">Peça</div>
+                  {garmentThumbUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={garmentThumbUrl}
+                      alt={pecaNome}
+                      className="h-[200px] w-full rounded-modal object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-[200px] flex-col items-center justify-center gap-2 rounded-modal bg-[#f0ebe3]">
+                      <ImageOff size={20} className="text-ink-3" />
+                      <span className="px-2 text-center text-xs text-ink-3">{pecaNome}</span>
+                    </div>
+                  )}
                 </div>
               </div>
+
               <div className="mb-5 rounded-[10px] bg-surface-2 px-4 py-3 text-xs text-ink-2">
                 ✓ Foto validada · ✓ Formato aceito · ✓ Tamanho adequado
               </div>
@@ -294,10 +322,17 @@ export function TryOnModal({
             </div>
           ) : null}
 
+          {/* ── STEP: loading ── */}
           {step === 'loading' ? (
             <div className="flex flex-col items-center justify-center py-8">
               <div className="relative mb-6 h-20 w-20">
-                <svg width="80" height="80" viewBox="0 0 80 80" className="animate-spin" style={{ animationDuration: '2s' }}>
+                <svg
+                  width="80"
+                  height="80"
+                  viewBox="0 0 80 80"
+                  className="animate-spin"
+                  style={{ animationDuration: '2s' }}
+                >
                   <circle cx="40" cy="40" r="34" fill="none" stroke="#e6dfd6" strokeWidth="4" />
                   <circle
                     cx="40"
@@ -308,6 +343,7 @@ export function TryOnModal({
                     strokeWidth="4"
                     strokeDasharray={`${progress * 2.14} 214`}
                     strokeLinecap="round"
+                    style={{ transition: 'stroke-dasharray 0.4s ease' }}
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center font-serif text-lg font-semibold">
@@ -316,13 +352,14 @@ export function TryOnModal({
               </div>
               <div className="font-serif text-lg font-semibold">Gerando sua prova virtual</div>
               <div className="mt-2 text-center text-[13px] leading-relaxed text-ink-3">
-                Nossa IA está combinando sua foto
+                Nossa IA está combinando sua foto com a peça.
                 <br />
-                com a peça selecionada
+                Isso pode levar até 30 segundos.
               </div>
             </div>
           ) : null}
 
+          {/* ── STEP: result ── */}
           {step === 'result' && resultUrl ? (
             <div>
               <div className="mb-4 flex items-center gap-2">
@@ -335,73 +372,23 @@ export function TryOnModal({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={resultUrl}
-                  alt="Simulação gerada"
+                  alt="Simulação de você com a peça"
                   className="w-full rounded-modal border-2 border-accent"
                 />
               </div>
+              <p className="mb-4 text-center text-xs text-ink-3">
+                Esta é uma simulação de estilo — pode não ser 100% precisa. A imagem expira em 24h.
+              </p>
               <div className="flex flex-col gap-2.5">
                 {waUrl ? (
                   <a
                     href={waUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-success px-6 py-3 text-base font-medium text-white transition hover:bg-[#5a8a67]"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#25d366] px-6 py-3 text-base font-medium text-white transition hover:bg-[#1da855]"
                   >
                     <MessageCircle size={16} />
-                    Tenho interesse — falar no WhatsApp
+                    Gostei — falar no WhatsApp
                   </a>
                 ) : null}
-                <Button variant="ghost" size="sm" onClick={() => setStep('choose')}>
-                  Provar outra peça
-                </Button>
-              </div>
-              <div className="mt-3 text-center text-[11px] text-ink-3">
-                A imagem não é armazenada e expirará em 24h.
-              </div>
-            </div>
-          ) : null}
-
-          {step === 'error' ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="mb-3 text-3xl">😕</div>
-              <div className="font-serif text-lg font-semibold">Não foi possível gerar agora</div>
-              <p className="mt-2 max-w-xs text-sm text-ink-2">
-                {errorMsg ?? 'Tente novamente em alguns instantes.'}
-              </p>
-              <Button variant="dark" onClick={() => setStep('choose')} className="mt-5">
-                Tentar de novo
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ChoiceTile({
-  label,
-  sub,
-  icon,
-  onClick,
-  disabled,
-}: {
-  label: string
-  sub: string
-  icon: React.ReactNode
-  onClick: () => void
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex flex-col items-center gap-2 rounded-modal border-2 border-border bg-surface-2 p-5 text-center transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      <span className="text-ink-2">{icon}</span>
-      <span className="text-sm font-semibold">{label}</span>
-      <span className="text-xs text-ink-3">{sub}</span>
-    </button>
-  )
-}
+                <Bu
