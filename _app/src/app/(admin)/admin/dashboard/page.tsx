@@ -40,7 +40,7 @@ export default async function DashboardPage() {
         />
         <KpiCard label="Total" value={metrics.pecas_total} sub="cadastradas" icon={<List size={18} />} />
         <KpiCard
-          label="Provador IA"
+          label="Provador Virtual"
           value={`${metrics.try_ons_mes}/${metrics.cota_mensal}`}
           sub="usos este mês"
           icon={<Sparkles size={18} />}

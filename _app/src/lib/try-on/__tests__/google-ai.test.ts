@@ -39,8 +39,17 @@ describe('googleAiProvider.generate', () => {
 
     await expect(
       googleAiProvider.generate({
-        modelImage: 'data:image/jpeg;base64,Y2xpZW50ZQ==',
-        garmentImage: 'https://example.com/garment.jpg',
+        customer: {
+          selfieImage: 'data:image/jpeg;base64,Y2xpZW50ZS1yb3N0bw==',
+          fullBodyImage: 'data:image/jpeg;base64,Y2xpZW50ZS1jb3Jwbw==',
+        },
+        references: {
+          faceReferenceImage: 'data:image/jpeg;base64,Y2xpZW50ZS1yb3N0bw==',
+          bodyReferenceImage: 'data:image/jpeg;base64,Y2xpZW50ZS1jb3Jwbw==',
+        },
+        product: {
+          productImage: 'https://example.com/garment.jpg',
+        },
       }),
     ).rejects.toEqual(
       new TryOnProviderError('GOOGLE_AI_API_KEY não configurada para o Nano Banana', 'google', false),
@@ -86,8 +95,17 @@ describe('googleAiProvider.generate', () => {
     })
 
     const result = await googleAiProvider.generate({
-      modelImage: `data:image/jpeg;base64,${Buffer.from('customer-image').toString('base64')}`,
-      garmentImage: 'https://example.com/garment.jpg',
+      customer: {
+        selfieImage: `data:image/jpeg;base64,${Buffer.from('customer-selfie').toString('base64')}`,
+        fullBodyImage: `data:image/jpeg;base64,${Buffer.from('customer-full-body').toString('base64')}`,
+      },
+      references: {
+        faceReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-selfie').toString('base64')}`,
+        bodyReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-full-body').toString('base64')}`,
+      },
+      product: {
+        productImage: 'https://example.com/garment.jpg',
+      },
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -106,6 +124,15 @@ describe('googleAiProvider.generate', () => {
         }),
       }),
     )
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
+    expect(requestBody.contents[0].parts).toHaveLength(4)
+    expect(requestBody.contents[0].parts[1]?.inlineData?.data).toBe(
+      Buffer.from('customer-selfie').toString('base64'),
+    )
+    expect(requestBody.contents[0].parts[2]?.inlineData?.data).toBe(
+      Buffer.from('customer-full-body').toString('base64'),
+    )
+    expect(requestBody.contents[0].parts[3]?.inlineData?.mimeType).toBe('image/jpeg')
 
     expect(storageBucket.upload).toHaveBeenCalledWith(
       expect.stringMatching(/\.png$/),

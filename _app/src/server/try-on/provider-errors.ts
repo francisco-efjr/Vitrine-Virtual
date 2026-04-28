@@ -4,13 +4,11 @@ export interface ProviderFailureResponse {
   status: number
 }
 
-export function mapProviderFailure(message: string, nodeEnv = process.env.NODE_ENV): ProviderFailureResponse {
-  const detailSuffix = nodeEnv === 'development' ? ` (${message})` : ''
-
+export function mapProviderFailure(message: string): ProviderFailureResponse {
   if (/\b(Nano Banana|Google AI)\s+429\b/i.test(message)) {
     return {
       code: 'PROVIDER_RATE_LIMITED',
-      message: `Nano Banana indisponível no momento por limite da API. Tente novamente em instantes ou revise a cota da chave configurada.${detailSuffix}`,
+      message: 'O provador virtual está temporariamente indisponível. Tente novamente em instantes.',
       status: 503,
     }
   }
@@ -18,17 +16,14 @@ export function mapProviderFailure(message: string, nodeEnv = process.env.NODE_E
   if (/\b(Nano Banana|Google AI)\s+(401|403)\b/i.test(message)) {
     return {
       code: 'PROVIDER_AUTH_FAILED',
-      message: `Nano Banana recusou a autenticação da API. Revise a chave GOOGLE_AI_API_KEY e a disponibilidade do modelo.${detailSuffix}`,
+      message: 'O provador virtual está temporariamente indisponível. Tente novamente mais tarde.',
       status: 502,
     }
   }
 
   return {
     code: 'PROVIDER_FAILED',
-    message:
-      nodeEnv === 'development'
-        ? `Provedor falhou: ${message}`
-        : 'Não foi possível gerar a simulação agora',
+    message: 'Não foi possível gerar o provador virtual agora.',
     status: 502,
   }
 }

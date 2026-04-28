@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { tryOnRequestSchema, tryOnResultSchema } from '../try-on'
+import { tryOnClientPhotosSchema, tryOnRequestSchema, tryOnResultSchema } from '../try-on'
 
 describe('tryOnRequestSchema', () => {
   it('aceita payload válido', () => {
@@ -89,5 +89,24 @@ describe('tryOnResultSchema', () => {
       expires_at: '2026-04-26',
     })
     expect(r.success).toBe(false)
+  })
+})
+
+describe('tryOnClientPhotosSchema', () => {
+  it('exige selfie e foto de corpo inteiro', () => {
+    expect(
+      tryOnClientPhotosSchema.safeParse({
+        selfie: { name: 'selfie.webp' },
+        corpo_inteiro: { name: 'espelho.webp' },
+      }).success,
+    ).toBe(true)
+  })
+
+  it('rejeita quando uma das fotos obrigatórias não foi informada', () => {
+    expect(
+      tryOnClientPhotosSchema.safeParse({
+        selfie: { name: 'selfie.webp' },
+      }).success,
+    ).toBe(false)
   })
 })

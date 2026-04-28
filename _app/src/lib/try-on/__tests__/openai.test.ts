@@ -39,8 +39,17 @@ describe('openAiProvider.generate', () => {
 
     await expect(
       openAiProvider.generate({
-        modelImage: 'data:image/jpeg;base64,Y2xpZW50ZQ==',
-        garmentImage: 'https://example.com/garment.jpg',
+        customer: {
+          selfieImage: 'data:image/jpeg;base64,Y2xpZW50ZS1yb3N0bw==',
+          fullBodyImage: 'data:image/jpeg;base64,Y2xpZW50ZS1jb3Jwbw==',
+        },
+        references: {
+          faceReferenceImage: 'data:image/jpeg;base64,Y2xpZW50ZS1yb3N0bw==',
+          bodyReferenceImage: 'data:image/jpeg;base64,Y2xpZW50ZS1jb3Jwbw==',
+        },
+        product: {
+          productImage: 'https://example.com/garment.jpg',
+        },
       }),
     ).rejects.toEqual(new TryOnProviderError('OPENAI_API_KEY não configurada', 'openai', false))
   })
@@ -71,8 +80,17 @@ describe('openAiProvider.generate', () => {
     })
 
     const result = await openAiProvider.generate({
-      modelImage: `data:image/jpeg;base64,${Buffer.from('customer-image').toString('base64')}`,
-      garmentImage: 'https://example.com/garment.jpg',
+      customer: {
+        selfieImage: `data:image/jpeg;base64,${Buffer.from('customer-selfie').toString('base64')}`,
+        fullBodyImage: `data:image/jpeg;base64,${Buffer.from('customer-full-body').toString('base64')}`,
+      },
+      references: {
+        faceReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-selfie').toString('base64')}`,
+        bodyReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-full-body').toString('base64')}`,
+      },
+      product: {
+        productImage: 'https://example.com/garment.jpg',
+      },
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -92,6 +110,9 @@ describe('openAiProvider.generate', () => {
         body: expect.any(FormData),
       }),
     )
+    const requestBody = fetchMock.mock.calls[1]?.[1]?.body as FormData
+    expect(requestBody.getAll('image[]')).toHaveLength(3)
+    expect(requestBody.get('prompt')).toBeTruthy()
 
     expect(storageBucket.upload).toHaveBeenCalledWith(
       expect.stringMatching(/\.png$/),

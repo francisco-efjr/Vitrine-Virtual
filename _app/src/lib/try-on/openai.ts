@@ -56,7 +56,7 @@ export const openAiProvider: TryOnProvider = {
     // 1. Baixar a foto da peça antes de montar o FormData
     //    (falha rápido se a URL já estiver expirada)
     // -------------------------------------------------------------------------
-    const garmentBuffer = await fetchImageBuffer(input.garmentImage)
+    const garmentBuffer = await fetchImageBuffer(input.product.productImage)
 
     // -------------------------------------------------------------------------
     // 2. Montar FormData com as duas imagens
@@ -72,11 +72,20 @@ export const openAiProvider: TryOnProvider = {
 
     // Foto do cliente (base64 data URL → Buffer → Blob)
     // OpenAI exige array syntax: 'image[]' quando múltiplas imagens são enviadas
-    const personBuffer = Buffer.from(extractBase64FromDataUrl(input.modelImage), 'base64')
-    const personMime = extractMimeFromDataUrl(input.modelImage)
-    const personExt = mimeToExt(personMime)
-    const personBlob = new Blob([new Uint8Array(personBuffer)], { type: personMime })
-    formData.append('image[]', personBlob, `person.${personExt}`)
+    const selfieBuffer = Buffer.from(extractBase64FromDataUrl(input.references.faceReferenceImage), 'base64')
+    const selfieMime = extractMimeFromDataUrl(input.references.faceReferenceImage)
+    const selfieExt = mimeToExt(selfieMime)
+    const selfieBlob = new Blob([new Uint8Array(selfieBuffer)], { type: selfieMime })
+    formData.append('image[]', selfieBlob, `face-reference.${selfieExt}`)
+
+    const fullBodyBuffer = Buffer.from(
+      extractBase64FromDataUrl(input.references.bodyReferenceImage),
+      'base64',
+    )
+    const fullBodyMime = extractMimeFromDataUrl(input.references.bodyReferenceImage)
+    const fullBodyExt = mimeToExt(fullBodyMime)
+    const fullBodyBlob = new Blob([new Uint8Array(fullBodyBuffer)], { type: fullBodyMime })
+    formData.append('image[]', fullBodyBlob, `body-reference.${fullBodyExt}`)
 
     // Foto da peça (baixada acima)
     const garmentBlob = new Blob([new Uint8Array(garmentBuffer)], { type: 'image/jpeg' })
@@ -85,7 +94,7 @@ export const openAiProvider: TryOnProvider = {
     // -------------------------------------------------------------------------
     // 3. Chamar a API de edição de imagem
     // -------------------------------------------------------------------------
-    logger.info('OpenAI try-on: enviando request', { model, personMime })
+    logger.info('OpenAI try-on: enviando request', { model, selfieMime, fullBodyMime })
 
     const response = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',

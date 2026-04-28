@@ -39,12 +39,14 @@ export const googleAiProvider: TryOnProvider = {
 
     const t0 = Date.now()
     const model = env.GOOGLE_AI_MODEL ?? 'gemini-2.5-flash-image'
-    const personBase64 = extractBase64FromDataUrl(input.modelImage)
-    const personMime = extractMimeFromDataUrl(input.modelImage)
-    const garmentBase64 = await fetchImageAsBase64(input.garmentImage)
+    const selfieBase64 = extractBase64FromDataUrl(input.references.faceReferenceImage)
+    const selfieMime = extractMimeFromDataUrl(input.references.faceReferenceImage)
+    const fullBodyBase64 = extractBase64FromDataUrl(input.references.bodyReferenceImage)
+    const fullBodyMime = extractMimeFromDataUrl(input.references.bodyReferenceImage)
+    const garmentBase64 = await fetchImageAsBase64(input.product.productImage)
     const requestUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
-    logger.info('Nano Banana try-on: enviando request', { model, personMime })
+    logger.info('Nano Banana try-on: enviando request', { model, selfieMime, fullBodyMime })
 
     const response = await fetch(requestUrl, {
       method: 'POST',
@@ -64,8 +66,14 @@ export const googleAiProvider: TryOnProvider = {
               { text: VIRTUAL_TRYON_PROMPT },
               {
                 inlineData: {
-                  mimeType: personMime,
-                  data: personBase64,
+                  mimeType: selfieMime,
+                  data: selfieBase64,
+                },
+              },
+              {
+                inlineData: {
+                  mimeType: fullBodyMime,
+                  data: fullBodyBase64,
                 },
               },
               {

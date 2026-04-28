@@ -79,15 +79,15 @@ export default async function PecaPublicaPage({
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-12">
-        <div className="grid gap-8 sm:grid-cols-2">
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-12 sm:py-8">
+        <div className="grid gap-6 sm:gap-8 md:grid-cols-2">
           <GaleriaFotos
             fotos={fotosComUrl.map((foto) => ({ id: foto.id, url: foto.url }))}
             pecaNome={peca.nome}
           />
 
-          <div className="flex flex-col">
-            <h1 className="font-serif text-3xl font-semibold text-ink">{peca.nome}</h1>
+          <div className="flex min-w-0 flex-col">
+            <h1 className="font-serif text-2xl font-semibold text-ink sm:text-3xl">{peca.nome}</h1>
             {peca.tamanho ? <p className="mt-2 text-sm text-ink-3">Tamanho: {peca.tamanho}</p> : null}
 
             <div className="mt-5">
