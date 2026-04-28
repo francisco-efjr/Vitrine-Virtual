@@ -103,7 +103,7 @@ export class MissingFeatureEnvError extends Error {
 // =============================================================================
 
 export function getServerEnv(): ServerEnv {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && !process.env.VITEST && process.env.NODE_ENV !== 'test') {
     throw new Error('getServerEnv() não pode ser chamado no browser')
   }
   if (_serverEnv) return _serverEnv
@@ -164,4 +164,15 @@ export function isFeatureConfigured(
     case 'rate_limit':
       return !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN)
     case 'turnstile':
-      return !!env.TURNSTILE_SECRET_K
+      return !!env.TURNSTILE_SECRET_KEY
+    case 'ip_hash':
+      return !!env.IP_HASH_SALT
+    case 'sentry':
+      return !!env.SENTRY_AUTH_TOKEN
+  }
+}
+
+export function _resetEnvCache(): void {
+  _serverEnv = null
+  _publicEnv = null
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { ZodError } from 'zod'
+import { ZodError, type ZodIssue } from 'zod'
 import { logger } from '@/lib/logger'
 import { AuthError } from '@/server/auth/session'
 import { LojaError } from '@/server/lojas/errors'
@@ -23,7 +23,7 @@ export async function handleRoute<T>(fn: () => Promise<NextResponse | T>): Promi
     return ok(result)
   } catch (err) {
     if (err instanceof ZodError) {
-      return fail('Dados inválidos', 'VALIDATION_ERROR', 400)
+      return fail(formatZodErrorMessage(err.issues), 'VALIDATION_ERROR', 400)
     }
     if (err instanceof AuthError) {
       return fail(err.message, 'AUTH_ERROR', err.status)
@@ -36,4 +36,19 @@ export async function handleRoute<T>(fn: () => Promise<NextResponse | T>): Promi
     })
     return fail('Erro interno', 'INTERNAL_ERROR', 500)
   }
+}
+
+function formatZodErrorMessage(issues: ZodIssue[]): string {
+  const messages = issues
+    .map((issue) => {
+      const field = issue.path.at(0)
+      if (typeof field === 'string' && issue.message) {
+        const label = field.replace(/_/g, ' ')
+        return `${label}: ${issue.message}`
+      }
+      return issue.message
+    })
+    .filter(Boolean)
+
+  return messages[0] ?? 'Dados inválidos'
 }

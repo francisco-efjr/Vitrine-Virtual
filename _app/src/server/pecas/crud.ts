@@ -8,6 +8,7 @@ import {
 } from '@/lib/validators/peca'
 import { logger } from '@/lib/logger'
 import { PecaError, PecaNaoEncontradaError } from './errors'
+import { getPecaPreviewUrl } from './fotos'
 import type { PecaRow } from '@/types/database'
 
 export interface ListPecasOptions {
@@ -16,7 +17,14 @@ export interface ListPecasOptions {
   ordem?: 'recentes' | 'antigas'
 }
 
-export async function listOwnPecas(lojaId: string, opts: ListPecasOptions = {}): Promise<PecaRow[]> {
+export interface PecaListItem extends PecaRow {
+  foto_principal_url: string | null
+}
+
+export async function listOwnPecas(
+  lojaId: string,
+  opts: ListPecasOptions = {},
+): Promise<PecaListItem[]> {
   const supabase = createServerSupabase()
   let query = supabase.from('pecas').select('*').eq('loja_id', lojaId)
   if (opts.somenteDisponiveis) query = query.eq('status', 'disponivel')
@@ -25,7 +33,12 @@ export async function listOwnPecas(lojaId: string, opts: ListPecasOptions = {}):
 
   const { data, error } = await query
   if (error) throw error
-  return data ?? []
+  return await Promise.all(
+    (data ?? []).map(async (peca) => ({
+      ...peca,
+      foto_principal_url: await getPecaPreviewUrl(peca.id),
+    })),
+  )
 }
 
 export async function getOwnPeca(lojaId: string, pecaId: string): Promise<PecaRow> {

@@ -1,6 +1,11 @@
 import 'server-only'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
-import { fotoUploadSchema, type FotoUploadInput } from '@/lib/validators/peca'
+import {
+  fotoBase64UploadSchema,
+  fotoUploadSchema,
+  type FotoBase64UploadInput,
+  type FotoUploadInput,
+} from '@/lib/validators/peca'
 import { getOwnPeca } from './crud'
 import {
   FotoForaDaPecaError,
@@ -17,6 +22,15 @@ const EXT_MAP: Record<FotoUploadInput['contentType'], string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+}
+
+interface FotoWithPreview extends PecaFotoRow {
+  signed_url: string | null
+  is_principal: boolean
+}
+
+export interface PecaFotoPreview {
+  foto_principal_url: string | null
 }
 
 /**
@@ -61,6 +75,61 @@ export async function createSignedUploadUrl(
   }
 
   return { path, token: signed.token, ordem: proxOrdem }
+}
+
+export async function uploadFotoBase64(
+  lojaId: string,
+  pecaId: string,
+  input: FotoBase64UploadInput,
+): Promise<FotoWithPreview> {
+  const data = fotoBase64UploadSchema.parse(input)
+  const peca = await getOwnPeca(lojaId, pecaId)
+  const supabase = createServerSupabase()
+
+  const { data: existing, error: countErr } = await supabase
+    .from('pecas_fotos')
+    .select('id')
+    .eq('peca_id', pecaId)
+  if (countErr) throw countErr
+  if ((existing?.length ?? 0) >= MAX_FOTOS_POR_PECA) throw LimiteFotosExcedidoError()
+
+  const fileBuffer = dataUrlToBuffer(data.data_url, data.contentType)
+  if (fileBuffer.byteLength > MAX_FOTOS_POR_PECA * 1024 * 1024) {
+    throw new PecaError('Falha ao processar foto', 'BAD_IMAGE_BUFFER', 400)
+  }
+
+  const ext = EXT_MAP[data.contentType]
+  const fileId = crypto.randomUUID()
+  const path = `${lojaId}/${pecaId}/${fileId}.${ext}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('pecas-fotos')
+    .upload(path, fileBuffer, {
+      contentType: data.contentType,
+      upsert: false,
+    })
+
+  if (uploadError) {
+    logger.error('Erro ao subir foto base64', { code: uploadError.message })
+    throw new PecaError('Falha ao salvar foto', 'UPLOAD_FAIL', 500)
+  }
+
+  const foto = await confirmFotoUploaded(lojaId, pecaId, path, data.ordem)
+
+  const shouldBePrincipal = (existing?.length ?? 0) === 0 || peca.foto_principal_id == null
+  if (shouldBePrincipal) {
+    await setFotoPrincipal(lojaId, pecaId, foto.id)
+  }
+
+  const { data: signed } = await supabase.storage
+    .from('pecas-fotos')
+    .createSignedUrl(path, 3600)
+
+  return {
+    ...foto,
+    signed_url: signed?.signedUrl ?? null,
+    is_principal: shouldBePrincipal || peca.foto_principal_id === foto.id,
+  }
 }
 
 /**
@@ -168,5 +237,61 @@ export async function deleteFoto(lojaId: string, pecaId: string, fotoId: string)
       .from('pecas')
       .update({ foto_principal_id: outra?.id ?? null })
       .eq('id', pecaId)
+  }
+}
+
+export async function getPecaPreviewUrl(
+  pecaId: string,
+  ttlSeconds = 3600,
+): Promise<string | null> {
+  const supabase = createServerSupabase()
+  const { data: peca, error } = await supabase
+    .from('pecas')
+    .select('foto_principal_id')
+    .eq('id', pecaId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!peca?.foto_principal_id) return null
+
+  const { data: foto, error: fotoError } = await supabase
+    .from('pecas_fotos')
+    .select('storage_path')
+    .eq('id', peca.foto_principal_id)
+    .maybeSingle()
+  if (fotoError) throw fotoError
+  if (!foto?.storage_path) return null
+
+  const { data: signed, error: signedError } = await supabase.storage
+    .from('pecas-fotos')
+    .createSignedUrl(foto.storage_path, ttlSeconds)
+
+  if (signedError) {
+    logger.warn('Falha ao gerar preview da foto principal', { code: signedError.message })
+    return null
+  }
+
+  return signed?.signedUrl ?? null
+}
+
+function dataUrlToBuffer(dataUrl: string, contentType: FotoUploadInput['contentType']): Buffer {
+  const match = dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/)
+  if (!match) {
+    throw new PecaError('data_url inválido', 'INVALID_DATA_URL', 400)
+  }
+
+  const mime = match[1] as FotoUploadInput['contentType']
+  const base64 = match[2]
+  if (!base64) {
+    throw new PecaError('data_url inválido', 'INVALID_DATA_URL', 400)
+  }
+  if (mime !== contentType) {
+    throw new PecaError('MIME da foto não confere com o payload', 'MIME_MISMATCH', 400)
+  }
+
+  try {
+    return Buffer.from(base64, 'base64')
+  } catch {
+    throw new PecaError('Falha ao decodificar foto', 'BAD_BASE64', 400)
   }
 }

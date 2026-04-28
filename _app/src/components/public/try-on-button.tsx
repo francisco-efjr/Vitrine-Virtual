@@ -8,21 +8,37 @@ export function TryOnButton({
   pecaId,
   pecaNome,
   whatsappE164,
-  garmentImageUrl,
-  garmentThumbUrl,
+  garmentImageUrl = null,
+  garmentThumbUrl = null,
 }: {
   pecaId: string
   pecaNome: string
   whatsappE164: string | null
-  /** URL assinada (5 min) usada pelo servidor IA para buscar a imagem da peça. */
-  garmentImageUrl: string | null
-  /** URL assinada (1h) para exibir thumbnail da peça no modal de preview. */
-  garmentThumbUrl: string | null
+  garmentImageUrl?: string | null
+  garmentThumbUrl?: string | null
 }) {
   const [open, setOpen] = useState(false)
+
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-
+        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-dark"
+      >
+        <Sparkles size={15} />
+        Provar com IA
+      </button>
+
+      <TryOnModal
+        open={open}
+        onClose={() => setOpen(false)}
+        pecaId={pecaId}
+        pecaNome={pecaNome}
+        whatsappE164={whatsappE164}
+        garmentImageUrl={garmentImageUrl}
+        garmentThumbUrl={garmentThumbUrl}
+      />
+    </>
+  )
+}

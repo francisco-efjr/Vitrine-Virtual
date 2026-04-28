@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lojaCreateSchema, nomeToSlug, slugSchema } from '../loja'
+import { lojaCreateSchema, lojaUpdateSchema, nomeToSlug, slugSchema } from '../loja'
 
 describe('slugSchema', () => {
   it.each([
@@ -98,5 +98,28 @@ describe('lojaCreateSchema', () => {
       email: 'a@b.com',
     })
     expect(r.success).toBe(false)
+  })
+})
+
+describe('lojaUpdateSchema', () => {
+  it('normaliza instagram e tiktok removendo @', () => {
+    const result = lojaUpdateSchema.parse({
+      instagram: '@atelier.laila',
+      tiktok: '@atelier_laila',
+    })
+
+    expect(result.instagram).toBe('atelier.laila')
+    expect(result.tiktok).toBe('atelier_laila')
+  })
+
+  it('mantém mensagem clara quando WhatsApp não está em E.164', () => {
+    const result = lojaUpdateSchema.safeParse({
+      whatsapp_e164: '5511999999999',
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toMatch(/\+5511/)
+    }
   })
 })
