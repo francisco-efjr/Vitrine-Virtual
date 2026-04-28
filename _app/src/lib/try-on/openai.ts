@@ -176,9 +176,10 @@ export const openAiProvider: TryOnProvider = {
 
     if (uploadError) {
       logger.error('OpenAI try-on: falha ao salvar no storage', { code: uploadError.message })
-      throw new TryOnProviderError('Falha ao armazenar resultado', 'openai', true)
+      // Inclui o erro do Supabase na mensagem para facilitar diagnóstico
+      throw new TryOnProviderError(
+        `Falha ao armazenar resultado (storage): ${uploadError.message}`,
+        'openai',
+        true,
+      )
     }
-
-    // -------------------------------------------------------------------------
-    // 6. Gerar signed URL com 24 h de validade
-    // -----
