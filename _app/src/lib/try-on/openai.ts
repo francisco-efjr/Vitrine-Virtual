@@ -78,7 +78,7 @@ export const openAiProvider: TryOnProvider = {
 
     // -------------------------------------------------------------------------
     // 2. Montar FormData com as duas imagens
-    //    gpt-image-1 aceita múltiplos campos 'image' no multipart
+    //    gpt-image-1 exige array syntax: 'image[]' para múltiplas imagens
     // -------------------------------------------------------------------------
     const formData = new FormData()
     formData.append('model', model)
@@ -89,15 +89,16 @@ export const openAiProvider: TryOnProvider = {
     formData.append('quality', 'medium')
 
     // Foto do cliente (base64 data URL → Buffer → Blob)
+    // OpenAI exige array syntax: 'image[]' quando múltiplas imagens são enviadas
     const personBuffer = Buffer.from(extractBase64FromDataUrl(input.modelImage), 'base64')
     const personMime = extractMimeFromDataUrl(input.modelImage)
     const personExt = mimeToExt(personMime)
     const personBlob = new Blob([personBuffer], { type: personMime })
-    formData.append('image', personBlob, `person.${personExt}`)
+    formData.append('image[]', personBlob, `person.${personExt}`)
 
     // Foto da peça (baixada acima)
     const garmentBlob = new Blob([garmentBuffer], { type: 'image/jpeg' })
-    formData.append('image', garmentBlob, 'garment.jpg')
+    formData.append('image[]', garmentBlob, 'garment.jpg')
 
     // -------------------------------------------------------------------------
     // 3. Chamar a API de edição de imagem
@@ -180,5 +181,4 @@ export const openAiProvider: TryOnProvider = {
 
     // -------------------------------------------------------------------------
     // 6. Gerar signed URL com 24 h de validade
-    // -------------------------------------------------------------------------
-    const TTL = 24 * 60 * 6
+    // -----
