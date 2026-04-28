@@ -21,6 +21,8 @@ export interface TryOnSuccess {
   ok: true
   resultUrl: string
   expiresAt: string
+  // Mantemos 'google' por compatibilidade com dados/histórico, mas hoje esse fluxo
+  // representa o provider Gemini Nano Banana.
   provider: 'fashn' | 'replicate' | 'google' | 'openai'
 }
 

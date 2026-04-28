@@ -8,25 +8,7 @@ import {
   type TryOnProviderInput,
   type TryOnProviderResult,
 } from './types'
-
-const TRY_ON_PROMPT = `You are a professional fashion AI specialized in virtual try-on visualization.
-
-You will receive TWO images:
-- Image 1: The customer's photo
-- Image 2: A clothing piece from a store
-
-TASK: Generate a single realistic photo showing the customer in Image 1 wearing the clothing from Image 2.
-
-STRICT REQUIREMENTS:
-1. PERSON IDENTITY — Preserve the customer's face, hairstyle, skin tone, and body proportions exactly as they appear.
-2. CLOTHING INTEGRATION — Make the garment appear naturally draped on the body with realistic folds and shadows.
-3. SIZE & PROPORTIONS — Keep the clothing looking properly sized for this person.
-4. BODY STRUCTURE — Respect posture, pose, and body shape from the original photo.
-5. LIGHTING — Match the lighting direction and temperature of the original customer photo.
-6. BACKGROUND — Keep a background consistent with the original customer photo.
-7. STYLE GOAL — This is a fashion preview, so natural wearability is more important than pixel-perfect accuracy.
-
-Output a high-quality fashion photograph. Do not include any text, watermark, or annotations.`
+import { VIRTUAL_TRYON_PROMPT } from './prompts/virtual-try-on-prompt'
 
 interface GeminiInlineData {
   mimeType?: string
@@ -52,54 +34,60 @@ export const googleAiProvider: TryOnProvider = {
   async generate(input: TryOnProviderInput): Promise<TryOnProviderResult> {
     const env = getServerEnv()
     if (!env.GOOGLE_AI_API_KEY) {
-      throw new TryOnProviderError('GOOGLE_AI_API_KEY não configurada', 'google', false)
+      throw new TryOnProviderError('GOOGLE_AI_API_KEY não configurada para o Nano Banana', 'google', false)
     }
 
     const t0 = Date.now()
-    const model = env.GOOGLE_AI_MODEL ?? 'gemini-2.0-flash-exp'
+    const model = env.GOOGLE_AI_MODEL ?? 'gemini-2.5-flash-image'
     const personBase64 = extractBase64FromDataUrl(input.modelImage)
     const personMime = extractMimeFromDataUrl(input.modelImage)
     const garmentBase64 = await fetchImageAsBase64(input.garmentImage)
+    const requestUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GOOGLE_AI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          generationConfig: {
-            temperature: 0.4,
-            responseModalities: ['IMAGE', 'TEXT'],
-          },
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: TRY_ON_PROMPT },
-                {
-                  inlineData: {
-                    mimeType: personMime,
-                    data: personBase64,
-                  },
-                },
-                {
-                  inlineData: {
-                    mimeType: 'image/jpeg',
-                    data: garmentBase64,
-                  },
-                },
-              ],
-            },
-          ],
-        }),
+    logger.info('Nano Banana try-on: enviando request', { model, personMime })
+
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': env.GOOGLE_AI_API_KEY,
       },
-    )
+      body: JSON.stringify({
+        generationConfig: {
+          temperature: 0.4,
+          responseModalities: ['IMAGE', 'TEXT'],
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: VIRTUAL_TRYON_PROMPT },
+              {
+                inlineData: {
+                  mimeType: personMime,
+                  data: personBase64,
+                },
+              },
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: garmentBase64,
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    })
 
     if (!response.ok) {
       const body = await response.text().catch(() => '')
-      logger.warn('Google AI request falhou', { status: response.status, body: body.slice(0, 200) })
+      logger.warn('Nano Banana request falhou', {
+        status: response.status,
+        body: body.slice(0, 200),
+      })
       throw new TryOnProviderError(
-        `Google AI ${response.status}`,
+        `Nano Banana ${response.status}`,
         'google',
         response.status >= 500 || response.status === 429,
       )
@@ -111,10 +99,10 @@ export const googleAiProvider: TryOnProvider = {
     const imagePart = parts.find((part) => part.inlineData?.mimeType?.startsWith('image/'))
 
     if (!imagePart?.inlineData?.data) {
-      logger.warn('Google AI: resposta sem imagem gerada', {
+      logger.warn('Nano Banana: resposta sem imagem gerada', {
         parts: parts.map((part) => Object.keys(part).join(',')),
       })
-      throw new TryOnProviderError('Google AI não gerou imagem', 'google', true)
+      throw new TryOnProviderError('Nano Banana não gerou imagem', 'google', true)
     }
 
     const resultBase64 = imagePart.inlineData.data
@@ -134,7 +122,9 @@ export const googleAiProvider: TryOnProvider = {
       })
 
     if (uploadError) {
-      logger.error('Google AI: falha ao salvar resultado no storage', { code: uploadError.message })
+      logger.error('Nano Banana: falha ao salvar resultado no storage', {
+        code: uploadError.message,
+      })
       throw new TryOnProviderError('Falha ao armazenar resultado', 'google', true)
     }
 
@@ -143,9 +133,15 @@ export const googleAiProvider: TryOnProvider = {
       .createSignedUrl(storagePath, 24 * 60 * 60)
 
     if (signError || !signed?.signedUrl) {
-      logger.error('Google AI: falha ao gerar signed URL', { code: signError?.message })
+      logger.error('Nano Banana: falha ao gerar signed URL', { code: signError?.message })
       throw new TryOnProviderError('Falha ao gerar URL do resultado', 'google', true)
     }
+
+    logger.info('Nano Banana try-on: geração concluída', {
+      requestId,
+      durationMs: Date.now() - t0,
+      model,
+    })
 
     return {
       resultUrl: signed.signedUrl,

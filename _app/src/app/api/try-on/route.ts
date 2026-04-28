@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { extractClientIp } from '@/lib/security/ip-hash'
 import { runTryOn } from '@/server/try-on/use-case'
+import { mapProviderFailure } from '@/server/try-on/provider-errors'
 import { fail, ok } from '@/lib/api/response'
 import { logger } from '@/lib/logger'
 
@@ -83,13 +84,8 @@ export async function POST(req: NextRequest) {
       case 'provider_failed': {
         const detail = result.error.message
         logger.warn('Provider final falhou', { detail })
-        // Em desenvolvimento, devolve o erro real para facilitar debug.
-        // Em produção, mantém a mensagem genérica.
-        const clientMsg =
-          process.env.NODE_ENV === 'development'
-            ? `Provedor falhou: ${detail}`
-            : 'Não foi possível gerar a simulação agora'
-        return fail(clientMsg, 'PROVIDER_FAILED', 502)
+        const mapped = mapProviderFailure(detail)
+        return fail(mapped.message, mapped.code, mapped.status)
       }
     }
   }

@@ -2,6 +2,7 @@ import 'server-only'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getServerEnv } from '@/lib/env'
 import { logger } from '@/lib/logger'
+import { VIRTUAL_TRYON_PROMPT } from './prompts/virtual-try-on-prompt'
 import {
   TryOnProviderError,
   type TryOnProvider,
@@ -22,25 +23,6 @@ import {
  *   - 1024×1024 / quality=low    ≈ US$ 0,02–0,03 por geração
  *   - 1024×1024 / quality=medium ≈ US$ 0,06–0,08 por geração
  */
-
-const TRY_ON_PROMPT = `You are a professional fashion AI specialized in virtual try-on visualization.
-
-You will receive TWO reference images:
-- Image 1: The customer's photo (the person)
-- Image 2: A clothing piece from a fashion store (the garment)
-
-TASK: Generate a single, realistic fashion photograph showing the customer from Image 1 wearing the clothing from Image 2.
-
-STRICT REQUIREMENTS:
-1. PERSON IDENTITY — Preserve the customer's face, hairstyle, skin tone, and body proportions exactly.
-2. CLOTHING INTEGRATION — Make the garment appear naturally draped on the body with realistic folds, shadows, and texture.
-3. SIZE & PROPORTIONS — Keep the clothing properly sized for this specific person's body.
-4. BODY STRUCTURE — Respect the original posture, pose, and body shape.
-5. LIGHTING — Match the lighting direction and color temperature of the original customer photo.
-6. BACKGROUND — Keep a background consistent with the original customer photo.
-7. STYLE GOAL — This is a fashion preview; natural wearability matters more than pixel-perfect accuracy.
-
-Output a single high-quality fashion photograph. No text, watermarks, or annotations.`
 
 interface OpenAIErrorBody {
   error?: {
@@ -82,7 +64,7 @@ export const openAiProvider: TryOnProvider = {
     // -------------------------------------------------------------------------
     const formData = new FormData()
     formData.append('model', model)
-    formData.append('prompt', TRY_ON_PROMPT)
+    formData.append('prompt', VIRTUAL_TRYON_PROMPT)
     formData.append('n', '1')
     // 'auto' deixa o modelo escolher o tamanho ideal — mais compatível
     formData.append('size', 'auto')
@@ -93,11 +75,11 @@ export const openAiProvider: TryOnProvider = {
     const personBuffer = Buffer.from(extractBase64FromDataUrl(input.modelImage), 'base64')
     const personMime = extractMimeFromDataUrl(input.modelImage)
     const personExt = mimeToExt(personMime)
-    const personBlob = new Blob([personBuffer], { type: personMime })
+    const personBlob = new Blob([new Uint8Array(personBuffer)], { type: personMime })
     formData.append('image[]', personBlob, `person.${personExt}`)
 
     // Foto da peça (baixada acima)
-    const garmentBlob = new Blob([garmentBuffer], { type: 'image/jpeg' })
+    const garmentBlob = new Blob([new Uint8Array(garmentBuffer)], { type: 'image/jpeg' })
     formData.append('image[]', garmentBlob, 'garment.jpg')
 
     // -------------------------------------------------------------------------
