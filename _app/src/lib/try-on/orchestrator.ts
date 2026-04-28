@@ -1,14 +1,14 @@
 import 'server-only'
+import { logger } from '@/lib/logger'
 import { fashnProvider } from './fashn'
-import { replicateProvider } from './replicate'
 import { googleAiProvider } from './google-ai'
+import { replicateProvider } from './replicate'
 import {
   TryOnProviderError,
   type TryOnProvider,
   type TryOnProviderInput,
   type TryOnProviderResult,
 } from './types'
-import { logger } from '@/lib/logger'
 
 /**
  * Orquestrador: tenta providers em sequência até um ter sucesso.
@@ -36,4 +36,16 @@ export async function generateTryOn(
       logger.warn('Provider falhou, tentando próximo', {
         provider: provider.name,
         retriable: isRetriable,
-        message: err instanceof Error ? err.mes
+        message: err instanceof Error ? err.message : String(err),
+      })
+
+      if (!isRetriable) {
+        throw err
+      }
+    }
+  }
+
+  throw lastErr instanceof Error
+    ? lastErr
+    : new TryOnProviderError('Todos os providers falharam', 'unknown', true)
+}

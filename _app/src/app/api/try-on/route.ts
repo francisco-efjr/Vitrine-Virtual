@@ -26,6 +26,7 @@ const fieldSchema = z.object({
   turnstile_token: z.string().min(1),
   consent: z.literal('true'),
   session_id: z.string().optional(),
+  garment_url_override: z.string().url().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
     modelImage: dataUrl,
     ip,
     sessionId: parsed.data.session_id,
+    garmentImageUrlOverride: parsed.data.garment_url_override,
   })
 
   if (!result.ok) {

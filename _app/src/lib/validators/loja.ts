@@ -11,9 +11,25 @@ export const slugSchema = z
   .max(60, 'Slug muito longo (máx 60)')
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Use apenas letras minúsculas, números e hífens')
 
-export const whatsappE164Schema = z
-  .string()
-  .regex(/^\+[1-9][0-9]{6,14}$/, 'Use formato internacional (+55...)')
+function normalizeSocialHandle(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  return value.trim().replace(/^@+/, '')
+}
+
+function normalizeWhatsApp(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  return value.trim().replace(/\s+/g, '').replace(/[()-]/g, '')
+}
+
+export const whatsappE164Schema = z.preprocess(
+  normalizeWhatsApp,
+  z
+    .string()
+    .regex(
+      /^\+[1-9][0-9]{6,14}$/,
+      'WhatsApp inválido. Use o formato internacional completo, por exemplo: +5511999999999',
+    ),
+)
 
 export const lojaCreateSchema = z.object({
   nome: z.string().trim().min(1, 'Nome obrigatório').max(80, 'Máximo 80 caracteres'),
@@ -29,22 +45,27 @@ export const lojaCreateSchema = z.object({
 export type LojaCreateInput = z.infer<typeof lojaCreateSchema>
 
 export const lojaUpdateSchema = z.object({
-  nome: z.string().trim().min(1).max(80).optional(),
-  slug: slugSchema.optional(),
-  instagram: z
-    .string()
-    .trim()
-    .max(50)
-    .regex(/^[a-zA-Z0-9._]*$/, 'Apenas letras, números, ponto e underscore')
-    .optional()
-    .or(z.literal('')),
-  tiktok: z
-    .string()
-    .trim()
-    .max(50)
-    .regex(/^[a-zA-Z0-9._]*$/, 'Apenas letras, números, ponto e underscore')
-    .optional()
-    .or(z.literal('')),
+  nome: z.string().trim().min(1, 'Nome da loja é obrigatório').max(80, 'Nome da loja muito longo').optional(),
+  instagram: z.preprocess(
+    normalizeSocialHandle,
+    z
+      .string()
+      .trim()
+      .max(50, 'Instagram muito longo')
+      .regex(/^[a-zA-Z0-9._]*$/, 'Instagram inválido. Use apenas letras, números, ponto e underscore')
+      .optional()
+      .or(z.literal('')),
+  ),
+  tiktok: z.preprocess(
+    normalizeSocialHandle,
+    z
+      .string()
+      .trim()
+      .max(50, 'TikTok muito longo')
+      .regex(/^[a-zA-Z0-9._]*$/, 'TikTok inválido. Use apenas letras, números, ponto e underscore')
+      .optional()
+      .or(z.literal('')),
+  ),
   whatsapp_e164: whatsappE164Schema.optional().or(z.literal('')),
   exibir_preco_publico: z.boolean().optional(),
 })

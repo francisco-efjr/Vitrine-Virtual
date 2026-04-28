@@ -48,11 +48,14 @@ describe('handleRoute()', () => {
 
   it('mapeia ZodError para 400', async () => {
     const res = await handleRoute(async () => {
-      z.string().parse(123) // throws ZodError
+      z.object({ whatsapp_e164: z.string().regex(/^\+/, 'Inclua o + no WhatsApp') }).parse({
+        whatsapp_e164: '5511999999999',
+      })
     })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(body.error.message).toContain('whatsapp e164')
   })
 
   it('mapeia AuthError para o status do erro', async () => {

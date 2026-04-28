@@ -28,4 +28,6 @@ export class TryOnProviderError extends Error {
     public readonly retriable: boolean = false,
   ) {
     super(message)
-    this.name = 'TryOnProviderEr
+    this.name = 'TryOnProviderError'
+  }
+}

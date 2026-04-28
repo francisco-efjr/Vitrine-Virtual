@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   const metrics = await getDashboardMetrics(session.loja.id, session.loja.cota_try_on_mensal)
 
   const cotaPct = Math.min(100, Math.round((metrics.try_ons_mes / metrics.cota_mensal) * 100))
-  const nomeCurto = session.profile.nome_completo?.split(' ')[0] ?? 'lá'
+  const nomeCurto = session.profile.nome_completo?.split(' ')[0] ?? 'la'
 
   return (
     <div className="max-w-[900px] p-9">

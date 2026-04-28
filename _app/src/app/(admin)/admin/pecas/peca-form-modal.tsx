@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { FotoUploader, type ExistingFoto, type FotoUploaderHandle } from '@/components/admin/foto-uploader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Spinner } from '@/components/ui/spinner'
-import { FotoUploader, type ExistingFoto, type FotoUploaderHandle } from '@/components/admin/foto-uploader'
 import {
   centavosToPrecoString,
   precoStringToCentavos,
@@ -28,33 +28,32 @@ export function PecaFormModal({
   const [tamanho, setTamanho] = useState('')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-
-  // Fotos existentes carregadas da API ao editar
   const [existingFotos, setExistingFotos] = useState<ExistingFoto[]>([])
   const [loadingFotos, setLoadingFotos] = useState(false)
-
   const uploaderRef = useRef<FotoUploaderHandle>(null)
 
-  // Reset e carregamento ao abrir
   useEffect(() => {
     if (!open) return
+
     setNome(peca?.nome ?? '')
     setPreco(centavosToPrecoString(peca?.preco_centavos))
     setTamanho(peca?.tamanho ?? '')
     setErr(null)
     setExistingFotos([])
 
-    if (peca?.id) {
-      setLoadingFotos(true)
-      fetch(`/api/pecas/${peca.id}/fotos`)
-        .then((r) => r.json())
-        .then((data) => {
-          const fotos = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
-          setExistingFotos(fotos as ExistingFoto[])
-        })
-        .catch(() => {/* fotos não-críticas */})
-        .finally(() => setLoadingFotos(false))
-    }
+    if (!peca?.id) return
+
+    setLoadingFotos(true)
+    fetch(`/api/pecas/${peca.id}/fotos`)
+      .then((res) => res.json())
+      .then((data) => {
+        const fotos = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
+        setExistingFotos(fotos as ExistingFoto[])
+      })
+      .catch(() => {
+        setErr('Nao foi possivel carregar as fotos atuais da peca.')
+      })
+      .finally(() => setLoadingFotos(false))
   }, [open, peca])
 
   async function handleSave() {
@@ -63,50 +62,48 @@ export function PecaFormModal({
     setErr(null)
 
     try {
-      // 1. Salva metadados (cria ou edita)
-      let preco_centavos: number | null = null
+      let precoCentavos: number | null = null
       try {
-        preco_centavos = preco ? precoStringToCentavos(preco) : null
+        precoCentavos = preco ? precoStringToCentavos(preco) : null
       } catch {
-        setErr('Preço inválido')
+        setErr('Preco invalido')
         setSaving(false)
         return
       }
 
       const url = peca ? `/api/pecas/${peca.id}` : '/api/pecas'
       const method = peca ? 'PATCH' : 'POST'
-      const r = await fetch(url, {
+      const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nome: nome.trim(),
-          preco_centavos,
+          preco_centavos: precoCentavos,
           tamanho: tamanho.trim() || null,
         }),
       })
-      const data = await r.json()
-      if (!r.ok || !data.ok) {
-        setErr(data?.error?.message ?? 'Falha ao salvar peça')
+
+      const data = await response.json()
+      if (!response.ok || !data.ok) {
+        setErr(data?.error?.message ?? 'Falha ao salvar peca')
         return
       }
 
-      // 2. Flush de fotos (deletes + uploads + set_principal)
-      const savedPecaId: string = data.data?.id ?? peca?.id
+      const savedPecaId = (data.data?.id ?? peca?.id) as string | undefined
       if (uploaderRef.current && savedPecaId) {
         try {
           await uploaderRef.current.flush(savedPecaId, peca?.foto_principal_id ?? null)
         } catch (fotoErr) {
           console.error('[PecaFormModal] Erro nas fotos:', fotoErr)
-          // Peça salva, fotos podem estar parcialmente aplicadas — avisa e continua
-          setErr('Peça salva! Porém houve um problema com as fotos — verifique e tente novamente.')
+          setErr('Peca salva, mas houve um problema ao aplicar as fotos.')
           onSaved()
           return
         }
       }
 
       onSaved()
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Erro inesperado')
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'Erro inesperado')
     } finally {
       setSaving(false)
     }
@@ -123,4 +120,61 @@ export function PecaFormModal({
             Cancelar
           </Button>
           <Button variant="dark" onClick={handleSave} disabled={!nome.trim() || saving}>
-            {saving ? <Spinner size={14} className="text-white" /> : null
+            {saving ? <Spinner size={14} className="text-white" /> : null}
+            {saving ? 'Salvando...' : 'Salvar'}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Input
+          label="Nome"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          placeholder="Ex: Blazer de linho"
+          disabled={saving}
+        />
+
+        <Input
+          label="Preço"
+          value={preco}
+          onChange={(e) => setPreco(e.target.value)}
+          placeholder="89,90"
+          disabled={saving}
+          inputMode="decimal"
+          helper="Opcional. Aceita 89,90 ou 89.90."
+        />
+
+        <Input
+          label="Tamanho"
+          value={tamanho}
+          onChange={(e) => setTamanho(e.target.value)}
+          placeholder="Ex: P, M, 38"
+          disabled={saving}
+          helper="Opcional."
+        />
+
+        <div className="rounded-card border border-border bg-surface-2 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-ink">Fotos</div>
+              <div className="text-xs text-ink-3">
+                Adicione, remova e escolha a foto principal da peça.
+              </div>
+            </div>
+            {loadingFotos ? <span className="text-xs text-ink-3">Carregando...</span> : null}
+          </div>
+
+          <FotoUploader
+            ref={uploaderRef}
+            pecaId={peca?.id ?? null}
+            initialFotos={existingFotos}
+            disabled={saving}
+          />
+        </div>
+
+        {err ? <p className="text-sm text-danger">{err}</p> : null}
+      </div>
+    </Modal>
+  )
+}

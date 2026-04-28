@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   centavosToPrecoString,
+  fotoBase64UploadSchema,
   formatPreco,
   pecaCreateSchema,
   precoStringToCentavos,
@@ -66,6 +67,34 @@ describe('pecaCreateSchema', () => {
   it('rejeita preço negativo', () => {
     expect(
       pecaCreateSchema.safeParse({ nome: 'X', preco_centavos: -1 }).success,
+    ).toBe(false)
+  })
+})
+
+describe('fotoBase64UploadSchema', () => {
+  it('aceita data URL base64 de imagem válida', () => {
+    expect(
+      fotoBase64UploadSchema.safeParse({
+        action: 'upload_base64',
+        filename: 'camisa.jpg',
+        contentType: 'image/jpeg',
+        size: 128,
+        ordem: 0,
+        data_url: 'data:image/jpeg;base64,ZmFrZS1pbWFnZS1ieXRlcw==',
+      }).success,
+    ).toBe(true)
+  })
+
+  it('rejeita data URL com mime inválido', () => {
+    expect(
+      fotoBase64UploadSchema.safeParse({
+        action: 'upload_base64',
+        filename: 'camisa.gif',
+        contentType: 'image/png',
+        size: 128,
+        ordem: 0,
+        data_url: 'data:image/gif;base64,ZmFrZQ==',
+      }).success,
     ).toBe(false)
   })
 })

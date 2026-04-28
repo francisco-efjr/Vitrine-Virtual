@@ -22,7 +22,6 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nome: loja.nome,
-        slug: loja.slug,
         instagram: loja.instagram ?? '',
         tiktok: loja.tiktok ?? '',
         whatsapp_e164: loja.whatsapp_e164 ?? '',
@@ -37,6 +36,12 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
     }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  function normalizeWhatsApp(value: string) {
+    const compact = value.trim().replace(/\s+/g, '').replace(/[()-]/g, '')
+    if (!compact) return ''
+    return compact.startsWith('+') ? compact : `+${compact}`
   }
 
   return (
@@ -57,13 +62,6 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
             onChange={(e) => setLoja({ ...loja, nome: e.target.value })}
             maxLength={80}
           />
-          <Input
-            label="Slug da vitrine"
-            value={loja.slug}
-            onChange={(e) => setLoja({ ...loja, slug: e.target.value })}
-            prefix="vitrine.app/v/"
-            helper="Apenas letras minúsculas, números e hífens."
-          />
         </div>
       </Card>
 
@@ -76,9 +74,9 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
             label="WhatsApp"
             value={loja.whatsapp_e164 ?? ''}
             onChange={(e) => setLoja({ ...loja, whatsapp_e164: e.target.value })}
-            prefix="+"
-            placeholder="5511998765432"
-            helper="Formato internacional, só dígitos: +55 11 9..."
+            onBlur={(e) => setLoja({ ...loja, whatsapp_e164: normalizeWhatsApp(e.target.value) })}
+            placeholder="+5511998765432"
+            helper="Use o número completo com código do país. Exemplo: +5511998765432"
           />
           <Input
             label="Instagram"

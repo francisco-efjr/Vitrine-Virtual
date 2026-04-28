@@ -11,13 +11,15 @@ import { PecaFormModal } from './peca-form-modal'
 import { formatPreco } from '@/lib/validators/peca'
 import type { PecaRow } from '@/types/database'
 
+type PecaListItem = PecaRow & { foto_principal_url: string | null }
+
 export function PecasListClient({
   initialPecas,
   title,
   showAll,
   children,
 }: {
-  initialPecas: PecaRow[]
+  initialPecas: PecaListItem[]
   title: string
   showAll: boolean
   children?: React.ReactNode
@@ -27,7 +29,7 @@ export function PecasListClient({
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [modalOpen, setModalOpen] = useState(false)
-  const [editPeca, setEditPeca] = useState<PecaRow | null>(null)
+  const [editPeca, setEditPeca] = useState<PecaListItem | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const filtered = initialPecas.filter((p) => p.nome.toLowerCase().includes(search.toLowerCase()))
@@ -102,7 +104,16 @@ export function PecasListClient({
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           {filtered.map((p) => (
             <Card key={p.id} hoverable className="overflow-hidden">
-              <div className="h-[200px] w-full bg-[#f0ebe3]" aria-hidden="true" />
+              <div className="h-[200px] w-full bg-[#f0ebe3]" aria-hidden="true">
+                {p.foto_principal_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={p.foto_principal_url}
+                    alt={p.nome}
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+              </div>
               <div className="p-4">
                 <div className="mb-1.5 flex items-start justify-between gap-1.5">
                   <span className="text-sm font-medium leading-snug">{p.nome}</span>
@@ -155,7 +166,16 @@ export function PecasListClient({
                 i < filtered.length - 1 ? 'border-b border-border' : ''
               }`}
             >
-              <div className="h-12 w-12 shrink-0 rounded-lg bg-[#f0ebe3]" aria-hidden="true" />
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#f0ebe3]" aria-hidden="true">
+                {p.foto_principal_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={p.foto_principal_url}
+                    alt={p.nome}
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+              </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium">{p.nome}</div>
                 <div className="mt-0.5 text-xs text-ink-3">{p.tamanho ?? '—'}</div>

@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation'
 import { Sparkles, MessageCircle } from 'lucide-react'
+import Link from 'next/link'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { PublicLiveRefresh } from '@/components/public/public-live-refresh'
 import { formatPreco } from '@/lib/validators/peca'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
-import { TryOnButton } from '@/components/public/try-on-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +24,7 @@ interface VitrineData {
     tamanho: string | null
     preco_centavos: number | null
     foto_principal_path: string | null
+    foto_principal_url?: string | null
   }>
 }
 
@@ -33,6 +36,23 @@ async function loadVitrine(slug: string): Promise<VitrineData | null> {
   ])
   const loja = lojaArr?.[0]
   if (!loja) return null
+  const service = createServiceClient()
+  const pecas = await Promise.all(
+    (pecasArr ?? []).map(async (peca: VitrineData['pecas'][number]) => {
+      let fotoPrincipalUrl: string | null = null
+      if (peca.foto_principal_path) {
+        const { data } = await service.storage
+          .from('pecas-fotos')
+          .createSignedUrl(peca.foto_principal_path, 3600)
+        fotoPrincipalUrl = data?.signedUrl ?? null
+      }
+
+      return {
+        ...peca,
+        foto_principal_url: fotoPrincipalUrl,
+      }
+    }),
+  )
   return {
     loja: {
       nome: loja.nome,
@@ -42,7 +62,7 @@ async function loadVitrine(slug: string): Promise<VitrineData | null> {
       whatsapp_e164: loja.whatsapp_e164,
       exibir_preco_publico: loja.exibir_preco_publico,
     },
-    pecas: pecasArr ?? [],
+    pecas,
   }
 }
 
@@ -66,6 +86,7 @@ export default async function VitrinePage({ params }: { params: { slug: string }
 
   return (
     <div className="min-h-screen bg-bg">
+      <PublicLiveRefresh />
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-border bg-surface px-4 py-4 sm:px-12">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 sm:flex-row sm:justify-between">
@@ -140,12 +161,20 @@ export default async function VitrinePage({ params }: { params: { slug: string }
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5">
             {data.pecas.map((p) => (
-              <div
+              <Link
                 key={p.peca_id}
+                href={`/v/${data.loja.slug}/peca/${p.peca_id}`}
                 className="overflow-hidden rounded-card bg-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover"
               >
                 <div className="aspect-[4/5] w-full bg-[#f0ebe3]" aria-hidden="true">
-                  {/* TODO: signed URL ou public URL para foto principal */}
+                  {p.foto_principal_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.foto_principal_url}
+                      alt={p.nome}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
                 </div>
                 <div className="p-3 sm:p-4">
                   <div className="text-sm font-medium leading-snug">{p.nome}</div>
@@ -160,14 +189,14 @@ export default async function VitrinePage({ params }: { params: { slug: string }
                     ) : (
                       <span className="text-xs text-ink-3">Consulte</span>
                     )}
-                    <TryOnButton
-                      pecaId={p.peca_id}
-                      pecaNome={p.nome}
-                      whatsappE164={data.loja.whatsapp_e164}
-                    />
+                    <span
+                      className="inline-flex items-center rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white"
+                    >
+                      Ver peça
+                    </span>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

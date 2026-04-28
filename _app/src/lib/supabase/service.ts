@@ -1,6 +1,5 @@
 import 'server-only'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
 import { getServerEnv } from '@/lib/env'
 
 /**
@@ -15,7 +14,7 @@ import { getServerEnv } from '@/lib/env'
  */
 export function createServiceClient() {
   const env = getServerEnv()
-  return createSupabaseClient<Database>(
+  return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     env.SUPABASE_SERVICE_ROLE_KEY,
     {

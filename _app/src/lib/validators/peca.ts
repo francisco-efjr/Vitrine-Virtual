@@ -28,7 +28,9 @@ export type PecaUpdateInput = z.infer<typeof pecaUpdateSchema>
 export function precoStringToCentavos(input: string): number | null {
   const trimmed = input.trim()
   if (!trimmed) return null
-  const normalized = trimmed.replace(/\./g, '').replace(',', '.')
+  const normalized = trimmed.includes(',')
+    ? trimmed.replace(/\./g, '').replace(',', '.')
+    : trimmed
   const num = Number(normalized)
   if (!Number.isFinite(num) || num < 0) {
     throw new Error('Preço inválido')
@@ -55,3 +57,15 @@ export const fotoUploadSchema = z.object({
   size: z.number().int().min(1).max(5 * 1024 * 1024, 'Foto maior que 5 MB'),
 })
 export type FotoUploadInput = z.infer<typeof fotoUploadSchema>
+
+export const fotoBase64DataUrlSchema = z.string().regex(
+  /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/,
+  'data_url inválido',
+)
+
+export const fotoBase64UploadSchema = fotoUploadSchema.extend({
+  action: z.literal('upload_base64'),
+  data_url: fotoBase64DataUrlSchema,
+  ordem: z.number().int().min(0),
+})
+export type FotoBase64UploadInput = z.infer<typeof fotoBase64UploadSchema>

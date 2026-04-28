@@ -1,7 +1,3 @@
-// Tipos gerados automaticamente do schema Supabase via:
-//   pnpm supabase:types
-// Não editar à mão.
-
 export type Json =
   | string
   | number
@@ -10,10 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
-  __InternalSupabase: {
-    PostgrestVersion: '14.5'
-  }
+export interface Database {
   public: {
     Tables: {
       lojas: {
@@ -74,7 +67,6 @@ export type Database = {
           preco_centavos: number | null
           status: Database['public']['Enums']['peca_status']
           tamanho: string | null
-          updated_at: string
           vendida_em: string | null
         }
         Insert: {
@@ -86,7 +78,6 @@ export type Database = {
           preco_centavos?: number | null
           status?: Database['public']['Enums']['peca_status']
           tamanho?: string | null
-          updated_at?: string
           vendida_em?: string | null
         }
         Update: {
@@ -98,79 +89,52 @@ export type Database = {
           preco_centavos?: number | null
           status?: Database['public']['Enums']['peca_status']
           tamanho?: string | null
-          updated_at?: string
           vendida_em?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: 'pecas_foto_principal_fk'
-            columns: ['foto_principal_id']
-            isOneToOne: false
-            referencedRelation: 'pecas_fotos'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'pecas_loja_id_fkey'
-            columns: ['loja_id']
-            isOneToOne: false
-            referencedRelation: 'lojas'
-            referencedColumns: ['id']
-          },
-        ]
+        Relationships: []
       }
       pecas_fotos: {
         Row: {
-          created_at: string
           id: string
           ordem: number
           peca_id: string
           storage_path: string
         }
         Insert: {
-          created_at?: string
           id?: string
-          ordem?: number
+          ordem: number
           peca_id: string
           storage_path: string
         }
         Update: {
-          created_at?: string
           id?: string
           ordem?: number
           peca_id?: string
           storage_path?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: 'pecas_fotos_peca_id_fkey'
-            columns: ['peca_id']
-            isOneToOne: false
-            referencedRelation: 'pecas'
-            referencedColumns: ['id']
-          },
-        ]
+        Relationships: []
       }
       profiles: {
         Row: {
           created_at: string
           id: string
           nome_completo: string | null
-          role: Database['public']['Enums']['user_role']
           updated_at: string
+          role: Database['public']['Enums']['user_role']
         }
         Insert: {
           created_at?: string
           id: string
           nome_completo?: string | null
-          role?: Database['public']['Enums']['user_role']
           updated_at?: string
+          role?: Database['public']['Enums']['user_role']
         }
         Update: {
           created_at?: string
           id?: string
           nome_completo?: string | null
-          role?: Database['public']['Enums']['user_role']
           updated_at?: string
+          role?: Database['public']['Enums']['user_role']
         }
         Relationships: []
       }
@@ -235,22 +199,7 @@ export type Database = {
           session_id?: string | null
           success?: boolean
         }
-        Relationships: [
-          {
-            foreignKeyName: 'try_on_uses_loja_id_fkey'
-            columns: ['loja_id']
-            isOneToOne: false
-            referencedRelation: 'lojas'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'try_on_uses_peca_id_fkey'
-            columns: ['peca_id']
-            isOneToOne: false
-            referencedRelation: 'pecas'
-            referencedColumns: ['id']
-          },
-        ]
+        Relationships: []
       }
     }
     Views: { [_ in never]: never }
@@ -299,4 +248,18 @@ export type Database = {
       try_on_provider: 'fashn' | 'replicate' | 'google'
       user_role: 'lojista' | 'super_admin'
     }
-    CompositeTypes: { [_ in never]: nev
+    CompositeTypes: { [_ in never]: never }
+  }
+}
+
+type PublicSchema = Database['public']
+
+export type Tables<T extends keyof PublicSchema['Tables']> = PublicSchema['Tables'][T]['Row']
+export type TablesInsert<T extends keyof PublicSchema['Tables']> = PublicSchema['Tables'][T]['Insert']
+export type TablesUpdate<T extends keyof PublicSchema['Tables']> = PublicSchema['Tables'][T]['Update']
+export type Enum<T extends keyof PublicSchema['Enums']> = PublicSchema['Enums'][T]
+
+export type LojaRow = Tables<'lojas'>
+export type PecaRow = Tables<'pecas'>
+export type PecaFotoRow = Tables<'pecas_fotos'>
+export type ProfilesRow = Tables<'profiles'>

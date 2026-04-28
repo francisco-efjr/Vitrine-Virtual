@@ -35,6 +35,7 @@ export function GaleriaFotos({
   }
 
   const active = fotos[activeIdx]
+  if (!active) return null
   const hasMultiple = fotos.length > 1
 
   function prev() {

@@ -27,7 +27,7 @@ export interface FotoUploaderHandle {
   /**
    * Executa todas as operações pendentes:
    *   1. Delete fotos marcadas para remoção
-   *   2. Upload de fotos novas (via signed URL do Supabase)
+   *   2. Upload de fotos novas em base64 via API da aplicação
    *   3. Atualiza foto principal se mudou
    *
    * Deve ser chamado APÓS salvar os metadados da peça (para ter o pecaId).
@@ -108,10 +108,15 @@ export const FotoUploader = forwardRef<
       // 2. Upload de fotos novas
       const remaining = existing.filter((f) => !f.toDelete)
       const startOrdem = remaining.length
+      let uploadedPendingPrincipalId: string | null = null
 
       for (let i = 0; i < pending.length; i++) {
         const pf = pending[i]
-        await uploadFoto(targetPecaId, pf.file, startOrdem + i)
+        if (!pf) continue
+        const uploaded = await uploadFoto(targetPecaId, pf.file, startOrdem + i)
+        if (pf.isPrincipal) {
+          uploadedPendingPrincipalId = uploaded.id
+        }
       }
 
       // 3. Ajustar foto principal
@@ -130,9 +135,13 @@ export const FotoUploader = forwardRef<
           body: JSON.stringify({ action: 'set_principal', foto_id: newPrincipalExisting.id }),
         })
       }
-      // Se o principal é uma foto nova, foi definido como principal pelo confirmFotoUploaded
-      // automaticamente se for a primeira — caso contrário o uploadFoto precisa marcar.
-      // (A lógica de "primeira foto vira principal" já existe no backend.)
+      if (newPrincipalPending && uploadedPendingPrincipalId) {
+        await fetch(`/api/pecas/${targetPecaId}/fotos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'set_principal', foto_id: uploadedPendingPrincipalId }),
+        })
+      }
     },
   }))
 
@@ -186,8 +195,9 @@ export const FotoUploader = forwardRef<
     setPending((prev) => {
       const updated = [...prev, ...newPending]
       // Primeira foto da lista vira principal se não há existentes
-      if (existing.filter((f) => !f.toDelete).length === 0 && updated.length > 0) {
-        updated[0] = { ...updated[0], isPrincipal: true }
+      const firstPending = updated[0]
+      if (existing.filter((f) => !f.toDelete).length === 0 && firstPending) {
+        updated[0] = { ...firstPending, isPrincipal: true }
       }
       return updated
     })
@@ -222,8 +232,9 @@ export const FotoUploader = forwardRef<
       const updated = prev.filter((p) => p.tempId !== tempId)
       // Se removeu o principal e ainda há fotos, promove a primeira
       const wasPrincipal = removed?.isPrincipal
-      if (wasPrincipal && updated.length > 0) {
-        updated[0] = { ...updated[0], isPrincipal: true }
+      const firstPending = updated[0]
+      if (wasPrincipal && firstPending) {
+        updated[0] = { ...firstPending, isPrincipal: true }
       }
       return updated
     })
@@ -413,39 +424,44 @@ function FotoThumbnail({
 }
 
 // =============================================================================
-// Upload helper — fluxo: sign → PUT → confirm
+// Upload helper — fluxo: file -> data URL base64 -> API -> storage
 // =============================================================================
 
-async function uploadFoto(pecaId: string, file: File, ordem: number): Promise<void> {
-  // 1. Pede URL assinada ao servidor
-  const signRes = await fetch(`/api/pecas/${pecaId}/fotos`, {
+async function uploadFoto(
+  pecaId: string,
+  file: File,
+  ordem: number,
+): Promise<{ id: string; signed_url: string | null; is_principal: boolean }> {
+  const dataUrl = await fileToDataUrl(file)
+
+  const uploadRes = await fetch(`/api/pecas/${pecaId}/fotos`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      action: 'upload_base64',
       filename: file.name,
       contentType: file.type,
       size: file.size,
+      ordem,
+      data_url: dataUrl,
     }),
   })
-  if (!signRes.ok) throw new Error('Falha ao obter URL de upload')
-  const { data } = await signRes.json()
-  const { path, token } = data as { path: string; token: string; ordem: number }
+  if (!uploadRes.ok) throw new Error('Falha ao enviar foto')
+  const { data } = await uploadRes.json()
+  return data as { id: string; signed_url: string | null; is_principal: boolean }
+}
 
-  // 2. Upload direto para o Supabase Storage
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const uploadUrl = `${supabaseUrl}/storage/v1/object/pecas-fotos/${path}?token=${token}`
-  const uploadRes = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': file.type },
-    body: file,
+async function fileToDataUrl(file: File): Promise<string> {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Falha ao converter foto para base64'))
+        return
+      }
+      resolve(reader.result)
+    }
+    reader.onerror = () => reject(new Error('Falha ao ler foto'))
+    reader.readAsDataURL(file)
   })
-  if (!uploadRes.ok) throw new Error('Falha no upload para o storage')
-
-  // 3. Confirma upload no banco
-  const confirmRes = await fetch(`/api/pecas/${pecaId}/fotos`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'confirm', storage_path: path, ordem }),
-  })
-  if (!confirmRes.ok) throw new Error('Falha ao confirmar upload')
 }

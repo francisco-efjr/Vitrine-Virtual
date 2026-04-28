@@ -1,13 +1,13 @@
 import 'server-only'
-import { createServiceClient } from '@/lib/supabase/service'
 import { logger } from '@/lib/logger'
+import { hashIp } from '@/lib/security/ip-hash'
+import { createServiceClient } from '@/lib/supabase/service'
+import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
 import { generateTryOn } from '@/lib/try-on/orchestrator'
 import { checkTryOnRateLimit } from '@/lib/try-on/rate-limit'
 import { verifyTurnstileToken } from '@/lib/try-on/turnstile'
-import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
-import { hashIp } from '@/lib/security/ip-hash'
-import { checkLojaQuota } from './quota'
 import type { TryOnProviderInput } from '@/lib/try-on/types'
+import { checkLojaQuota } from './quota'
 
 export type TryOnError =
   | { kind: 'kill_switch_off' }
@@ -32,6 +32,7 @@ export interface RunTryOnInput {
   modelImage: string
   ip: string
   sessionId?: string
+  garmentImageUrlOverride?: string | null
 }
 
 /**
@@ -49,18 +50,15 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   const ipHash = hashIp(input.ip)
   const t0 = Date.now()
 
-  // CAMADA 4: kill switch global
   if (!(await isTryOnEnabled())) {
     return { ok: false, error: { kind: 'kill_switch_off' } }
   }
 
-  // CAMADA 1: Turnstile
   const turnstileOk = await verifyTurnstileToken(input.turnstileToken, input.ip)
   if (!turnstileOk) {
     return { ok: false, error: { kind: 'turnstile_failed' } }
   }
 
-  // CAMADA 2: rate limit por IP
   const rl = await checkTryOnRateLimit(ipHash)
   if (!rl.ok) {
     return {
@@ -69,7 +67,6 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     }
   }
 
-  // Carrega peça + loja para validar e pegar foto principal
   const { data: peca } = await supabase
     .from('pecas')
     .select('id, nome, status, loja_id, foto_principal_id')
@@ -85,9 +82,11 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     .select('id, ativa, cota_try_on_mensal')
     .eq('id', peca.loja_id)
     .single()
-  if (!loja?.ativa) return { ok: false, error: { kind: 'peca_unavailable' } }
 
-  // CAMADA 3: cota mensal por loja
+  if (!loja?.ativa) {
+    return { ok: false, error: { kind: 'peca_unavailable' } }
+  }
+
   const quota = await checkLojaQuota(loja.id, loja.cota_try_on_mensal)
   if (!quota.ok) {
     return {
@@ -96,14 +95,14 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     }
   }
 
-  // Pega URL pública da foto principal da peça
-  let garmentUrl = ''
-  if (peca.foto_principal_id) {
+  let garmentUrl = input.garmentImageUrlOverride ?? ''
+  if (!garmentUrl && peca.foto_principal_id) {
     const { data: foto } = await supabase
       .from('pecas_fotos')
       .select('storage_path')
       .eq('id', peca.foto_principal_id)
       .single()
+
     if (foto?.storage_path) {
       const { data: signed } = await supabase.storage
         .from('pecas-fotos')
@@ -111,6 +110,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       garmentUrl = signed?.signedUrl ?? ''
     }
   }
+
   if (!garmentUrl) {
     return { ok: false, error: { kind: 'peca_unavailable' } }
   }
@@ -123,7 +123,6 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   try {
     const result = await generateTryOn(providerInput)
 
-    // Log SANITIZADO — sem foto, sem IP cru, sem URL do resultado.
     await supabase.from('try_on_uses').insert({
       loja_id: loja.id,
       peca_id: peca.id,
@@ -149,6 +148,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+
     await supabase.from('try_on_uses').insert({
       loja_id: loja.id,
       peca_id: peca.id,
@@ -158,5 +158,8 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       error_code: 'provider_failed',
       duration_ms: Date.now() - t0,
     })
+
     logger.warn('Try-on falhou', { message })
-    return { ok: false, error: { kind: 'provider_failed', message
+    return { ok: false, error: { kind: 'provider_failed', message } }
+  }
+}
