@@ -52,13 +52,13 @@ export function Modal({
       role="dialog"
       aria-modal="true"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(30,26,23,0.55)] p-5 backdrop-blur-[3px]"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(30,26,23,0.55)] p-0 backdrop-blur-[3px] sm:items-center sm:p-5"
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: width }}
         className={cn(
-          'flex max-h-[90vh] w-full flex-col rounded-modal bg-surface shadow-modal',
+          'flex max-h-[92vh] w-full flex-col rounded-t-[22px] bg-surface shadow-modal sm:rounded-modal',
         )}
       >
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
@@ -74,7 +74,7 @@ export function Modal({
         </div>
         <div className="flex-1 overflow-y-auto p-6">{children}</div>
         {footer ? (
-          <div className="flex justify-end gap-2.5 border-t border-border px-6 py-4">
+          <div className="flex flex-wrap justify-end gap-2.5 border-t border-border px-4 py-4 sm:px-6">
             {footer}
           </div>
         ) : null}

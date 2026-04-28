@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { IMAGE_MAX_UPLOAD_BYTES } from '@/lib/images/upload'
 
 export const pecaStatusSchema = z.enum(['disponivel', 'vendida'])
 export type PecaStatus = z.infer<typeof pecaStatusSchema>
@@ -54,7 +55,7 @@ export function formatPreco(centavos: number | null | undefined): string {
 export const fotoUploadSchema = z.object({
   filename: z.string().min(1).max(200),
   contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-  size: z.number().int().min(1).max(5 * 1024 * 1024, 'Foto maior que 5 MB'),
+  size: z.number().int().min(1).max(IMAGE_MAX_UPLOAD_BYTES, 'Foto maior que 10 MB'),
 })
 export type FotoUploadInput = z.infer<typeof fotoUploadSchema>
 

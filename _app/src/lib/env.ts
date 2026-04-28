@@ -37,9 +37,9 @@ const serverSchema = z.object({
   FASHN_API_BASE_URL: z.string().url().default('https://api.fashn.ai/v1'),
   REPLICATE_API_TOKEN: z.string().min(1).optional(),
   REPLICATE_VTON_MODEL: z.string().min(1).optional(),
-  // Google AI (Gemini) — provider de try-on via Google AI Studio
+  // Google AI (Gemini Nano Banana) — provider de try-on via Google AI Studio
   GOOGLE_AI_API_KEY: z.string().min(1).optional(),
-  GOOGLE_AI_MODEL: z.string().min(1).default('gemini-2.0-flash-exp'),
+  GOOGLE_AI_MODEL: z.string().min(1).default('gemini-2.5-flash-image'),
   // OpenAI — provider de try-on via gpt-image-1 (multi-image edits API)
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_IMAGE_MODEL: z.string().min(1).default('gpt-image-1'),

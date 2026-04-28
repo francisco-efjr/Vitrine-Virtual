@@ -49,15 +49,15 @@ export function PecasListClient({
   }
 
   return (
-    <div className="p-9">
-      <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+    <div className="p-4 sm:p-6 lg:p-9">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-serif text-[26px] font-semibold text-ink">{title}</h1>
           <p className="mt-1 text-sm text-ink-2">
             {filtered.length} {filtered.length === 1 ? 'peça encontrada' : 'peças encontradas'}
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-wrap items-center gap-3">
           {children}
           <Button
             variant="dark"
@@ -72,7 +72,7 @@ export function PecasListClient({
         </div>
       </div>
 
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="relative max-w-sm flex-1">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
           <input
@@ -103,18 +103,18 @@ export function PecasListClient({
       {view === 'grid' ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           {filtered.map((p) => (
-            <Card key={p.id} hoverable className="overflow-hidden">
-              <div className="h-[200px] w-full bg-[#f0ebe3]" aria-hidden="true">
+            <Card key={p.id} hoverable className="flex h-full flex-col overflow-hidden">
+              <div className="aspect-square w-full bg-[#f0ebe3]" aria-hidden="true">
                 {p.foto_principal_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={p.foto_principal_url}
                     alt={p.nome}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover object-center"
                   />
                 ) : null}
               </div>
-              <div className="p-4">
+              <div className="flex flex-1 flex-col p-4">
                 <div className="mb-1.5 flex items-start justify-between gap-1.5">
                   <span className="text-sm font-medium leading-snug">{p.nome}</span>
                   <Badge
@@ -122,11 +122,13 @@ export function PecasListClient({
                     variant={p.status}
                   />
                 </div>
-                {p.tamanho ? <div className="mb-1 text-xs text-ink-3">{p.tamanho}</div> : null}
-                <div className="mb-3 font-serif text-lg font-semibold">
-                  {formatPreco(p.preco_centavos) || <span className="text-ink-3 text-sm">sem preço</span>}
+                <div className="min-h-[36px]">
+                  {p.tamanho ? <div className="mb-1 text-xs text-ink-3">{p.tamanho}</div> : null}
+                  <div className="font-serif text-lg font-semibold">
+                    {formatPreco(p.preco_centavos) || <span className="text-sm text-ink-3">Consulte</span>}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="mt-auto flex flex-wrap gap-2 pt-4">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -158,21 +160,21 @@ export function PecasListClient({
           )}
         </div>
       ) : (
-        <Card>
+          <Card>
           {filtered.map((p, i) => (
             <div
               key={p.id}
-              className={`flex items-center gap-4 px-5 py-3.5 ${
+              className={`flex flex-wrap items-center gap-4 px-4 py-3.5 sm:px-5 ${
                 i < filtered.length - 1 ? 'border-b border-border' : ''
               }`}
             >
-              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#f0ebe3]" aria-hidden="true">
+              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[#f0ebe3]" aria-hidden="true">
                 {p.foto_principal_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={p.foto_principal_url}
                     alt={p.nome}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover object-center"
                   />
                 ) : null}
               </div>
@@ -180,7 +182,7 @@ export function PecasListClient({
                 <div className="text-sm font-medium">{p.nome}</div>
                 <div className="mt-0.5 text-xs text-ink-3">{p.tamanho ?? '—'}</div>
               </div>
-              <div className="font-serif text-base font-semibold">
+              <div className="font-serif text-base font-semibold sm:ml-auto">
                 {formatPreco(p.preco_centavos) || '—'}
               </div>
               <Badge

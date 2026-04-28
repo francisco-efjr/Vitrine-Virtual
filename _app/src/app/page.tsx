@@ -15,7 +15,7 @@ export default function HomePage() {
       <main className="flex-1 flex items-center justify-center px-6 py-16">
         <div className="max-w-2xl text-center space-y-6">
           <h1 className="font-serif text-5xl font-semibold text-ink leading-tight">
-            A vitrine online da sua loja, com provador virtual por IA.
+            A vitrine online da sua loja, com provador virtual.
           </h1>
           <p className="text-lg text-ink-2 max-w-xl mx-auto">
             Mostre suas peças, deixe seus clientes provarem virtualmente e converse direto no

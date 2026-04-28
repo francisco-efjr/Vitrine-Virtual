@@ -27,7 +27,7 @@ export function TryOnButton({
         className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-dark"
       >
         <Sparkles size={15} />
-        Provar com IA
+        Abrir provador virtual
       </button>
 
       <TryOnModal

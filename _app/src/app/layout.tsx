@@ -20,7 +20,7 @@ const dmsans = DM_Sans({
 export const metadata: Metadata = {
   title: 'Vitrine Virtual',
   description:
-    'A vitrine online da sua loja de roupas, com provador virtual por IA e link direto para WhatsApp.',
+    'A vitrine online da sua loja de roupas, com provador virtual e link direto para WhatsApp.',
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
 }
 

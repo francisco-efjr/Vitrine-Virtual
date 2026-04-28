@@ -2,6 +2,7 @@ import 'server-only'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getServerEnv } from '@/lib/env'
 import { logger } from '@/lib/logger'
+import { VIRTUAL_TRYON_PROMPT } from './prompts/virtual-try-on-prompt'
 import {
   TryOnProviderError,
   type TryOnProvider,
@@ -22,25 +23,6 @@ import {
  *   - 1024×1024 / quality=low    ≈ US$ 0,02–0,03 por geração
  *   - 1024×1024 / quality=medium ≈ US$ 0,06–0,08 por geração
  */
-
-const TRY_ON_PROMPT = `You are a professional fashion AI specialized in virtual try-on visualization.
-
-You will receive TWO reference images:
-- Image 1: The customer's photo (the person)
-- Image 2: A clothing piece from a fashion store (the garment)
-
-TASK: Generate a single, realistic fashion photograph showing the customer from Image 1 wearing the clothing from Image 2.
-
-STRICT REQUIREMENTS:
-1. PERSON IDENTITY — Preserve the customer's face, hairstyle, skin tone, and body proportions exactly.
-2. CLOTHING INTEGRATION — Make the garment appear naturally draped on the body with realistic folds, shadows, and texture.
-3. SIZE & PROPORTIONS — Keep the clothing properly sized for this specific person's body.
-4. BODY STRUCTURE — Respect the original posture, pose, and body shape.
-5. LIGHTING — Match the lighting direction and color temperature of the original customer photo.
-6. BACKGROUND — Keep a background consistent with the original customer photo.
-7. STYLE GOAL — This is a fashion preview; natural wearability matters more than pixel-perfect accuracy.
-
-Output a single high-quality fashion photograph. No text, watermarks, or annotations.`
 
 interface OpenAIErrorBody {
   error?: {
@@ -74,7 +56,7 @@ export const openAiProvider: TryOnProvider = {
     // 1. Baixar a foto da peça antes de montar o FormData
     //    (falha rápido se a URL já estiver expirada)
     // -------------------------------------------------------------------------
-    const garmentBuffer = await fetchImageBuffer(input.garmentImage)
+    const garmentBuffer = await fetchImageBuffer(input.product.productImage)
 
     // -------------------------------------------------------------------------
     // 2. Montar FormData com as duas imagens
@@ -82,7 +64,7 @@ export const openAiProvider: TryOnProvider = {
     // -------------------------------------------------------------------------
     const formData = new FormData()
     formData.append('model', model)
-    formData.append('prompt', TRY_ON_PROMPT)
+    formData.append('prompt', VIRTUAL_TRYON_PROMPT)
     formData.append('n', '1')
     // 'auto' deixa o modelo escolher o tamanho ideal — mais compatível
     formData.append('size', 'auto')
@@ -90,20 +72,29 @@ export const openAiProvider: TryOnProvider = {
 
     // Foto do cliente (base64 data URL → Buffer → Blob)
     // OpenAI exige array syntax: 'image[]' quando múltiplas imagens são enviadas
-    const personBuffer = Buffer.from(extractBase64FromDataUrl(input.modelImage), 'base64')
-    const personMime = extractMimeFromDataUrl(input.modelImage)
-    const personExt = mimeToExt(personMime)
-    const personBlob = new Blob([personBuffer], { type: personMime })
-    formData.append('image[]', personBlob, `person.${personExt}`)
+    const selfieBuffer = Buffer.from(extractBase64FromDataUrl(input.references.faceReferenceImage), 'base64')
+    const selfieMime = extractMimeFromDataUrl(input.references.faceReferenceImage)
+    const selfieExt = mimeToExt(selfieMime)
+    const selfieBlob = new Blob([new Uint8Array(selfieBuffer)], { type: selfieMime })
+    formData.append('image[]', selfieBlob, `face-reference.${selfieExt}`)
+
+    const fullBodyBuffer = Buffer.from(
+      extractBase64FromDataUrl(input.references.bodyReferenceImage),
+      'base64',
+    )
+    const fullBodyMime = extractMimeFromDataUrl(input.references.bodyReferenceImage)
+    const fullBodyExt = mimeToExt(fullBodyMime)
+    const fullBodyBlob = new Blob([new Uint8Array(fullBodyBuffer)], { type: fullBodyMime })
+    formData.append('image[]', fullBodyBlob, `body-reference.${fullBodyExt}`)
 
     // Foto da peça (baixada acima)
-    const garmentBlob = new Blob([garmentBuffer], { type: 'image/jpeg' })
+    const garmentBlob = new Blob([new Uint8Array(garmentBuffer)], { type: 'image/jpeg' })
     formData.append('image[]', garmentBlob, 'garment.jpg')
 
     // -------------------------------------------------------------------------
     // 3. Chamar a API de edição de imagem
     // -------------------------------------------------------------------------
-    logger.info('OpenAI try-on: enviando request', { model, personMime })
+    logger.info('OpenAI try-on: enviando request', { model, selfieMime, fullBodyMime })
 
     const response = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',

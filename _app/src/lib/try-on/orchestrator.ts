@@ -3,7 +3,6 @@ import { logger } from '@/lib/logger'
 import { isFeatureConfigured } from '@/lib/env'
 import { fashnProvider } from './fashn'
 import { googleAiProvider } from './google-ai'
-import { openAiProvider } from './openai'
 import { replicateProvider } from './replicate'
 import {
   TryOnProviderError,
@@ -16,10 +15,9 @@ import {
  * Orquestrador: tenta providers em sequência até um ter sucesso.
  *
  * Ordem de prioridade (baseada nas keys configuradas no .env.local):
- *   1. FASHN.ai      — primário (melhor qualidade, especializado em fashion)
- *   2. OpenAI        — secundário (gpt-image-1, boa qualidade geral)
- *   3. Google Gemini — terciário (Gemini 2.0 Flash, custo-benefício)
- *   4. Replicate     — último recurso (IDM-VTON, latência maior)
+ *   1. FASHN.ai           — primário (melhor qualidade, especializado em fashion)
+ *   2. Nano Banana        — secundário (Gemini 2.5 Flash Image, custo/latência bons)
+ *   3. Replicate          — último recurso (IDM-VTON, latência maior)
  *
  * Providers sem key configurada são pulados silenciosamente antes de tentar.
  * A ordem pode ser sobrescrita no teste passando `providers` explicitamente.
@@ -31,14 +29,13 @@ function buildDefaultProviders(): TryOnProvider[] {
   // Cada provider só entra na lista se tiver key configurada.
   // Isso evita tentativas desnecessárias que resultariam em erro non-retriable.
   if (isFeatureConfigured('try_on_fashn')) providers.push(fashnProvider)
-  if (isFeatureConfigured('try_on_openai')) providers.push(openAiProvider)
   if (isFeatureConfigured('try_on_google')) providers.push(googleAiProvider)
   if (isFeatureConfigured('try_on_replicate')) providers.push(replicateProvider)
 
   // Fallback: inclui todos (cada um vai lançar erro non-retriable se sem key)
   // Isso garante mensagem de erro clara em vez de "lista vazia".
   if (providers.length === 0) {
-    providers.push(fashnProvider, openAiProvider, googleAiProvider, replicateProvider)
+    providers.push(fashnProvider, googleAiProvider, replicateProvider)
   }
 
   return providers
