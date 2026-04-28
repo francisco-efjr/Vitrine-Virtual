@@ -86,4 +86,17 @@ export async function POST(req: NextRequest) {
         // Em desenvolvimento, devolve o erro real para facilitar debug.
         // Em produção, mantém a mensagem genérica.
         const clientMsg =
-          process.env.NODE_ENV === 'devel
+          process.env.NODE_ENV === 'development'
+            ? `Provedor falhou: ${detail}`
+            : 'Não foi possível gerar a simulação agora'
+        return fail(clientMsg, 'PROVIDER_FAILED', 502)
+      }
+    }
+  }
+
+  return ok({
+    result_url: result.resultUrl,
+    expires_at: result.expiresAt,
+    provider: result.provider,
+  })
+}

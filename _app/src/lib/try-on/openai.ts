@@ -183,3 +183,62 @@ export const openAiProvider: TryOnProvider = {
         true,
       )
     }
+
+    // -------------------------------------------------------------------------
+    // 6. Gerar signed URL com 24 h de validade
+    // -------------------------------------------------------------------------
+    const TTL = 24 * 60 * 60
+
+    const { data: signed, error: signError } = await supabase.storage
+      .from('try-on-results')
+      .createSignedUrl(storagePath, TTL)
+
+    if (signError || !signed?.signedUrl) {
+      logger.error('OpenAI try-on: falha ao gerar signed URL', { code: signError?.message })
+      throw new TryOnProviderError('Falha ao gerar URL do resultado', 'openai', true)
+    }
+
+    const durationMs = Date.now() - t0
+    logger.info('OpenAI try-on: geração concluída', { requestId, durationMs, model })
+
+    return {
+      resultUrl: signed.signedUrl,
+      requestId,
+      durationMs,
+      expiresAt: new Date(Date.now() + TTL * 1000).toISOString(),
+    }
+  },
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+function extractBase64FromDataUrl(dataUrl: string): string {
+  const comma = dataUrl.indexOf(',')
+  return comma === -1 ? dataUrl : dataUrl.slice(comma + 1)
+}
+
+function extractMimeFromDataUrl(dataUrl: string): string {
+  const match = dataUrl.match(/^data:([^;]+);/)
+  return match?.[1] ?? 'image/jpeg'
+}
+
+function mimeToExt(mime: string): string {
+  if (mime === 'image/png') return 'png'
+  if (mime === 'image/webp') return 'webp'
+  if (mime === 'image/gif') return 'gif'
+  return 'jpg'
+}
+
+async function fetchImageBuffer(url: string): Promise<Buffer> {
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new TryOnProviderError(
+      `Falha ao baixar imagem (${res.status}): ${url.slice(0, 80)}`,
+      'openai',
+      res.status >= 500,
+    )
+  }
+  return Buffer.from(await res.arrayBuffer())
+}

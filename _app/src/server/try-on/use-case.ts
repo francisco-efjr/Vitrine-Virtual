@@ -160,4 +160,6 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     })
 
     logger.warn('Try-on falhou', { message })
-    return { ok: false, error: { kind: 'provider_failed', message
+    return { ok: false, error: { kind: 'provider_failed', message } }
+  }
+}
