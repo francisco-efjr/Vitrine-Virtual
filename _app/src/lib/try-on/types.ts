@@ -17,7 +17,7 @@ export interface TryOnProviderResult {
 }
 
 export interface TryOnProvider {
-  readonly name: 'fashn' | 'replicate' | 'google'
+  readonly name: 'fashn' | 'replicate' | 'google' | 'openai'
   generate(input: TryOnProviderInput): Promise<TryOnProviderResult>
 }
 
