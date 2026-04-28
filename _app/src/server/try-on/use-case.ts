@@ -21,7 +21,7 @@ export interface TryOnSuccess {
   ok: true
   resultUrl: string
   expiresAt: string
-  provider: 'fashn' | 'replicate' | 'google'
+  provider: 'fashn' | 'replicate' | 'google' | 'openai'
 }
 
 export type TryOnResult = TryOnSuccess | { ok: false; error: TryOnError }
@@ -160,6 +160,4 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     })
 
     logger.warn('Try-on falhou', { message })
-    return { ok: false, error: { kind: 'provider_failed', message } }
-  }
-}
+    return { ok: false, error: { kind: 'provider_failed', message
