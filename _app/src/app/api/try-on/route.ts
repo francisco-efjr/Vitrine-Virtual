@@ -80,9 +80,17 @@ export async function POST(req: NextRequest) {
         )
       case 'peca_unavailable':
         return fail('Peça indisponível', 'PECA_UNAVAILABLE', 404)
-      case 'provider_failed':
-        logger.warn('Provider final falhou', { msg: result.error.message })
-        return fail('Não foi possível gerar a simulação agora', 'PROVIDER_FAILED', 502)
+      case 'provider_failed': {
+        const detail = result.error.message
+        logger.warn('Provider final falhou', { detail })
+        // Em desenvolvimento, devolve o erro real para facilitar debug.
+        // Em produção, mantém a mensagem genérica.
+        const clientMsg =
+          process.env.NODE_ENV === 'development'
+            ? `Provedor falhou: ${detail}`
+            : 'Não foi possível gerar a simulação agora'
+        return fail(clientMsg, 'PROVIDER_FAILED', 502)
+      }
     }
   }
 

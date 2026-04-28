@@ -21,7 +21,7 @@ export interface TryOnSuccess {
   ok: true
   resultUrl: string
   expiresAt: string
-  provider: 'fashn' | 'replicate' | 'google'
+  provider: 'fashn' | 'replicate' | 'google' | 'openai'
 }
 
 export type TryOnResult = TryOnSuccess | { ok: false; error: TryOnError }
