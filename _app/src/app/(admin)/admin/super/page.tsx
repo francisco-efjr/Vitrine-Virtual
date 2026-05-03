@@ -23,22 +23,22 @@ export default async function SuperAdminPage() {
 
   return (
     <div className="min-h-screen bg-bg">
-      <header className="border-b border-border bg-surface px-8 py-4">
-        <div className="flex items-center justify-between">
+      <header className="border-b border-border bg-surface px-4 py-4 sm:px-8">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="font-serif text-xl font-semibold">Super-admin</span>
             <Badge label="Francisco" variant="admin" />
           </div>
         </div>
       </header>
-      <main className="px-9 py-8">
+      <main className="px-4 py-6 sm:px-6 sm:py-8 lg:px-9">
         <h1 className="mb-4 font-serif text-[26px] font-semibold">Visão geral da plataforma</h1>
         <section className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <KpiBlock label="Lojas ativas" value={lojas.filter((l) => l.ativa).length} sub={`de ${lojas.length} cadastradas`} />
           <KpiBlock label="Peças na plataforma" value={totalPecas} sub="em todas as vitrines" />
           <KpiBlock label="Peças vendidas" value={totalVendidas} sub="total" color="success" />
           <KpiBlock
-            label="Try-ons este mês"
+            label="Provadores no mês"
             value={totalTryOns}
             sub={`≈ US$ ${estCost} estimado`}
             color="warning"

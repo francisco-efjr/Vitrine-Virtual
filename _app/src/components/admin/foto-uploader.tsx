@@ -2,7 +2,8 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Camera, Star, Trash2, Upload } from 'lucide-react'
-import imageCompression from 'browser-image-compression'
+import { preparePreviewableImage } from '@/lib/images/client-standardize'
+import { IMAGE_INVALID_FORMAT_MESSAGE, IMAGE_MAX_UPLOAD_BYTES } from '@/lib/images/upload'
 
 // =============================================================================
 // Types
@@ -39,8 +40,6 @@ export interface FotoUploaderHandle {
 // FotoUploader
 // =============================================================================
 
-const ACCEPTED_MIMES = ['image/jpeg', 'image/png', 'image/webp']
-const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB (limite do bucket)
 const MAX_FOTOS = 8
 
 export const FotoUploader = forwardRef<
@@ -156,12 +155,8 @@ export const FotoUploader = forwardRef<
     const accepted: File[] = []
 
     for (const file of Array.from(files)) {
-      if (!ACCEPTED_MIMES.includes(file.type)) {
-        errs.push(`"${file.name}" — formato não aceito (use JPEG, PNG ou WebP)`)
-        continue
-      }
-      if (file.size > MAX_SIZE_BYTES) {
-        errs.push(`"${file.name}" — maior que 5 MB`)
+      if (file.size > IMAGE_MAX_UPLOAD_BYTES) {
+        errs.push(`"${file.name}" — a imagem deve ter no máximo 10 MB`)
         continue
       }
       accepted.push(file)
@@ -175,22 +170,27 @@ export const FotoUploader = forwardRef<
 
     setErrors(errs)
 
-    const newPending: PendingFoto[] = await Promise.all(
-      accepted.map(async (file) => {
-        // Comprime client-side antes de mostrar preview e antes do upload
-        const compressed = await imageCompression(file, {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1600,
-          useWebWorker: true,
-        }).catch(() => file) // se falhar, usa original
-        return {
+    const newPending: PendingFoto[] = []
+
+    for (const file of accepted) {
+      try {
+        const prepared = await preparePreviewableImage(file)
+        newPending.push({
           tempId: crypto.randomUUID(),
-          file: compressed,
-          preview: URL.createObjectURL(compressed),
+          file: prepared.file,
+          preview: prepared.previewUrl,
           isPrincipal: false,
-        }
-      }),
-    )
+        })
+      } catch (error) {
+        errs.push(
+          `"${file.name}" — ${
+            error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE
+          }`,
+        )
+      }
+    }
+
+    setErrors(errs)
 
     setPending((prev) => {
       const updated = [...prev, ...newPending]
@@ -267,12 +267,12 @@ export const FotoUploader = forwardRef<
             Arraste fotos ou clique para selecionar
           </div>
           <div className="text-xs text-ink-3">
-            JPEG, PNG ou WebP · Máx 5 MB · Até {MAX_FOTOS} fotos ({totalFotos()}/{MAX_FOTOS})
+            JPG, JPEG, PNG, HEIC ou WEBP · Máx 10 MB · Até {MAX_FOTOS} fotos ({totalFotos()}/{MAX_FOTOS})
           </div>
           <input
             ref={inputRef}
             type="file"
-            accept={ACCEPTED_MIMES.join(',')}
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
             multiple
             hidden
             onChange={(e) => e.target.files && handleFiles(e.target.files)}
@@ -293,7 +293,7 @@ export const FotoUploader = forwardRef<
 
       {/* Grade de fotos */}
       {(existing.length > 0 || pending.length > 0) && (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {/* Existentes */}
           {existing.map((foto) => (
             <FotoThumbnail
@@ -333,7 +333,7 @@ export const FotoUploader = forwardRef<
       )}
 
       <p className="mt-2 text-[11px] text-ink-3">
-        ⭐ Estrela = foto principal (aparece na listagem e no provador IA)
+        ⭐ Estrela = foto principal (aparece na listagem e no provador virtual)
       </p>
     </div>
   )
@@ -372,7 +372,7 @@ function FotoThumbnail({
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="h-full w-full object-cover" />
+        <img src={src} alt="" className="h-full w-full object-cover object-center" />
       ) : (
         <div className="h-full w-full bg-[#f0ebe3]" />
       )}

@@ -1,8 +1,19 @@
 export interface TryOnProviderInput {
-  /** Foto do cliente final em base64 (data URL ou URL pública). */
-  modelImage: string
-  /** URL pública da foto principal da peça. */
-  garmentImage: string
+  customer: {
+    /** Selfie do cliente usada como referência principal do rosto. */
+    selfieImage: string
+    /** Foto de corpo inteiro usada como referência principal do corpo/postura. */
+    fullBodyImage: string
+  }
+  references: {
+    /** Alias explícito para integração com providers que separam face/body reference. */
+    faceReferenceImage: string
+    bodyReferenceImage: string
+  }
+  product: {
+    /** URL pública da imagem da peça. */
+    productImage: string
+  }
 }
 
 export interface TryOnProviderResult {
@@ -17,7 +28,7 @@ export interface TryOnProviderResult {
 }
 
 export interface TryOnProvider {
-  readonly name: 'fashn' | 'replicate' | 'google'
+  readonly name: 'fashn' | 'replicate' | 'google' | 'openai'
   generate(input: TryOnProviderInput): Promise<TryOnProviderResult>
 }
 

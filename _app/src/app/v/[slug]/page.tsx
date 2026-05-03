@@ -136,12 +136,12 @@ export default async function VitrinePage({ params }: { params: { slug: string }
 
       {/* Hero */}
       <div className="bg-accent-light px-4 py-4 sm:px-12">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-1 sm:flex-row">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
           <div className="font-serif text-sm font-medium text-accent-dark sm:text-base">
             <Sparkles size={14} className="mr-1.5 inline" />
-            Provador virtual com IA — experimente antes de comprar
+            Provador Virtual — experimente antes de comprar
           </div>
-          <div className="text-xs text-accent-dark hidden sm:block">
+          <div className="text-xs text-accent-dark">
             Toque em qualquer peça para provar
           </div>
         </div>
@@ -149,7 +149,7 @@ export default async function VitrinePage({ params }: { params: { slug: string }
 
       {/* Grid */}
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-12 sm:py-10">
-        <div className="mb-5 flex items-center justify-between">
+        <div className="mb-5 flex items-center justify-between gap-3">
           <h2 className="font-serif text-xl font-medium sm:text-[22px]">Peças disponíveis</h2>
           <span className="text-xs text-ink-3 sm:text-sm">{data.pecas.length} itens</span>
         </div>
@@ -164,24 +164,24 @@ export default async function VitrinePage({ params }: { params: { slug: string }
               <Link
                 key={p.peca_id}
                 href={`/v/${data.loja.slug}/peca/${p.peca_id}`}
-                className="overflow-hidden rounded-card bg-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover"
+                className="flex h-full flex-col overflow-hidden rounded-card bg-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover"
               >
-                <div className="aspect-[4/5] w-full bg-[#f0ebe3]" aria-hidden="true">
+                <div className="aspect-square w-full bg-[#f0ebe3]" aria-hidden="true">
                   {p.foto_principal_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={p.foto_principal_url}
                       alt={p.nome}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover object-center"
                     />
                   ) : null}
                 </div>
-                <div className="p-3 sm:p-4">
+                <div className="flex flex-1 flex-col p-3 sm:p-4">
                   <div className="text-sm font-medium leading-snug">{p.nome}</div>
                   {p.tamanho ? (
                     <div className="mt-1 text-xs text-ink-3">{p.tamanho}</div>
                   ) : null}
-                  <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                     {data.loja.exibir_preco_publico && p.preco_centavos != null ? (
                       <span className="font-serif text-base font-semibold sm:text-lg">
                         {formatPreco(p.preco_centavos)}

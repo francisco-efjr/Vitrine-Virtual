@@ -92,7 +92,7 @@ export function SuperAdminClient({
               </div>
               <div className="min-w-[120px]">
                 <div className="mb-1 flex justify-between text-[11px] text-ink-3">
-                  <span>Provador IA</span>
+                  <span>Provador Virtual</span>
                   <span className={cotaPct > 80 ? 'text-danger' : ''}>
                     {loja.try_ons_mes}/{loja.cota_try_on_mensal}
                   </span>
@@ -126,7 +126,7 @@ export function SuperAdminClient({
           }`}
         >
           <div>
-            <div className="text-base font-semibold">Kill switch global — Provador IA</div>
+            <div className="text-base font-semibold">Kill switch global — Provador Virtual</div>
             <div className="mt-1 text-xs text-ink-2">
               Desligar desativa o provador em <strong>todas</strong> as lojas imediatamente.
             </div>
@@ -138,7 +138,7 @@ export function SuperAdminClient({
         </div>
         <div className="flex items-end gap-3">
           <Input
-            label="Orçamento mensal total de IA (US$)"
+            label="Orçamento mensal total do provador virtual (US$)"
             value={budget}
             onChange={(e) => setBudget(e.target.value)}
             type="number"
@@ -259,7 +259,7 @@ function CreateLojaModal({
             helper="Gerado automaticamente do nome, pode editar."
           />
           <Input
-            label="Cota mensal de try-ons"
+            label="Cota mensal do provador virtual"
             value={cota}
             onChange={(e) => setCota(e.target.value)}
             type="number"

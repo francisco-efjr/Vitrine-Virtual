@@ -1,8 +1,10 @@
 # ADR 0002 — Provador IA: FASHN.ai (primário) + Replicate IDM-VTON (fallback)
 
-> **Status:** Aceita
-> **Data:** 2026-04-25
+> **Status:** Substituída por [[0011-nano-banana-substitui-fashn|ADR 0011]] (em 02/05/2026)
+> **Data original:** 2026-04-25
 > **Decisores:** Francisco (cliente/PO) + Claude
+>
+> ⚠️ **Esta ADR não vale mais como decisão ativa.** A escolha de provider mudou para Gemini 2.5 Flash Image (Nano Banana). O documento permanece para histórico — as 4 camadas anti-abuso ([[0004-anti-abuso-quatro-camadas]]), a regra de privacidade ([[0006-privacidade-foto-cliente-final]]) e o teto de US$ 0,15/geração continuam valendo, originados aqui.
 
 ## Contexto
 

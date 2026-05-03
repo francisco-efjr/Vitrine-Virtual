@@ -9,9 +9,19 @@ export const tryOnRequestSchema = z.object({
 })
 export type TryOnRequest = z.infer<typeof tryOnRequestSchema>
 
+export const tryOnClientPhotosSchema = z.object({
+  selfie: z.object({
+    name: z.string().min(1),
+  }),
+  corpo_inteiro: z.object({
+    name: z.string().min(1),
+  }),
+})
+export type TryOnClientPhotos = z.infer<typeof tryOnClientPhotosSchema>
+
 export const tryOnResultSchema = z.object({
   result_url: z.string().url(),
-  provider: z.enum(['fashn', 'replicate']),
+  provider: z.enum(['fashn', 'replicate', 'google', 'openai']),
   duration_ms: z.number().int().nonnegative(),
   expires_at: z.string().datetime(),
 })

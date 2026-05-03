@@ -4,9 +4,9 @@ import { hashIp } from '@/lib/security/ip-hash'
 import { createServiceClient } from '@/lib/supabase/service'
 import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
 import { generateTryOn } from '@/lib/try-on/orchestrator'
+import { buildTryOnProviderInput } from '@/lib/try-on/payload'
 import { checkTryOnRateLimit } from '@/lib/try-on/rate-limit'
 import { verifyTurnstileToken } from '@/lib/try-on/turnstile'
-import type { TryOnProviderInput } from '@/lib/try-on/types'
 import { checkLojaQuota } from './quota'
 
 export type TryOnError =
@@ -21,7 +21,9 @@ export interface TryOnSuccess {
   ok: true
   resultUrl: string
   expiresAt: string
-  provider: 'fashn' | 'replicate' | 'google'
+  // Mantemos 'google' por compatibilidade com dados/histórico, mas hoje esse fluxo
+  // representa o provider Gemini Nano Banana.
+  provider: 'fashn' | 'replicate' | 'google' | 'openai'
 }
 
 export type TryOnResult = TryOnSuccess | { ok: false; error: TryOnError }
@@ -29,7 +31,8 @@ export type TryOnResult = TryOnSuccess | { ok: false; error: TryOnError }
 export interface RunTryOnInput {
   pecaId: string
   turnstileToken: string
-  modelImage: string
+  customerSelfieImage: string
+  customerFullBodyImage: string
   ip: string
   sessionId?: string
   garmentImageUrlOverride?: string | null
@@ -115,10 +118,11 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     return { ok: false, error: { kind: 'peca_unavailable' } }
   }
 
-  const providerInput: TryOnProviderInput = {
-    modelImage: input.modelImage,
-    garmentImage: garmentUrl,
-  }
+  const providerInput = buildTryOnProviderInput({
+    customerSelfieImage: input.customerSelfieImage,
+    customerFullBodyImage: input.customerFullBodyImage,
+    productImage: garmentUrl,
+  })
 
   try {
     const result = await generateTryOn(providerInput)

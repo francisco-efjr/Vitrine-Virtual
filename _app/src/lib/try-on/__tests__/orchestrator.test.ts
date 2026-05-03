@@ -23,7 +23,19 @@ function makeProvider(name: 'fashn' | 'replicate', behavior: 'ok' | 'retry' | 'f
 }
 
 describe('orchestrator.generateTryOn', () => {
-  const input = { modelImage: 'data:image/jpeg;base64,xxx', garmentImage: 'https://x.com/g.jpg' }
+  const input = {
+    customer: {
+      selfieImage: 'data:image/jpeg;base64,selfie',
+      fullBodyImage: 'data:image/jpeg;base64,body',
+    },
+    references: {
+      faceReferenceImage: 'data:image/jpeg;base64,selfie',
+      bodyReferenceImage: 'data:image/jpeg;base64,body',
+    },
+    product: {
+      productImage: 'https://x.com/g.jpg',
+    },
+  }
 
   it('retorna resultado do primário quando ele responde', async () => {
     const fashn = makeProvider('fashn', 'ok')

@@ -27,7 +27,7 @@ export function GaleriaFotos({
 
   if (fotos.length === 0) {
     return (
-      <div className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-3 rounded-modal bg-[#f0ebe3]">
+      <div className="flex aspect-square w-full flex-col items-center justify-center gap-3 rounded-modal bg-[#f0ebe3]">
         <ImageOff size={32} className="text-ink-3" />
         <span className="text-sm text-ink-3">Sem fotos disponíveis</span>
       </div>
@@ -48,13 +48,13 @@ export function GaleriaFotos({
   return (
     <div className="flex flex-col gap-3">
       {/* Foto principal */}
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-modal bg-[#f0ebe3]">
+      <div className="relative aspect-square w-full overflow-hidden rounded-modal bg-[#f0ebe3]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           key={active.id}
           src={active.url}
           alt={`${pecaNome} — foto ${activeIdx + 1}`}
-          className="h-full w-full object-cover transition-opacity duration-200"
+          className="h-full w-full object-cover object-center transition-opacity duration-200"
         />
 
         {/* Setas de navegação */}
@@ -107,13 +107,13 @@ export function GaleriaFotos({
               className={`shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
                 i === activeIdx ? 'border-accent' : 'border-transparent opacity-60 hover:opacity-100'
               }`}
-              style={{ width: 60, height: 75 }}
+              style={{ width: 64, height: 80 }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={foto.url}
                 alt=""
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover object-center"
               />
             </button>
           ))}

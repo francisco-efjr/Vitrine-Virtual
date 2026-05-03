@@ -1,15 +1,17 @@
 import type { NextRequest } from 'next/server'
 import { z } from 'zod'
+import { validateImageUploadMeta } from '@/lib/images/upload'
 import { extractClientIp } from '@/lib/security/ip-hash'
 import { runTryOn } from '@/server/try-on/use-case'
+import { mapProviderFailure } from '@/server/try-on/provider-errors'
 import { fail, ok } from '@/lib/api/response'
 import { logger } from '@/lib/logger'
 
 /**
  * Rota do provador virtual.
  *
- * - Aceita multipart com: foto (File), peca_id (string), turnstile_token (string), consent ('true').
- * - Foto vive APENAS aqui em memória — descartada após response (ADR 0006).
+ * - Aceita multipart com: customerSelfieImage, customerFullBodyImage, peca_id, turnstile_token, consent.
+ * - As fotos vivem APENAS aqui em memória — descartadas após response (ADR 0006).
  * - Tamanho máx: 8 MB (validação extra além das 4 camadas anti-abuso).
  *
  * Roda em Node runtime (não Edge) porque o polling do FASHN pode passar de 25s.
@@ -17,9 +19,6 @@ import { logger } from '@/lib/logger'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // segundos
-
-const MAX_PHOTO_BYTES = 8 * 1024 * 1024
-const ACCEPTED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 const fieldSchema = z.object({
   peca_id: z.string().uuid('peca_id inválido'),
@@ -41,20 +40,54 @@ export async function POST(req: NextRequest) {
   const parsed = fieldSchema.safeParse(fields)
   if (!parsed.success) return fail('Campos inválidos', 'VALIDATION_ERROR', 400)
 
-  const foto = formData.get('foto')
-  if (!(foto instanceof Blob)) return fail('Foto obrigatória', 'NO_PHOTO', 400)
-  if (foto.size > MAX_PHOTO_BYTES) return fail('Foto maior que 8 MB', 'PHOTO_TOO_LARGE', 413)
-  if (!ACCEPTED_MIMES.has(foto.type)) return fail('Formato de foto não aceito', 'BAD_MIME', 415)
+  const customerSelfieImage = formData.get('customerSelfieImage')
+  if (!(customerSelfieImage instanceof Blob)) {
+    return fail('Envie uma selfie para continuar.', 'NO_SELFIE_PHOTO', 400)
+  }
 
-  // Converte foto para data URL — vive em memória apenas durante este request.
-  const buf = Buffer.from(await foto.arrayBuffer())
-  const dataUrl = `data:${foto.type};base64,${buf.toString('base64')}`
+  const customerFullBodyImage = formData.get('customerFullBodyImage')
+  if (!(customerFullBodyImage instanceof Blob)) {
+    return fail('Envie uma foto de corpo inteiro para continuar.', 'NO_FULL_BODY_PHOTO', 400)
+  }
+
+  const selfieValidation = validateImageUploadMeta({
+    filename: customerSelfieImage instanceof File ? customerSelfieImage.name : 'selfie.webp',
+    contentType: customerSelfieImage.type,
+    size: customerSelfieImage.size,
+  })
+  if (!selfieValidation.ok) {
+    return fail(
+      selfieValidation.message,
+      'BAD_SELFIE_IMAGE',
+      selfieValidation.message.includes('10 MB') ? 413 : 415,
+    )
+  }
+
+  const fullBodyValidation = validateImageUploadMeta({
+    filename:
+      customerFullBodyImage instanceof File ? customerFullBodyImage.name : 'corpo-inteiro.webp',
+    contentType: customerFullBodyImage.type,
+    size: customerFullBodyImage.size,
+  })
+  if (!fullBodyValidation.ok) {
+    return fail(
+      fullBodyValidation.message,
+      'BAD_FULL_BODY_IMAGE',
+      fullBodyValidation.message.includes('10 MB') ? 413 : 415,
+    )
+  }
+
+  const selfieBuffer = Buffer.from(await customerSelfieImage.arrayBuffer())
+  const customerSelfieDataUrl = `data:${customerSelfieImage.type};base64,${selfieBuffer.toString('base64')}`
+  const fullBodyBuffer = Buffer.from(await customerFullBodyImage.arrayBuffer())
+  const customerFullBodyDataUrl = `data:${customerFullBodyImage.type};base64,${fullBodyBuffer.toString('base64')}`
 
   const ip = extractClientIp(req)
   const result = await runTryOn({
     pecaId: parsed.data.peca_id,
     turnstileToken: parsed.data.turnstile_token,
-    modelImage: dataUrl,
+    customerSelfieImage: customerSelfieDataUrl,
+    customerFullBodyImage: customerFullBodyDataUrl,
     ip,
     sessionId: parsed.data.session_id,
     garmentImageUrlOverride: parsed.data.garment_url_override,
@@ -80,9 +113,12 @@ export async function POST(req: NextRequest) {
         )
       case 'peca_unavailable':
         return fail('Peça indisponível', 'PECA_UNAVAILABLE', 404)
-      case 'provider_failed':
-        logger.warn('Provider final falhou', { msg: result.error.message })
-        return fail('Não foi possível gerar a simulação agora', 'PROVIDER_FAILED', 502)
+      case 'provider_failed': {
+        const detail = result.error.message
+        logger.warn('Provider final falhou', { detail })
+        const mapped = mapProviderFailure(detail)
+        return fail(mapped.message, mapped.code, mapped.status)
+      }
     }
   }
 

@@ -37,9 +37,12 @@ const serverSchema = z.object({
   FASHN_API_BASE_URL: z.string().url().default('https://api.fashn.ai/v1'),
   REPLICATE_API_TOKEN: z.string().min(1).optional(),
   REPLICATE_VTON_MODEL: z.string().min(1).optional(),
-  // Google AI (Gemini) — provider de try-on via Google AI Studio
+  // Google AI (Gemini Nano Banana) — provider de try-on via Google AI Studio
   GOOGLE_AI_API_KEY: z.string().min(1).optional(),
-  GOOGLE_AI_MODEL: z.string().min(1).default('gemini-2.0-flash-exp'),
+  GOOGLE_AI_MODEL: z.string().min(1).default('gemini-2.5-flash-image'),
+  // OpenAI — provider de try-on via gpt-image-1 (multi-image edits API)
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_IMAGE_MODEL: z.string().min(1).default('gpt-image-1'),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
@@ -151,7 +154,7 @@ export function getSuperAdminEmails(): string[] {
 }
 
 export function isFeatureConfigured(
-  feature: 'try_on_fashn' | 'try_on_replicate' | 'try_on_google' | 'rate_limit' | 'turnstile' | 'ip_hash' | 'sentry',
+  feature: 'try_on_fashn' | 'try_on_replicate' | 'try_on_google' | 'try_on_openai' | 'rate_limit' | 'turnstile' | 'ip_hash' | 'sentry',
 ): boolean {
   const env = getServerEnv()
   switch (feature) {
@@ -161,6 +164,8 @@ export function isFeatureConfigured(
       return !!(env.REPLICATE_API_TOKEN && env.REPLICATE_VTON_MODEL)
     case 'try_on_google':
       return !!env.GOOGLE_AI_API_KEY
+    case 'try_on_openai':
+      return !!env.OPENAI_API_KEY
     case 'rate_limit':
       return !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN)
     case 'turnstile':

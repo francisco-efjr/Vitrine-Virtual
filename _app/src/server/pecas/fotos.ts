@@ -1,4 +1,5 @@
 import 'server-only'
+import { IMAGE_MAX_UPLOAD_BYTES, validateImageUploadMeta } from '@/lib/images/upload'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
 import {
   fotoBase64UploadSchema,
@@ -83,6 +84,15 @@ export async function uploadFotoBase64(
   input: FotoBase64UploadInput,
 ): Promise<FotoWithPreview> {
   const data = fotoBase64UploadSchema.parse(input)
+  const validation = validateImageUploadMeta({
+    filename: data.filename,
+    contentType: data.contentType,
+    size: data.size,
+  })
+  if (!validation.ok) {
+    throw new PecaError(validation.message, 'INVALID_IMAGE_UPLOAD', 400)
+  }
+
   const peca = await getOwnPeca(lojaId, pecaId)
   const supabase = createServerSupabase()
 
@@ -94,7 +104,7 @@ export async function uploadFotoBase64(
   if ((existing?.length ?? 0) >= MAX_FOTOS_POR_PECA) throw LimiteFotosExcedidoError()
 
   const fileBuffer = dataUrlToBuffer(data.data_url, data.contentType)
-  if (fileBuffer.byteLength > MAX_FOTOS_POR_PECA * 1024 * 1024) {
+  if (fileBuffer.byteLength > IMAGE_MAX_UPLOAD_BYTES) {
     throw new PecaError('Falha ao processar foto', 'BAD_IMAGE_BUFFER', 400)
   }
 

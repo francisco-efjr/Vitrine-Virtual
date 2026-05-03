@@ -51,7 +51,7 @@ export function PecaFormModal({
         setExistingFotos(fotos as ExistingFoto[])
       })
       .catch(() => {
-        setErr('Nao foi possivel carregar as fotos atuais da peca.')
+        setErr('Não foi possível carregar as fotos atuais da peça.')
       })
       .finally(() => setLoadingFotos(false))
   }, [open, peca])
@@ -66,7 +66,7 @@ export function PecaFormModal({
       try {
         precoCentavos = preco ? precoStringToCentavos(preco) : null
       } catch {
-        setErr('Preco invalido')
+        setErr('Preço inválido.')
         setSaving(false)
         return
       }
@@ -85,7 +85,7 @@ export function PecaFormModal({
 
       const data = await response.json()
       if (!response.ok || !data.ok) {
-        setErr(data?.error?.message ?? 'Falha ao salvar peca')
+        setErr(data?.error?.message ?? 'Falha ao salvar peça.')
         return
       }
 
@@ -95,7 +95,7 @@ export function PecaFormModal({
           await uploaderRef.current.flush(savedPecaId, peca?.foto_principal_id ?? null)
         } catch (fotoErr) {
           console.error('[PecaFormModal] Erro nas fotos:', fotoErr)
-          setErr('Peca salva, mas houve um problema ao aplicar as fotos.')
+          setErr('Peça salva, mas houve um problema ao aplicar as fotos.')
           onSaved()
           return
         }
