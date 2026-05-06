@@ -104,7 +104,7 @@ export function PecasListClient({
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           {filtered.map((p) => (
             <Card key={p.id} hoverable className="flex h-full flex-col overflow-hidden">
-              <div className="aspect-square w-full bg-[#f0ebe3]" aria-hidden="true">
+              <div className="aspect-[3/4] w-full bg-[#f0ebe3]" aria-hidden="true">
                 {p.foto_principal_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -168,7 +168,7 @@ export function PecasListClient({
                 i < filtered.length - 1 ? 'border-b border-border' : ''
               }`}
             >
-              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[#f0ebe3]" aria-hidden="true">
+              <div className="h-[68px] w-[51px] shrink-0 overflow-hidden rounded-lg bg-[#f0ebe3]" aria-hidden="true">
                 {p.foto_principal_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

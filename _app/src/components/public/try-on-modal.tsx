@@ -42,6 +42,14 @@ const PHOTO_COPY: Record<PhotoKind, { title: string; helper: string }> = {
   },
 }
 
+const LOADING_MESSAGES = [
+  'Preparando sua visualização…',
+  'Analisando a peça…',
+  'Combinando looks…',
+  'Quase lá…',
+  'Finalizando os detalhes…',
+]
+
 export function TryOnModal({
   open,
   onClose,
@@ -64,6 +72,7 @@ export function TryOnModal({
   const [customerSelfieImage, setCustomerSelfieImage] = useState<SelectedPhoto | null>(null)
   const [customerFullBodyImage, setCustomerFullBodyImage] = useState<SelectedPhoto | null>(null)
   const [progress, setProgress] = useState(0)
+  const [msgIdx, setMsgIdx] = useState(0)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [validationAttempted, setValidationAttempted] = useState(false)
@@ -79,6 +88,16 @@ export function TryOnModal({
     ? buildWhatsAppUrl(whatsappE164, buildVitrineMessage({ pecaNome }))
     : null
   const currentStepIndex = Math.max(0, STEPS.findIndex((item) => item.id === step))
+
+  // Rotate loading messages
+  useEffect(() => {
+    if (step !== 'loading') return
+    setMsgIdx(0)
+    const iv = window.setInterval(() => {
+      setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length)
+    }, 2200)
+    return () => window.clearInterval(iv)
+  }, [step])
 
   useEffect(() => {
     if (!open) return
@@ -138,7 +157,7 @@ export function TryOnModal({
             Ajustar fotos
           </Button>
           <Button variant="dark" onClick={handleGenerate} disabled={!canContinue}>
-            Gerar provador virtual
+            Entrar na Cabine
           </Button>
         </>
       )
@@ -148,7 +167,7 @@ export function TryOnModal({
       return (
         <>
           <Button variant="ghost" onClick={() => setStep('choose')}>
-            Gerar outro
+            Experimentar outra peça
           </Button>
           {waUrl ? (
             <a
@@ -158,7 +177,7 @@ export function TryOnModal({
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#25d366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1da855]"
             >
               <MessageCircle size={15} />
-              Falar no WhatsApp
+              Falar com a loja
             </a>
           ) : null}
         </>
@@ -223,7 +242,7 @@ export function TryOnModal({
   async function handleGenerate() {
     if (!customerSelfieImage || !customerFullBodyImage) {
       setValidationAttempted(true)
-      setErrorMsg('As duas fotos são obrigatórias para gerar o provador virtual.')
+      setErrorMsg('As duas fotos são obrigatórias para usar a Cabine.')
       setStep('choose')
       return
     }
@@ -252,7 +271,7 @@ export function TryOnModal({
       window.clearInterval(interval)
 
       if (!res.ok || !data?.ok) {
-        setErrorMsg(data?.error?.message ?? 'Não foi possível gerar o provador virtual agora.')
+        setErrorMsg(data?.error?.message ?? 'Não foi possível gerar a visualização agora.')
         setStep('error')
         return
       }
@@ -273,7 +292,7 @@ export function TryOnModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Provador Virtual"
+      aria-label="Cabine Virtual"
       onClick={onClose}
       className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(20,16,14,0.7)] p-0 backdrop-blur sm:items-center sm:p-5"
     >
@@ -281,9 +300,10 @@ export function TryOnModal({
         onClick={(e) => e.stopPropagation()}
         className="flex max-h-[92vh] min-h-[60vh] w-full max-w-[680px] flex-col overflow-hidden rounded-t-[22px] bg-surface shadow-modal sm:min-h-0 sm:rounded-modal"
       >
+        {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-4 sm:px-6">
           <div>
-            <div className="font-serif text-xl font-semibold">Provador Virtual</div>
+            <div className="font-serif text-xl font-semibold">Cabine</div>
             <div className="mt-0.5 text-xs text-ink-3">{pecaNome}</div>
           </div>
           <button
@@ -296,6 +316,7 @@ export function TryOnModal({
           </button>
         </div>
 
+        {/* Step indicator */}
         <div className="flex items-center gap-1.5 px-4 py-3 sm:px-6">
           {STEPS.map((item, index) => {
             const done = index < currentStepIndex || step === 'result'
@@ -325,13 +346,14 @@ export function TryOnModal({
           })}
         </div>
 
+        {/* Content */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-2 sm:px-6 sm:pb-6">
           {step === 'choose' ? (
             <div className="space-y-5">
               <div>
                 <div className="text-sm font-medium">As duas fotos são obrigatórias para continuar.</div>
                 <div className="mt-1 text-[13px] text-ink-3">
-                  Suas fotos são usadas apenas para gerar o provador virtual e descartadas após o processamento.
+                  Suas fotos são usadas apenas para gerar a visualização e descartadas em seguida.
                 </div>
               </div>
 
@@ -357,36 +379,18 @@ export function TryOnModal({
                 onGallery={() => inputRefs.corpoGallery.current?.click()}
               />
 
-              <input
-                ref={inputRefs.selfieCamera}
-                type="file"
+              <input ref={inputRefs.selfieCamera} type="file"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
-                capture="user"
-                hidden
-                onChange={(e) => onPick('selfie', e.target.files?.[0] ?? null)}
-              />
-              <input
-                ref={inputRefs.selfieGallery}
-                type="file"
+                capture="user" hidden onChange={(e) => onPick('selfie', e.target.files?.[0] ?? null)} />
+              <input ref={inputRefs.selfieGallery} type="file"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
-                hidden
-                onChange={(e) => onPick('selfie', e.target.files?.[0] ?? null)}
-              />
-              <input
-                ref={inputRefs.corpoCamera}
-                type="file"
+                hidden onChange={(e) => onPick('selfie', e.target.files?.[0] ?? null)} />
+              <input ref={inputRefs.corpoCamera} type="file"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
-                capture="environment"
-                hidden
-                onChange={(e) => onPick('corpo', e.target.files?.[0] ?? null)}
-              />
-              <input
-                ref={inputRefs.corpoGallery}
-                type="file"
+                capture="environment" hidden onChange={(e) => onPick('corpo', e.target.files?.[0] ?? null)} />
+              <input ref={inputRefs.corpoGallery} type="file"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
-                hidden
-                onChange={(e) => onPick('corpo', e.target.files?.[0] ?? null)}
-              />
+                hidden onChange={(e) => onPick('corpo', e.target.files?.[0] ?? null)} />
 
               <button
                 type="button"
@@ -401,7 +405,7 @@ export function TryOnModal({
                   {agreed ? <Check size={11} className="text-white" /> : null}
                 </span>
                 <span className="text-xs leading-relaxed text-ink-2">
-                  Concordo que minhas fotos sejam usadas apenas para gerar o provador virtual e descartadas após o processamento.
+                  Concordo que minhas fotos sejam usadas apenas para gerar a visualização e descartadas após o processamento.
                 </span>
               </button>
 
@@ -421,49 +425,71 @@ export function TryOnModal({
             <div className="space-y-4">
               <div className="text-sm text-ink-2">Confirme as fotos antes de continuar.</div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <PreviewCard
-                  label="Selfie"
-                  src={customerSelfieImage?.previewUrl ?? null}
-                  alt="Foto selfie"
-                />
-                <PreviewCard
-                  label="Corpo inteiro"
-                  src={customerFullBodyImage?.previewUrl ?? null}
-                  alt="Foto de corpo inteiro no espelho"
-                />
+                <PreviewCard label="Selfie" src={customerSelfieImage?.previewUrl ?? null} alt="Foto selfie" />
+                <PreviewCard label="Corpo inteiro" src={customerFullBodyImage?.previewUrl ?? null} alt="Foto de corpo inteiro" />
                 <PreviewCard label="Peça" src={garmentThumbUrl} alt={pecaNome} fallback={pecaNome} />
               </div>
               <div className="rounded-[10px] bg-surface-2 px-4 py-3 text-xs text-ink-2">
-                Fotos prontas para o provador virtual.
+                Fotos prontas. Clique em &quot;Entrar na Cabine&quot; para gerar a visualização.
               </div>
             </div>
           ) : null}
 
           {step === 'loading' ? (
             <div className="flex min-h-full flex-col items-center justify-center py-8 text-center">
+              {/* Branded ring — no percentage */}
               <div className="relative mb-6 h-20 w-20">
-                <svg width="80" height="80" viewBox="0 0 80 80" className="animate-spin" style={{ animationDuration: '2s' }}>
-                  <circle cx="40" cy="40" r="34" fill="none" stroke="#e6dfd6" strokeWidth="4" />
+                <svg
+                  width="80"
+                  height="80"
+                  viewBox="0 0 80 80"
+                  className="animate-spin"
+                  style={{ animationDuration: '2s' }}
+                >
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="#e6dfd6" strokeWidth="3.5" />
                   <circle
                     cx="40"
                     cy="40"
                     r="34"
                     fill="none"
                     stroke="#b8956a"
-                    strokeWidth="4"
-                    strokeDasharray={`${progress * 2.14} 214`}
+                    strokeWidth="3.5"
+                    strokeDasharray="60 154"
                     strokeLinecap="round"
-                    style={{ transition: 'stroke-dasharray 0.4s ease' }}
+                    transform="rotate(-90 40 40)"
                   />
                 </svg>
-                <div className="absolute inset-0 flex items-center justify-center font-serif text-lg font-semibold">
-                  {Math.round(progress)}%
+                {/* vv brand mark in center */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-serif text-base font-semibold text-accent" style={{ letterSpacing: '0.5px' }}>
+                    vv
+                  </span>
                 </div>
               </div>
-              <div className="font-serif text-lg font-semibold">Gerando seu provador virtual</div>
-            <div className="mt-2 text-[13px] leading-relaxed text-ink-3">
-                Estamos preparando a visualização com base nas suas fotos e na peça selecionada.
+
+              {/* Thin progress bar */}
+              <div className="mb-5 h-0.5 w-32 overflow-hidden rounded-full bg-border">
+                <div
+                  className="h-full rounded-full bg-accent transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
+
+              <div className="font-serif text-lg font-semibold text-ink">Preparando sua Cabine</div>
+              <div
+                key={msgIdx}
+                className="mt-2 text-[13px] text-ink-3 transition-opacity"
+                style={{ animation: 'vv-fade-msg 0.4s ease' }}
+              >
+                {LOADING_MESSAGES[msgIdx]}
+              </div>
+
+              <style>{`
+                @keyframes vv-fade-msg {
+                  from { opacity: 0; transform: translateY(4px); }
+                  to   { opacity: 1; transform: translateY(0); }
+                }
+              `}</style>
             </div>
           ) : null}
 
@@ -473,13 +499,13 @@ export function TryOnModal({
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success-light text-success">
                   <Check size={13} />
                 </span>
-                <span className="text-sm font-medium text-success">Provador virtual gerado com sucesso.</span>
+                <span className="text-sm font-medium text-success">Visualização gerada com sucesso.</span>
               </div>
 
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={resultUrl}
-                alt="Resultado do provador virtual"
+                alt="Resultado da Cabine"
                 className="w-full rounded-modal border border-border object-cover"
               />
 
