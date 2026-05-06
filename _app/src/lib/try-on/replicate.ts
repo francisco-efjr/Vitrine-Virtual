@@ -33,7 +33,7 @@ export const replicateProvider: TryOnProvider = {
       body: JSON.stringify({
         version: env.REPLICATE_VTON_MODEL.split(':')[1],
         input: {
-          human_img: input.references.bodyReferenceImage,
+          human_img: input.references.customerReferenceImage,
           garm_img: input.product.productImage,
           garment_des: 'clothing',
           category: 'upper_body',

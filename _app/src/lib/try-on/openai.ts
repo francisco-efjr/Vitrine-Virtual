@@ -70,31 +70,24 @@ export const openAiProvider: TryOnProvider = {
     formData.append('size', 'auto')
     formData.append('quality', 'medium')
 
-    // Foto do cliente (base64 data URL → Buffer → Blob)
-    // OpenAI exige array syntax: 'image[]' quando múltiplas imagens são enviadas
-    const selfieBuffer = Buffer.from(extractBase64FromDataUrl(input.references.faceReferenceImage), 'base64')
-    const selfieMime = extractMimeFromDataUrl(input.references.faceReferenceImage)
-    const selfieExt = mimeToExt(selfieMime)
-    const selfieBlob = new Blob([new Uint8Array(selfieBuffer)], { type: selfieMime })
-    formData.append('image[]', selfieBlob, `face-reference.${selfieExt}`)
-
-    const fullBodyBuffer = Buffer.from(
-      extractBase64FromDataUrl(input.references.bodyReferenceImage),
+    // CUSTOMER_PHOTO: sole reference for the person's body, pose, and face.
+    const customerBuffer = Buffer.from(
+      extractBase64FromDataUrl(input.references.customerReferenceImage),
       'base64',
     )
-    const fullBodyMime = extractMimeFromDataUrl(input.references.bodyReferenceImage)
-    const fullBodyExt = mimeToExt(fullBodyMime)
-    const fullBodyBlob = new Blob([new Uint8Array(fullBodyBuffer)], { type: fullBodyMime })
-    formData.append('image[]', fullBodyBlob, `body-reference.${fullBodyExt}`)
+    const customerMime = extractMimeFromDataUrl(input.references.customerReferenceImage)
+    const customerExt = mimeToExt(customerMime)
+    const customerBlob = new Blob([new Uint8Array(customerBuffer)], { type: customerMime })
+    formData.append('image[]', customerBlob, `customer-photo.${customerExt}`)
 
-    // Foto da peça (baixada acima)
+    // GARMENT_IMAGE: exact product reference.
     const garmentBlob = new Blob([new Uint8Array(garmentBuffer)], { type: 'image/jpeg' })
-    formData.append('image[]', garmentBlob, 'garment.jpg')
+    formData.append('image[]', garmentBlob, 'garment-image.jpg')
 
     // -------------------------------------------------------------------------
     // 3. Chamar a API de edição de imagem
     // -------------------------------------------------------------------------
-    logger.info('OpenAI try-on: enviando request', { model, selfieMime, fullBodyMime })
+    logger.info('OpenAI try-on: enviando request', { model, customerMime })
 
     const response = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
@@ -119,12 +112,9 @@ export const openAiProvider: TryOnProvider = {
       logger.warn('OpenAI try-on: API retornou erro', { status: response.status, errorMsg })
 
       // 401/403 = key inválida ou sem acesso ao modelo → não tentar outro provider
-      const nonRetriable = response.status === 401 || response.status === 403 || response.status === 404
-      throw new TryOnProviderError(
-        `OpenAI ${errorMsg}`,
-        'openai',
-        !nonRetriable,
-      )
+      const nonRetriable =
+        response.status === 401 || response.status === 403 || response.status === 404
+      throw new TryOnProviderError(`OpenAI ${errorMsg}`, 'openai', !nonRetriable)
     }
 
     // -------------------------------------------------------------------------
@@ -134,7 +124,9 @@ export const openAiProvider: TryOnProvider = {
     const item = payload.data?.[0]
 
     if (!item) {
-      logger.warn('OpenAI try-on: resposta sem data[]', { payload: JSON.stringify(payload).slice(0, 200) })
+      logger.warn('OpenAI try-on: resposta sem data[]', {
+        payload: JSON.stringify(payload).slice(0, 200),
+      })
       throw new TryOnProviderError('OpenAI retornou resposta vazia', 'openai', true)
     }
 

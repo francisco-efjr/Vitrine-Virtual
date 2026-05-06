@@ -1,14 +1,11 @@
 export interface TryOnProviderInput {
   customer: {
-    /** Selfie do cliente usada como referência principal do rosto. */
-    selfieImage: string
-    /** Foto de corpo inteiro usada como referência principal do corpo/postura. */
-    fullBodyImage: string
+    /** Foto única do cliente usada como referência completa. */
+    photoImage: string
   }
   references: {
-    /** Alias explícito para integração com providers que separam face/body reference. */
-    faceReferenceImage: string
-    bodyReferenceImage: string
+    /** Alias usado pelos providers para receber a foto do cliente. */
+    customerReferenceImage: string
   }
   product: {
     /** URL pública da imagem da peça. */

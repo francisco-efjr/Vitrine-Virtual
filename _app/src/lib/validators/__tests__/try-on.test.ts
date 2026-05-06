@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { tryOnClientPhotosSchema, tryOnRequestSchema, tryOnResultSchema } from '../try-on'
+import { tryOnClientPhotoSchema, tryOnRequestSchema, tryOnResultSchema } from '../try-on'
 
 describe('tryOnRequestSchema', () => {
   it('aceita payload válido', () => {
@@ -36,7 +36,7 @@ describe('tryOnRequestSchema', () => {
     }
     expect(tryOnRequestSchema.safeParse({ ...base, consent: false }).success).toBe(false)
     expect(tryOnRequestSchema.safeParse({ ...base, consent: 'true' }).success).toBe(false)
-    expect(tryOnRequestSchema.safeParse({ ...base }).success).toBe(false) // sem consent
+    expect(tryOnRequestSchema.safeParse({ ...base }).success).toBe(false)
   })
 })
 
@@ -54,7 +54,7 @@ describe('tryOnResultSchema', () => {
   it('rejeita provider inválido', () => {
     const r = tryOnResultSchema.safeParse({
       result_url: 'https://x.com/r.jpg',
-      provider: 'kling', // não é fashn nem replicate
+      provider: 'kling',
       duration_ms: 100,
       expires_at: new Date().toISOString(),
     })
@@ -92,20 +92,23 @@ describe('tryOnResultSchema', () => {
   })
 })
 
-describe('tryOnClientPhotosSchema', () => {
-  it('exige selfie e foto de corpo inteiro', () => {
+describe('tryOnClientPhotoSchema', () => {
+  it('aceita foto válida', () => {
     expect(
-      tryOnClientPhotosSchema.safeParse({
-        selfie: { name: 'selfie.webp' },
-        corpo_inteiro: { name: 'espelho.webp' },
+      tryOnClientPhotoSchema.safeParse({
+        foto: { name: 'minha-foto.webp' },
       }).success,
     ).toBe(true)
   })
 
-  it('rejeita quando uma das fotos obrigatórias não foi informada', () => {
+  it('rejeita quando a foto não foi informada', () => {
+    expect(tryOnClientPhotoSchema.safeParse({}).success).toBe(false)
+  })
+
+  it('rejeita foto com nome vazio', () => {
     expect(
-      tryOnClientPhotosSchema.safeParse({
-        selfie: { name: 'selfie.webp' },
+      tryOnClientPhotoSchema.safeParse({
+        foto: { name: '' },
       }).success,
     ).toBe(false)
   })

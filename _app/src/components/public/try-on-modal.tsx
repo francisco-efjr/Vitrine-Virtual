@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  Camera,
   Check,
   Image as ImageIcon,
   ImageOff,
@@ -16,7 +15,6 @@ import { IMAGE_INVALID_FORMAT_MESSAGE } from '@/lib/images/upload'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 
 type Step = 'choose' | 'preview' | 'loading' | 'result' | 'error'
-type PhotoKind = 'selfie' | 'corpo'
 
 type SelectedPhoto = {
   file: File
@@ -24,23 +22,11 @@ type SelectedPhoto = {
 }
 
 const STEPS: Array<{ id: Exclude<Step, 'error'>; label: string }> = [
-  { id: 'choose', label: 'Suas fotos' },
+  { id: 'choose', label: 'Sua foto' },
   { id: 'preview', label: 'Confirmar' },
   { id: 'loading', label: 'Gerando' },
   { id: 'result', label: 'Resultado' },
 ]
-
-const PHOTO_COPY: Record<PhotoKind, { title: string; helper: string }> = {
-  selfie: {
-    title: 'Foto selfie',
-    helper: 'Envie uma selfie com boa iluminação, mostrando claramente o rosto.',
-  },
-  corpo: {
-    title: 'Foto de corpo inteiro no espelho',
-    helper:
-      'Envie uma foto no espelho mostrando o corpo inteiro, de preferência em ambiente bem iluminado.',
-  },
-}
 
 const LOADING_MESSAGES = [
   'Preparando sua visualização…',
@@ -49,6 +35,8 @@ const LOADING_MESSAGES = [
   'Quase lá…',
   'Finalizando os detalhes…',
 ]
+
+const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif'
 
 export function TryOnModal({
   open,
@@ -69,27 +57,21 @@ export function TryOnModal({
 }) {
   const [step, setStep] = useState<Step>('choose')
   const [agreed, setAgreed] = useState(false)
-  const [customerSelfieImage, setCustomerSelfieImage] = useState<SelectedPhoto | null>(null)
-  const [customerFullBodyImage, setCustomerFullBodyImage] = useState<SelectedPhoto | null>(null)
+  const [customerPhoto, setCustomerPhoto] = useState<SelectedPhoto | null>(null)
   const [progress, setProgress] = useState(0)
   const [msgIdx, setMsgIdx] = useState(0)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [validationAttempted, setValidationAttempted] = useState(false)
-  const inputRefs = {
-    selfieCamera: useRef<HTMLInputElement>(null),
-    selfieGallery: useRef<HTMLInputElement>(null),
-    corpoCamera: useRef<HTMLInputElement>(null),
-    corpoGallery: useRef<HTMLInputElement>(null),
-  }
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
 
-  const canContinue = agreed && !!customerSelfieImage && !!customerFullBodyImage
+  const canContinue = agreed && !!customerPhoto
   const waUrl = whatsappE164
     ? buildWhatsAppUrl(whatsappE164, buildVitrineMessage({ pecaNome }))
     : null
   const currentStepIndex = Math.max(0, STEPS.findIndex((item) => item.id === step))
 
-  // Rotate loading messages
   useEffect(() => {
     if (step !== 'loading') return
     setMsgIdx(0)
@@ -122,19 +104,17 @@ export function TryOnModal({
   useEffect(() => {
     if (open) return
     const timer = window.setTimeout(() => {
-      cleanupSelection(customerSelfieImage)
-      cleanupSelection(customerFullBodyImage)
+      cleanupSelection(customerPhoto)
       setStep('choose')
       setAgreed(false)
-      setCustomerSelfieImage(null)
-      setCustomerFullBodyImage(null)
+      setCustomerPhoto(null)
       setProgress(0)
       setResultUrl(null)
       setErrorMsg(null)
       setValidationAttempted(false)
     }, 180)
     return () => window.clearTimeout(timer)
-  }, [open, customerSelfieImage, customerFullBodyImage])
+  }, [open, customerPhoto])
 
   function renderFooter() {
     if (step === 'choose') {
@@ -144,7 +124,7 @@ export function TryOnModal({
             Fechar
           </Button>
           <Button variant="dark" onClick={handlePreviewStep} disabled={!agreed}>
-            Confirmar fotos
+            Confirmar foto
           </Button>
         </>
       )
@@ -154,7 +134,7 @@ export function TryOnModal({
       return (
         <>
           <Button variant="ghost" onClick={() => setStep('choose')}>
-            Ajustar fotos
+            Ajustar foto
           </Button>
           <Button variant="dark" onClick={handleGenerate} disabled={!canContinue}>
             Entrar na Cabine
@@ -190,11 +170,7 @@ export function TryOnModal({
           <Button variant="ghost" onClick={() => setStep('choose')}>
             Voltar
           </Button>
-          <Button
-            variant="dark"
-            onClick={handleGenerate}
-            disabled={!customerSelfieImage || !customerFullBodyImage}
-          >
+          <Button variant="dark" onClick={handleGenerate} disabled={!customerPhoto}>
             Tentar novamente
           </Button>
         </>
@@ -204,19 +180,13 @@ export function TryOnModal({
     return null
   }
 
-  async function onPick(kind: PhotoKind, file: File | null) {
+  async function onPick(file: File | null) {
     if (!file) return
-
     try {
       const prepared = await preparePreviewableImage(file)
+      cleanupSelection(customerPhoto)
+      setCustomerPhoto(prepared)
       setErrorMsg(null)
-      if (kind === 'selfie') {
-        cleanupSelection(customerSelfieImage)
-        setCustomerSelfieImage(prepared)
-      } else {
-        cleanupSelection(customerFullBodyImage)
-        setCustomerFullBodyImage(prepared)
-      }
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE)
     }
@@ -224,25 +194,18 @@ export function TryOnModal({
 
   function handlePreviewStep() {
     setValidationAttempted(true)
-
-    if (!customerSelfieImage) {
-      setErrorMsg('Envie uma selfie para continuar.')
+    if (!customerPhoto) {
+      setErrorMsg('Envie uma foto para continuar.')
       return
     }
-
-    if (!customerFullBodyImage) {
-      setErrorMsg('Envie uma foto de corpo inteiro para continuar.')
-      return
-    }
-
     setErrorMsg(null)
     setStep('preview')
   }
 
   async function handleGenerate() {
-    if (!customerSelfieImage || !customerFullBodyImage) {
+    if (!customerPhoto) {
       setValidationAttempted(true)
-      setErrorMsg('As duas fotos são obrigatórias para usar a Cabine.')
+      setErrorMsg('A foto é obrigatória para usar a Cabine.')
       setStep('choose')
       return
     }
@@ -260,8 +223,7 @@ export function TryOnModal({
       formData.set('peca_id', pecaId)
       formData.set('consent', 'true')
       formData.set('turnstile_token', 'dev-bypass')
-      formData.set('customerSelfieImage', customerSelfieImage.file)
-      formData.set('customerFullBodyImage', customerFullBodyImage.file)
+      formData.set('customerPhoto', customerPhoto.file)
       if (garmentImageUrl) {
         formData.set('garment_url_override', garmentImageUrl)
       }
@@ -351,46 +313,36 @@ export function TryOnModal({
           {step === 'choose' ? (
             <div className="space-y-5">
               <div>
-                <div className="text-sm font-medium">As duas fotos são obrigatórias para continuar.</div>
+                <div className="text-sm font-medium">Envie uma foto sua para continuar.</div>
                 <div className="mt-1 text-[13px] text-ink-3">
-                  Suas fotos são usadas apenas para gerar a visualização e descartadas em seguida.
+                  Sua foto é usada apenas para gerar a visualização e descartada em seguida.
                 </div>
               </div>
 
               <PhotoField
-                title={PHOTO_COPY.selfie.title}
-                helper={PHOTO_COPY.selfie.helper}
-                previewUrl={customerSelfieImage?.previewUrl ?? null}
-                error={validationAttempted && !customerSelfieImage ? 'Envie uma selfie para continuar.' : null}
-                onCamera={() => inputRefs.selfieCamera.current?.click()}
-                onGallery={() => inputRefs.selfieGallery.current?.click()}
+                title="Sua foto"
+                helper="Envie uma foto mostrando o corpo inteiro, de preferência em boa iluminação e fundo neutro."
+                previewUrl={customerPhoto?.previewUrl ?? null}
+                error={validationAttempted && !customerPhoto ? 'Envie uma foto para continuar.' : null}
+                onCamera={() => cameraRef.current?.click()}
+                onGallery={() => galleryRef.current?.click()}
               />
 
-              <PhotoField
-                title={PHOTO_COPY.corpo.title}
-                helper={PHOTO_COPY.corpo.helper}
-                previewUrl={customerFullBodyImage?.previewUrl ?? null}
-                error={
-                  validationAttempted && !customerFullBodyImage
-                    ? 'Envie uma foto de corpo inteiro para continuar.'
-                    : null
-                }
-                onCamera={() => inputRefs.corpoCamera.current?.click()}
-                onGallery={() => inputRefs.corpoGallery.current?.click()}
+              <input
+                ref={cameraRef}
+                type="file"
+                accept={ACCEPT}
+                capture="user"
+                hidden
+                onChange={(e) => onPick(e.target.files?.[0] ?? null)}
               />
-
-              <input ref={inputRefs.selfieCamera} type="file"
-                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
-                capture="user" hidden onChange={(e) => onPick('selfie', e.target.files?.[0] ?? null)} />
-              <input ref={inputRefs.selfieGallery} type="file"
-                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
-                hidden onChange={(e) => onPick('selfie', e.target.files?.[0] ?? null)} />
-              <input ref={inputRefs.corpoCamera} type="file"
-                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
-                capture="environment" hidden onChange={(e) => onPick('corpo', e.target.files?.[0] ?? null)} />
-              <input ref={inputRefs.corpoGallery} type="file"
-                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
-                hidden onChange={(e) => onPick('corpo', e.target.files?.[0] ?? null)} />
+              <input
+                ref={galleryRef}
+                type="file"
+                accept={ACCEPT}
+                hidden
+                onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+              />
 
               <button
                 type="button"
@@ -405,7 +357,7 @@ export function TryOnModal({
                   {agreed ? <Check size={11} className="text-white" /> : null}
                 </span>
                 <span className="text-xs leading-relaxed text-ink-2">
-                  Concordo que minhas fotos sejam usadas apenas para gerar a visualização e descartadas após o processamento.
+                  Concordo que minha foto seja usada apenas para gerar a visualização e descartada após o processamento.
                 </span>
               </button>
 
@@ -423,21 +375,19 @@ export function TryOnModal({
 
           {step === 'preview' ? (
             <div className="space-y-4">
-              <div className="text-sm text-ink-2">Confirme as fotos antes de continuar.</div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <PreviewCard label="Selfie" src={customerSelfieImage?.previewUrl ?? null} alt="Foto selfie" />
-                <PreviewCard label="Corpo inteiro" src={customerFullBodyImage?.previewUrl ?? null} alt="Foto de corpo inteiro" />
+              <div className="text-sm text-ink-2">Confirme a foto antes de continuar.</div>
+              <div className="grid grid-cols-2 gap-3">
+                <PreviewCard label="Sua foto" src={customerPhoto?.previewUrl ?? null} alt="Sua foto" />
                 <PreviewCard label="Peça" src={garmentThumbUrl} alt={pecaNome} fallback={pecaNome} />
               </div>
               <div className="rounded-[10px] bg-surface-2 px-4 py-3 text-xs text-ink-2">
-                Fotos prontas. Clique em &quot;Entrar na Cabine&quot; para gerar a visualização.
+                Foto pronta. Clique em &quot;Entrar na Cabine&quot; para gerar a visualização.
               </div>
             </div>
           ) : null}
 
           {step === 'loading' ? (
             <div className="flex min-h-full flex-col items-center justify-center py-8 text-center">
-              {/* Branded ring — no percentage */}
               <div className="relative mb-6 h-20 w-20">
                 <svg
                   width="80"
@@ -459,7 +409,6 @@ export function TryOnModal({
                     transform="rotate(-90 40 40)"
                   />
                 </svg>
-                {/* vv brand mark in center */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="font-serif text-base font-semibold text-accent" style={{ letterSpacing: '0.5px' }}>
                     vv
@@ -467,7 +416,6 @@ export function TryOnModal({
                 </div>
               </div>
 
-              {/* Thin progress bar */}
               <div className="mb-5 h-0.5 w-32 overflow-hidden rounded-full bg-border">
                 <div
                   className="h-full rounded-full bg-accent transition-all duration-300"
@@ -506,7 +454,7 @@ export function TryOnModal({
               <img
                 src={resultUrl}
                 alt="Resultado da Cabine"
-                className="w-full rounded-modal border border-border object-cover"
+                className="aspect-[3/4] w-full rounded-modal border border-border object-cover"
               />
 
               <p className="text-center text-xs text-ink-3">
@@ -519,7 +467,7 @@ export function TryOnModal({
             <div className="flex min-h-full flex-col items-center justify-center py-8 text-center">
               <div className="mb-3 font-serif text-lg font-semibold">Não foi possível gerar agora</div>
               <p className="mb-4 max-w-[340px] text-sm text-ink-3">
-                {errorMsg ?? 'Tente novamente em instantes com outras fotos.'}
+                {errorMsg ?? 'Tente novamente em instantes com outra foto.'}
               </p>
             </div>
           ) : null}
@@ -565,9 +513,9 @@ function PhotoField({
       <div className="mb-3 overflow-hidden rounded-modal bg-[#efe7de]">
         {previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt={title} className="aspect-square w-full object-cover object-center" />
+          <img src={previewUrl} alt={title} className="aspect-[3/4] w-full object-cover object-center" />
         ) : (
-          <div className="flex aspect-square items-center justify-center text-ink-3">
+          <div className="flex aspect-[3/4] items-center justify-center text-ink-3">
             <ImageIcon size={24} />
           </div>
         )}
@@ -577,7 +525,7 @@ function PhotoField({
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Button variant="ghost" onClick={onCamera}>
-          <Camera size={15} />
+          <ImageIcon size={15} />
           Tirar foto
         </Button>
         <Button variant="ghost" onClick={onGallery}>
@@ -605,9 +553,9 @@ function PreviewCard({
       <div className="mb-1.5 text-xs font-medium text-ink-3">{label}</div>
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt} className="aspect-square w-full rounded-modal object-cover object-center" />
+        <img src={src} alt={alt} className="aspect-[3/4] w-full rounded-modal object-cover object-center" />
       ) : (
-        <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-modal bg-[#f0ebe3]">
+        <div className="flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-modal bg-[#f0ebe3]">
           <ImageOff size={20} className="text-ink-3" />
           {fallback ? <span className="px-2 text-center text-xs text-ink-3">{fallback}</span> : null}
         </div>

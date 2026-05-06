@@ -18,13 +18,34 @@ vi.mock('@/lib/supabase/service', () => ({
   }),
 }))
 
+// Sharp is used to resize images; mock it so tests don't need real image buffers.
+vi.mock('sharp', () => {
+  const sharpInstance = {
+    resize() { return sharpInstance },
+    jpeg() { return sharpInstance },
+    toBuffer: async () => Buffer.from('resized-image'),
+  }
+  return { default: () => sharpInstance }
+})
+
+const SINGLE_PHOTO_INPUT = {
+  customer: {
+    photoImage: `data:image/jpeg;base64,${Buffer.from('customer-photo').toString('base64')}`,
+  },
+  references: {
+    customerReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-photo').toString('base64')}`,
+  },
+  product: {
+    productImage: 'https://example.com/garment.jpg',
+  },
+}
+
 describe('googleAiProvider.generate', () => {
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV, SUPABASE_SERVICE_ROLE_KEY: 'service-role-test' }
     _resetEnvCache()
     storageBucket.upload.mockReset()
     storageBucket.createSignedUrl.mockReset()
-    vi.restoreAllMocks()
   })
 
   afterEach(() => {
@@ -37,22 +58,12 @@ describe('googleAiProvider.generate', () => {
     delete process.env.GOOGLE_AI_API_KEY
     _resetEnvCache()
 
-    await expect(
-      googleAiProvider.generate({
-        customer: {
-          selfieImage: 'data:image/jpeg;base64,Y2xpZW50ZS1yb3N0bw==',
-          fullBodyImage: 'data:image/jpeg;base64,Y2xpZW50ZS1jb3Jwbw==',
-        },
-        references: {
-          faceReferenceImage: 'data:image/jpeg;base64,Y2xpZW50ZS1yb3N0bw==',
-          bodyReferenceImage: 'data:image/jpeg;base64,Y2xpZW50ZS1jb3Jwbw==',
-        },
-        product: {
-          productImage: 'https://example.com/garment.jpg',
-        },
-      }),
-    ).rejects.toEqual(
-      new TryOnProviderError('GOOGLE_AI_API_KEY não configurada para o Nano Banana', 'google', false),
+    await expect(googleAiProvider.generate(SINGLE_PHOTO_INPUT)).rejects.toEqual(
+      new TryOnProviderError(
+        'GOOGLE_AI_API_KEY não configurada para o Nano Banana',
+        'google',
+        false,
+      ),
     )
   })
 
@@ -63,12 +74,14 @@ describe('googleAiProvider.generate', () => {
 
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
+      // garment download
       .mockResolvedValueOnce(
         new Response(new Uint8Array([1, 2, 3, 4]), {
           status: 200,
           headers: { 'Content-Type': 'image/jpeg' },
         }),
       )
+      // Gemini API response
       .mockResolvedValueOnce(
         Response.json({
           candidates: [
@@ -77,7 +90,7 @@ describe('googleAiProvider.generate', () => {
                 parts: [
                   {
                     inlineData: {
-                      mimeType: 'image/png',
+                      mimeType: 'image/jpeg',
                       data: Buffer.from('generated-image').toString('base64'),
                     },
                   },
@@ -90,23 +103,11 @@ describe('googleAiProvider.generate', () => {
 
     storageBucket.upload.mockResolvedValue({ error: null })
     storageBucket.createSignedUrl.mockResolvedValue({
-      data: { signedUrl: 'https://cdn.example.com/result.png' },
+      data: { signedUrl: 'https://cdn.example.com/result.jpg' },
       error: null,
     })
 
-    const result = await googleAiProvider.generate({
-      customer: {
-        selfieImage: `data:image/jpeg;base64,${Buffer.from('customer-selfie').toString('base64')}`,
-        fullBodyImage: `data:image/jpeg;base64,${Buffer.from('customer-full-body').toString('base64')}`,
-      },
-      references: {
-        faceReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-selfie').toString('base64')}`,
-        bodyReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-full-body').toString('base64')}`,
-      },
-      product: {
-        productImage: 'https://example.com/garment.jpg',
-      },
-    })
+    const result = await googleAiProvider.generate(SINGLE_PHOTO_INPUT)
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -124,26 +125,24 @@ describe('googleAiProvider.generate', () => {
         }),
       }),
     )
+
     const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
-    expect(requestBody.contents[0].parts).toHaveLength(4)
-    expect(requestBody.contents[0].parts[1]?.inlineData?.data).toBe(
-      Buffer.from('customer-selfie').toString('base64'),
-    )
-    expect(requestBody.contents[0].parts[2]?.inlineData?.data).toBe(
-      Buffer.from('customer-full-body').toString('base64'),
-    )
-    expect(requestBody.contents[0].parts[3]?.inlineData?.mimeType).toBe('image/jpeg')
+    const parts = requestBody.contents[0].parts
+    // 5 parts: prompt text, CUSTOMER_PHOTO label, customer image, GARMENT_IMAGE label, garment image
+    expect(parts).toHaveLength(5)
+    expect(parts[1]?.text).toContain('CUSTOMER_PHOTO')
+    expect(parts[3]?.text).toContain('GARMENT_IMAGE')
 
     expect(storageBucket.upload).toHaveBeenCalledWith(
-      expect.stringMatching(/\.png$/),
+      expect.stringMatching(/\.jpg$/),
       expect.any(Buffer),
       expect.objectContaining({
-        contentType: 'image/png',
+        contentType: 'image/jpeg',
         upsert: false,
       }),
     )
     expect(storageBucket.createSignedUrl).toHaveBeenCalledOnce()
-    expect(result.resultUrl).toBe('https://cdn.example.com/result.png')
+    expect(result.resultUrl).toBe('https://cdn.example.com/result.jpg')
     expect(result.requestId).toBeTruthy()
   })
 })

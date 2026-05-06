@@ -31,8 +31,7 @@ export type TryOnResult = TryOnSuccess | { ok: false; error: TryOnError }
 export interface RunTryOnInput {
   pecaId: string
   turnstileToken: string
-  customerSelfieImage: string
-  customerFullBodyImage: string
+  customerPhoto: string
   ip: string
   sessionId?: string
   garmentImageUrlOverride?: string | null
@@ -119,8 +118,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   }
 
   const providerInput = buildTryOnProviderInput({
-    customerSelfieImage: input.customerSelfieImage,
-    customerFullBodyImage: input.customerFullBodyImage,
+    customerPhoto: input.customerPhoto,
     productImage: garmentUrl,
   })
 

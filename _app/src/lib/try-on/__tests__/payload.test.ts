@@ -2,25 +2,33 @@ import { describe, expect, it } from 'vitest'
 import { buildTryOnProviderInput } from '../payload'
 
 describe('buildTryOnProviderInput', () => {
-  it('mapeia selfie para referência de rosto e corpo inteiro para referência corporal', () => {
+  it('mapeia a foto única do cliente para customer e references', () => {
     const payload = buildTryOnProviderInput({
-      customerSelfieImage: 'data:image/webp;base64,selfie',
-      customerFullBodyImage: 'data:image/webp;base64,body',
+      customerPhoto: 'data:image/webp;base64,foto',
       productImage: 'https://cdn.example.com/product.webp',
     })
 
     expect(payload).toEqual({
       customer: {
-        selfieImage: 'data:image/webp;base64,selfie',
-        fullBodyImage: 'data:image/webp;base64,body',
+        photoImage: 'data:image/webp;base64,foto',
       },
       references: {
-        faceReferenceImage: 'data:image/webp;base64,selfie',
-        bodyReferenceImage: 'data:image/webp;base64,body',
+        customerReferenceImage: 'data:image/webp;base64,foto',
       },
       product: {
         productImage: 'https://cdn.example.com/product.webp',
       },
     })
+  })
+
+  it('customer.photoImage e references.customerReferenceImage apontam para a mesma imagem', () => {
+    const photo = 'data:image/jpeg;base64,abc123'
+    const payload = buildTryOnProviderInput({
+      customerPhoto: photo,
+      productImage: 'https://cdn.example.com/p.jpg',
+    })
+
+    expect(payload.customer.photoImage).toBe(photo)
+    expect(payload.references.customerReferenceImage).toBe(photo)
   })
 })

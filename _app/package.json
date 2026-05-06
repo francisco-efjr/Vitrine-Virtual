@@ -21,6 +21,9 @@
     "supabase:types": "supabase gen types typescript --local > src/types/database.ts",
     "prepare": "husky"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["sharp", "esbuild"]
+  },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
@@ -32,6 +35,7 @@
     "next": "14.2.16",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "sharp": "^0.33.5",
     "tailwind-merge": "^2.5.4",
     "zod": "^3.23.8"
   },
@@ -76,4 +80,3 @@
     "node": ">=20.0.0"
   }
 }
- 

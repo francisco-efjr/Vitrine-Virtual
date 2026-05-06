@@ -14,7 +14,7 @@ describe('TryOnModal', () => {
     vi.restoreAllMocks()
   })
 
-  it('exige selfie e foto de corpo inteiro antes de permitir continuar', async () => {
+  it('exige uma foto antes de permitir continuar', async () => {
     const { container } = render(
       <TryOnModal
         open
@@ -27,33 +27,28 @@ describe('TryOnModal', () => {
       />,
     )
 
-    const confirmButton = screen.getByRole('button', { name: /confirmar fotos/i })
+    const confirmButton = screen.getByRole('button', { name: /confirmar foto/i })
     expect(confirmButton).toBeDisabled()
 
     const fileInputs = Array.from(container.querySelectorAll('input[type="file"]'))
-    const selfieFile = new File(['selfie'], 'selfie.jpg', { type: 'image/jpeg' })
-    const corpoFile = new File(['corpo'], 'corpo.jpg', { type: 'image/jpeg' })
+    const photoFile = new File(['foto'], 'foto.jpg', { type: 'image/jpeg' })
 
-    fireEvent.click(screen.getByText(/concordo que minhas fotos/i))
+    fireEvent.click(screen.getByText(/concordo que minha foto/i))
     expect(confirmButton).toBeEnabled()
-    fireEvent.click(confirmButton)
-    expect(screen.getAllByText('Envie uma selfie para continuar.').length).toBeGreaterThan(0)
 
-    fireEvent.change(fileInputs[1] as HTMLInputElement, { target: { files: [selfieFile] } })
-    await waitFor(() => expect(screen.getAllByAltText('Foto selfie').length).toBeGreaterThan(0))
     fireEvent.click(confirmButton)
-    expect(screen.getAllByText('Envie uma foto de corpo inteiro para continuar.').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Envie uma foto para continuar.').length).toBeGreaterThan(0)
 
-    fireEvent.change(fileInputs[3] as HTMLInputElement, { target: { files: [corpoFile] } })
+    fireEvent.change(fileInputs[0] as HTMLInputElement, { target: { files: [photoFile] } })
+    await waitFor(() => expect(screen.getAllByAltText('Sua foto').length).toBeGreaterThan(0))
+
+    fireEvent.click(confirmButton)
     await waitFor(() =>
-      expect(screen.getAllByAltText('Foto de corpo inteiro no espelho').length).toBeGreaterThan(0),
+      expect(screen.getByText(/confirme a foto antes de continuar/i)).toBeInTheDocument(),
     )
-    fireEvent.click(confirmButton)
-
-    await waitFor(() => expect(screen.getByText(/confirme as fotos antes de continuar/i)).toBeInTheDocument())
   })
 
-  it('envia selfie e foto de corpo inteiro em campos separados', async () => {
+  it('envia apenas uma foto do cliente em customerPhoto', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
         ok: true,
@@ -76,30 +71,27 @@ describe('TryOnModal', () => {
     )
 
     const fileInputs = Array.from(container.querySelectorAll('input[type="file"]'))
-    const selfieFile = new File(['selfie'], 'selfie.jpg', { type: 'image/jpeg' })
-    const corpoFile = new File(['corpo'], 'corpo.jpg', { type: 'image/jpeg' })
+    const photoFile = new File(['foto'], 'foto.jpg', { type: 'image/jpeg' })
 
-    fireEvent.change(fileInputs[1] as HTMLInputElement, { target: { files: [selfieFile] } })
-    fireEvent.change(fileInputs[3] as HTMLInputElement, { target: { files: [corpoFile] } })
-    await waitFor(() => expect(screen.getAllByAltText('Foto selfie').length).toBeGreaterThan(0))
-    await waitFor(() =>
-      expect(screen.getAllByAltText('Foto de corpo inteiro no espelho').length).toBeGreaterThan(0),
-    )
-    fireEvent.click(screen.getByText(/concordo que minhas fotos/i))
-    fireEvent.click(screen.getByRole('button', { name: /confirmar fotos/i }))
+    fireEvent.change(fileInputs[0] as HTMLInputElement, { target: { files: [photoFile] } })
+    await waitFor(() => expect(screen.getAllByAltText('Sua foto').length).toBeGreaterThan(0))
+
+    fireEvent.click(screen.getByText(/concordo que minha foto/i))
+    fireEvent.click(screen.getByRole('button', { name: /confirmar foto/i }))
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /gerar provador virtual/i })).toBeInTheDocument(),
+      expect(screen.getByText(/confirme a foto antes de continuar/i)).toBeInTheDocument(),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /gerar provador virtual/i }))
+    fireEvent.click(screen.getByRole('button', { name: /entrar na cabine/i }))
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
 
     const [, init] = fetchMock.mock.calls[0] ?? []
     const body = init?.body as FormData
-    expect(body.get('customerSelfieImage')).toBeInstanceOf(File)
-    expect(body.get('customerFullBodyImage')).toBeInstanceOf(File)
+    expect(body.get('customerPhoto')).toBeInstanceOf(File)
+    expect(body.has('customerSelfieImage')).toBe(false)
+    expect(body.has('customerFullBodyImage')).toBe(false)
     expect(body.get('garment_url_override')).toBe('https://cdn.example.com/product.webp')
   })
 })
