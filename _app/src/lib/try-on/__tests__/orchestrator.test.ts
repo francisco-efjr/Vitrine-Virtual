@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { _resetEnvCache } from '@/lib/env'
+import { fashnProvider } from '../fashn'
+import { googleAiProvider } from '../google-ai'
 import { generateTryOn } from '../orchestrator'
+import { replicateProvider } from '../replicate'
 import { TryOnProviderError, type TryOnProvider } from '../types'
 
-function makeProvider(name: 'fashn' | 'replicate', behavior: 'ok' | 'retry' | 'fatal'): TryOnProvider {
+const ORIGINAL_ENV = { ...process.env }
+
+function makeProvider(
+  name: 'fashn' | 'replicate',
+  behavior: 'ok' | 'retry' | 'fatal',
+): TryOnProvider {
   return {
     name,
     generate: vi.fn(async () => {
@@ -23,14 +32,24 @@ function makeProvider(name: 'fashn' | 'replicate', behavior: 'ok' | 'retry' | 'f
 }
 
 describe('orchestrator.generateTryOn', () => {
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+    _resetEnvCache()
+    vi.restoreAllMocks()
+  })
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV
+    _resetEnvCache()
+    vi.restoreAllMocks()
+  })
+
   const input = {
     customer: {
-      selfieImage: 'data:image/jpeg;base64,selfie',
-      fullBodyImage: 'data:image/jpeg;base64,body',
+      photoImage: 'data:image/jpeg;base64,foto',
     },
     references: {
-      faceReferenceImage: 'data:image/jpeg;base64,selfie',
-      bodyReferenceImage: 'data:image/jpeg;base64,body',
+      customerReferenceImage: 'data:image/jpeg;base64,foto',
     },
     product: {
       productImage: 'https://x.com/g.jpg',
@@ -69,5 +88,40 @@ describe('orchestrator.generateTryOn', () => {
     await expect(generateTryOn(input, [fashn, replicate])).rejects.toBeInstanceOf(
       TryOnProviderError,
     )
+  })
+
+  it('usa Nano Banana como primeiro provider default quando configurado', async () => {
+    process.env = {
+      ...ORIGINAL_ENV,
+      SUPABASE_SERVICE_ROLE_KEY: 'service-role-test',
+      GOOGLE_AI_API_KEY: 'google-test-key',
+      FASHN_API_KEY: 'fashn-test-key',
+      REPLICATE_API_TOKEN: 'replicate-test-token',
+      REPLICATE_VTON_MODEL: 'replicate-test-model',
+    }
+    _resetEnvCache()
+
+    const resultPayload = {
+      resultUrl: 'https://google.example.com/r.jpg',
+      requestId: 'google-1',
+      durationMs: 100,
+      expiresAt: new Date(Date.now() + 86400_000).toISOString(),
+    }
+    const googleGenerate = vi.spyOn(googleAiProvider, 'generate').mockResolvedValue(resultPayload)
+    const fashnGenerate = vi.spyOn(fashnProvider, 'generate').mockResolvedValue({
+      ...resultPayload,
+      requestId: 'fashn-1',
+    })
+    const replicateGenerate = vi.spyOn(replicateProvider, 'generate').mockResolvedValue({
+      ...resultPayload,
+      requestId: 'replicate-1',
+    })
+
+    const result = await generateTryOn(input)
+
+    expect(result.provider).toBe('google')
+    expect(googleGenerate).toHaveBeenCalledOnce()
+    expect(fashnGenerate).not.toHaveBeenCalled()
+    expect(replicateGenerate).not.toHaveBeenCalled()
   })
 })

@@ -18,6 +18,18 @@ vi.mock('@/lib/supabase/service', () => ({
   }),
 }))
 
+const SINGLE_PHOTO_INPUT = {
+  customer: {
+    photoImage: `data:image/jpeg;base64,${Buffer.from('customer-photo').toString('base64')}`,
+  },
+  references: {
+    customerReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-photo').toString('base64')}`,
+  },
+  product: {
+    productImage: 'https://example.com/garment.jpg',
+  },
+}
+
 describe('openAiProvider.generate', () => {
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV, SUPABASE_SERVICE_ROLE_KEY: 'service-role-test' }
@@ -37,21 +49,9 @@ describe('openAiProvider.generate', () => {
     delete process.env.OPENAI_API_KEY
     _resetEnvCache()
 
-    await expect(
-      openAiProvider.generate({
-        customer: {
-          selfieImage: 'data:image/jpeg;base64,Y2xpZW50ZS1yb3N0bw==',
-          fullBodyImage: 'data:image/jpeg;base64,Y2xpZW50ZS1jb3Jwbw==',
-        },
-        references: {
-          faceReferenceImage: 'data:image/jpeg;base64,Y2xpZW50ZS1yb3N0bw==',
-          bodyReferenceImage: 'data:image/jpeg;base64,Y2xpZW50ZS1jb3Jwbw==',
-        },
-        product: {
-          productImage: 'https://example.com/garment.jpg',
-        },
-      }),
-    ).rejects.toEqual(new TryOnProviderError('OPENAI_API_KEY não configurada', 'openai', false))
+    await expect(openAiProvider.generate(SINGLE_PHOTO_INPUT)).rejects.toEqual(
+      new TryOnProviderError('OPENAI_API_KEY não configurada', 'openai', false),
+    )
   })
 
   it('gera imagem, salva no storage e retorna signed URL', async () => {
@@ -61,12 +61,14 @@ describe('openAiProvider.generate', () => {
 
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
+      // garment download
       .mockResolvedValueOnce(
         new Response(new Uint8Array([1, 2, 3, 4]), {
           status: 200,
           headers: { 'Content-Type': 'image/jpeg' },
         }),
       )
+      // OpenAI images/edits
       .mockResolvedValueOnce(
         Response.json({
           data: [{ b64_json: Buffer.from('generated-image').toString('base64') }],
@@ -79,19 +81,7 @@ describe('openAiProvider.generate', () => {
       error: null,
     })
 
-    const result = await openAiProvider.generate({
-      customer: {
-        selfieImage: `data:image/jpeg;base64,${Buffer.from('customer-selfie').toString('base64')}`,
-        fullBodyImage: `data:image/jpeg;base64,${Buffer.from('customer-full-body').toString('base64')}`,
-      },
-      references: {
-        faceReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-selfie').toString('base64')}`,
-        bodyReferenceImage: `data:image/jpeg;base64,${Buffer.from('customer-full-body').toString('base64')}`,
-      },
-      product: {
-        productImage: 'https://example.com/garment.jpg',
-      },
-    })
+    const result = await openAiProvider.generate(SINGLE_PHOTO_INPUT)
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -110,8 +100,12 @@ describe('openAiProvider.generate', () => {
         body: expect.any(FormData),
       }),
     )
+
     const requestBody = fetchMock.mock.calls[1]?.[1]?.body as FormData
-    expect(requestBody.getAll('image[]')).toHaveLength(3)
+    const images = requestBody.getAll('image[]') as File[]
+    // 2 images: customer-photo + garment (no more body/selfie split)
+    expect(images).toHaveLength(2)
+    expect(images.map((image) => image.name)).toEqual(['customer-photo.jpg', 'garment-image.jpg'])
     expect(requestBody.get('prompt')).toBeTruthy()
 
     expect(storageBucket.upload).toHaveBeenCalledWith(

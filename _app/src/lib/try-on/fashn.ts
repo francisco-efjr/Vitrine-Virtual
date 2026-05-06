@@ -33,7 +33,7 @@ export const fashnProvider: TryOnProvider = {
         'X-No-Retention': 'true',
       },
       body: JSON.stringify({
-        model_image: input.references.bodyReferenceImage,
+        model_image: input.references.customerReferenceImage,
         garment_image: input.product.productImage,
         category: 'auto',
         mode: 'balanced',

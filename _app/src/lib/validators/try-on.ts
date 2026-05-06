@@ -9,15 +9,12 @@ export const tryOnRequestSchema = z.object({
 })
 export type TryOnRequest = z.infer<typeof tryOnRequestSchema>
 
-export const tryOnClientPhotosSchema = z.object({
-  selfie: z.object({
-    name: z.string().min(1),
-  }),
-  corpo_inteiro: z.object({
+export const tryOnClientPhotoSchema = z.object({
+  foto: z.object({
     name: z.string().min(1),
   }),
 })
-export type TryOnClientPhotos = z.infer<typeof tryOnClientPhotosSchema>
+export type TryOnClientPhoto = z.infer<typeof tryOnClientPhotoSchema>
 
 export const tryOnResultSchema = z.object({
   result_url: z.string().url(),

@@ -1,22 +1,18 @@
 import type { TryOnProviderInput } from './types'
 
 export function buildTryOnProviderInput({
-  customerSelfieImage,
-  customerFullBodyImage,
+  customerPhoto,
   productImage,
 }: {
-  customerSelfieImage: string
-  customerFullBodyImage: string
+  customerPhoto: string
   productImage: string
 }): TryOnProviderInput {
   return {
     customer: {
-      selfieImage: customerSelfieImage,
-      fullBodyImage: customerFullBodyImage,
+      photoImage: customerPhoto,
     },
     references: {
-      faceReferenceImage: customerSelfieImage,
-      bodyReferenceImage: customerFullBodyImage,
+      customerReferenceImage: customerPhoto,
     },
     product: {
       productImage,

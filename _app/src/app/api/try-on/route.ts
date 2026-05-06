@@ -10,15 +10,15 @@ import { logger } from '@/lib/logger'
 /**
  * Rota do provador virtual.
  *
- * - Aceita multipart com: customerSelfieImage, customerFullBodyImage, peca_id, turnstile_token, consent.
- * - As fotos vivem APENAS aqui em memória — descartadas após response (ADR 0006).
- * - Tamanho máx: 8 MB (validação extra além das 4 camadas anti-abuso).
+ * - Aceita multipart com: customerPhoto, peca_id, turnstile_token, consent.
+ * - A foto vive APENAS aqui em memória — descartada após response (ADR 0006).
+ * - Tamanho máx: 10 MB (validação extra além das 4 camadas anti-abuso).
  *
  * Roda em Node runtime (não Edge) porque o polling do FASHN pode passar de 25s.
  */
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // segundos
+export const maxDuration = 180 // segundos — cobre 120s de timeout do fetch + retry + upload
 
 const fieldSchema = z.object({
   peca_id: z.string().uuid('peca_id inválido'),
@@ -40,54 +40,32 @@ export async function POST(req: NextRequest) {
   const parsed = fieldSchema.safeParse(fields)
   if (!parsed.success) return fail('Campos inválidos', 'VALIDATION_ERROR', 400)
 
-  const customerSelfieImage = formData.get('customerSelfieImage')
-  if (!(customerSelfieImage instanceof Blob)) {
-    return fail('Envie uma selfie para continuar.', 'NO_SELFIE_PHOTO', 400)
+  const customerPhoto = formData.get('customerPhoto')
+  if (!(customerPhoto instanceof Blob)) {
+    return fail('Envie uma foto para continuar.', 'NO_CUSTOMER_PHOTO', 400)
   }
 
-  const customerFullBodyImage = formData.get('customerFullBodyImage')
-  if (!(customerFullBodyImage instanceof Blob)) {
-    return fail('Envie uma foto de corpo inteiro para continuar.', 'NO_FULL_BODY_PHOTO', 400)
-  }
-
-  const selfieValidation = validateImageUploadMeta({
-    filename: customerSelfieImage instanceof File ? customerSelfieImage.name : 'selfie.webp',
-    contentType: customerSelfieImage.type,
-    size: customerSelfieImage.size,
+  const photoValidation = validateImageUploadMeta({
+    filename: customerPhoto instanceof File ? customerPhoto.name : 'foto.webp',
+    contentType: customerPhoto.type,
+    size: customerPhoto.size,
   })
-  if (!selfieValidation.ok) {
+  if (!photoValidation.ok) {
     return fail(
-      selfieValidation.message,
-      'BAD_SELFIE_IMAGE',
-      selfieValidation.message.includes('10 MB') ? 413 : 415,
+      photoValidation.message,
+      'BAD_CUSTOMER_PHOTO',
+      photoValidation.message.includes('10 MB') ? 413 : 415,
     )
   }
 
-  const fullBodyValidation = validateImageUploadMeta({
-    filename:
-      customerFullBodyImage instanceof File ? customerFullBodyImage.name : 'corpo-inteiro.webp',
-    contentType: customerFullBodyImage.type,
-    size: customerFullBodyImage.size,
-  })
-  if (!fullBodyValidation.ok) {
-    return fail(
-      fullBodyValidation.message,
-      'BAD_FULL_BODY_IMAGE',
-      fullBodyValidation.message.includes('10 MB') ? 413 : 415,
-    )
-  }
-
-  const selfieBuffer = Buffer.from(await customerSelfieImage.arrayBuffer())
-  const customerSelfieDataUrl = `data:${customerSelfieImage.type};base64,${selfieBuffer.toString('base64')}`
-  const fullBodyBuffer = Buffer.from(await customerFullBodyImage.arrayBuffer())
-  const customerFullBodyDataUrl = `data:${customerFullBodyImage.type};base64,${fullBodyBuffer.toString('base64')}`
+  const photoBuffer = Buffer.from(await customerPhoto.arrayBuffer())
+  const customerPhotoDataUrl = `data:${customerPhoto.type};base64,${photoBuffer.toString('base64')}`
 
   const ip = extractClientIp(req)
   const result = await runTryOn({
     pecaId: parsed.data.peca_id,
     turnstileToken: parsed.data.turnstile_token,
-    customerSelfieImage: customerSelfieDataUrl,
-    customerFullBodyImage: customerFullBodyDataUrl,
+    customerPhoto: customerPhotoDataUrl,
     ip,
     sessionId: parsed.data.session_id,
     garmentImageUrlOverride: parsed.data.garment_url_override,

@@ -12,7 +12,7 @@ describe('TryOnButton', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: /abrir provador virtual/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /experimentar na cabine/i })).toBeInTheDocument()
     expect(screen.queryByText(/ia/i)).not.toBeInTheDocument()
   })
 })
