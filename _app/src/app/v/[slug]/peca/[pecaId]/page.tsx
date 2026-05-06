@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, MessageCircle } from 'lucide-react'
+// Cabine = virtual fitting room
 import { PublicLiveRefresh } from '@/components/public/public-live-refresh'
 import { TryOnButton } from '@/components/public/try-on-button'
 import { GaleriaFotos } from '@/components/public/galeria-fotos'

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +13,16 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // Local logo preview (before upload implementation)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
+
+  function handleLogoFile(file: File | null) {
+    if (!file || !file.type.startsWith('image/')) return
+    const url = URL.createObjectURL(file)
+    setLogoPreview(url)
+    // TODO: upload logo to storage and update loja.logo_storage_path
+  }
 
   async function save() {
     setSaving(true)
@@ -51,20 +62,61 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
         Personalize como sua vitrine aparece para os clientes.
       </p>
 
+      {/* Identidade */}
       <Card className="mb-5 p-6">
         <div className="mb-4 text-xs font-semibold uppercase tracking-widest text-ink-2">
           Identidade
         </div>
         <div className="flex flex-col gap-4">
-          <Input
-            label="Nome da loja"
-            value={loja.nome}
-            onChange={(e) => setLoja({ ...loja, nome: e.target.value })}
-            maxLength={80}
-          />
+          {/* Logo + nome em linha */}
+          <div className="flex items-center gap-4">
+            {/* Logo tile 64×64 */}
+            <button
+              type="button"
+              onClick={() => logoInputRef.current?.click()}
+              title="Clique para enviar o logo"
+              className="group relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-border bg-surface-2 transition hover:border-accent"
+              aria-label="Enviar logo da loja"
+            >
+              {logoPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoPreview}
+                  alt="Logo"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-1">
+                  <ImageIcon size={18} className="text-ink-3" />
+                  <span className="text-[9px] text-ink-3">Logo</span>
+                </div>
+              )}
+              {/* Hover overlay */}
+              <div className="absolute inset-0 flex items-center justify-center bg-ink/0 transition group-hover:bg-ink/25">
+                <ImageIcon size={14} className="text-white opacity-0 transition group-hover:opacity-100" />
+              </div>
+            </button>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => handleLogoFile(e.target.files?.[0] ?? null)}
+            />
+
+            <div className="flex-1">
+              <Input
+                label="Nome da loja"
+                value={loja.nome}
+                onChange={(e) => setLoja({ ...loja, nome: e.target.value })}
+                maxLength={80}
+              />
+            </div>
+          </div>
         </div>
       </Card>
 
+      {/* Contato & redes */}
       <Card className="mb-5 p-6">
         <div className="mb-4 text-xs font-semibold uppercase tracking-widest text-ink-2">
           Contato &amp; redes
@@ -76,25 +128,28 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
             onChange={(e) => setLoja({ ...loja, whatsapp_e164: e.target.value })}
             onBlur={(e) => setLoja({ ...loja, whatsapp_e164: normalizeWhatsApp(e.target.value) })}
             placeholder="+5511998765432"
-            helper="Use o número completo com código do país. Exemplo: +5511998765432"
+            helper="Número completo com código do país. Exemplo: +5511998765432"
           />
-          <Input
-            label="Instagram"
-            value={loja.instagram ?? ''}
-            onChange={(e) => setLoja({ ...loja, instagram: e.target.value })}
-            prefix="@"
-            placeholder="atelierlaila"
-          />
-          <Input
-            label="TikTok"
-            value={loja.tiktok ?? ''}
-            onChange={(e) => setLoja({ ...loja, tiktok: e.target.value })}
-            prefix="@"
-            placeholder="atelierlaila"
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Instagram"
+              value={loja.instagram ?? ''}
+              onChange={(e) => setLoja({ ...loja, instagram: e.target.value })}
+              prefix="@"
+              placeholder="atelierlaila"
+            />
+            <Input
+              label="TikTok"
+              value={loja.tiktok ?? ''}
+              onChange={(e) => setLoja({ ...loja, tiktok: e.target.value })}
+              prefix="@"
+              placeholder="atelierlaila"
+            />
+          </div>
         </div>
       </Card>
 
+      {/* Exibição */}
       <Card className="mb-6 p-6">
         <div className="mb-4 text-xs font-semibold uppercase tracking-widest text-ink-2">
           Exibição

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
-import { Sparkles, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
+import { MessageCircle } from 'lucide-react'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { PublicLiveRefresh } from '@/components/public/public-live-refresh'
@@ -71,7 +71,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   if (!data) return { title: 'Loja não encontrada' }
   return {
     title: `${data.loja.nome} · Vitrine Virtual`,
-    description: `Vitrine de ${data.loja.nome} — peças disponíveis com provador virtual.`,
+    description: `Vitrine de ${data.loja.nome} — peças disponíveis com cabine virtual.`,
     openGraph: { title: data.loja.nome, type: 'website' },
   }
 }
@@ -87,16 +87,12 @@ export default async function VitrinePage({ params }: { params: { slug: string }
   return (
     <div className="min-h-screen bg-bg">
       <PublicLiveRefresh />
+
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-border bg-surface px-4 py-4 sm:px-12">
-        <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 sm:flex-row sm:justify-between">
-          <div className="text-center sm:text-left">
-            <div className="font-serif text-2xl font-semibold tracking-wider">
-              {data.loja.nome}
-            </div>
-            {data.loja.instagram ? (
-              <div className="text-xs text-ink-3">@{data.loja.instagram}</div>
-            ) : null}
+      <header className="sticky top-0 z-10 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-12">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <div className="font-serif text-xl font-semibold tracking-wider text-ink sm:text-2xl">
+            {data.loja.nome}
           </div>
           <nav className="flex items-center gap-2">
             {data.loja.instagram ? (
@@ -104,9 +100,10 @@ export default async function VitrinePage({ params }: { params: { slug: string }
                 href={`https://instagram.com/${data.loja.instagram}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-full bg-surface-2 px-3 py-1.5 text-xs text-ink-2 transition hover:text-ink"
+                aria-label="Instagram"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-ink-2 transition hover:bg-surface-3 hover:text-ink"
               >
-                Instagram
+                <IconInstagram />
               </a>
             ) : null}
             {data.loja.tiktok ? (
@@ -114,9 +111,10 @@ export default async function VitrinePage({ params }: { params: { slug: string }
                 href={`https://tiktok.com/@${data.loja.tiktok}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-full bg-surface-2 px-3 py-1.5 text-xs text-ink-2 transition hover:text-ink"
+                aria-label="TikTok"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-ink-2 transition hover:bg-surface-3 hover:text-ink"
               >
-                TikTok
+                <IconTikTok />
               </a>
             ) : null}
             {wa ? (
@@ -124,32 +122,19 @@ export default async function VitrinePage({ params }: { params: { slug: string }
                 href={wa}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#25d366] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#1fb155]"
+                aria-label="WhatsApp"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25d366] text-white transition hover:bg-[#1fb155]"
               >
-                <MessageCircle size={12} />
-                WhatsApp
+                <MessageCircle size={16} />
               </a>
             ) : null}
           </nav>
         </div>
       </header>
 
-      {/* Hero */}
-      <div className="bg-accent-light px-4 py-4 sm:px-12">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
-          <div className="font-serif text-sm font-medium text-accent-dark sm:text-base">
-            <Sparkles size={14} className="mr-1.5 inline" />
-            Provador Virtual — experimente antes de comprar
-          </div>
-          <div className="text-xs text-accent-dark">
-            Toque em qualquer peça para provar
-          </div>
-        </div>
-      </div>
-
       {/* Grid */}
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-12 sm:py-10">
-        <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="mb-6 flex items-center justify-between gap-3">
           <h2 className="font-serif text-xl font-medium sm:text-[22px]">Peças disponíveis</h2>
           <span className="text-xs text-ink-3 sm:text-sm">{data.pecas.length} itens</span>
         </div>
@@ -166,7 +151,8 @@ export default async function VitrinePage({ params }: { params: { slug: string }
                 href={`/v/${data.loja.slug}/peca/${p.peca_id}`}
                 className="flex h-full flex-col overflow-hidden rounded-card bg-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover"
               >
-                <div className="aspect-square w-full bg-[#f0ebe3]" aria-hidden="true">
+                {/* 3:4 portrait ratio */}
+                <div className="aspect-[3/4] w-full bg-[#f0ebe3]" aria-hidden="true">
                   {p.foto_principal_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -181,42 +167,84 @@ export default async function VitrinePage({ params }: { params: { slug: string }
                   {p.tamanho ? (
                     <div className="mt-1 text-xs text-ink-3">{p.tamanho}</div>
                   ) : null}
-                  <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+                  <div className="mt-auto pt-3">
                     {data.loja.exibir_preco_publico && p.preco_centavos != null ? (
                       <span className="font-serif text-base font-semibold sm:text-lg">
                         {formatPreco(p.preco_centavos)}
                       </span>
                     ) : (
-                      <span className="text-xs text-ink-3">Consulte</span>
+                      <span className="text-xs text-ink-3">Experimentar</span>
                     )}
-                    <span
-                      className="inline-flex items-center rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-white"
-                    >
-                      Ver peça
-                    </span>
                   </div>
                 </div>
               </Link>
             ))}
           </div>
         )}
-
-        {wa ? (
-          <a
-            href={wa}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-8 flex items-center justify-center gap-2 rounded-card bg-[#25d366] py-3.5 font-semibold text-white transition hover:bg-[#1fb155] sm:mx-auto sm:max-w-md"
-          >
-            <MessageCircle size={18} />
-            Falar com a loja no WhatsApp
-          </a>
-        ) : null}
-
-        <p className="mt-8 text-center text-xs text-ink-3">
-          Vitrine criada com <span className="text-accent">vitrine.app</span>
-        </p>
       </main>
+
+      {/* Store banner */}
+      <footer className="mt-4 bg-ink px-4 py-10 text-center sm:px-12">
+        <div className="mx-auto max-w-sm">
+          <div className="mb-4 font-serif text-2xl font-medium tracking-wider text-surface">
+            {data.loja.nome}
+          </div>
+          <div className="mb-6 flex items-center justify-center gap-3">
+            {data.loja.instagram ? (
+              <a
+                href={`https://instagram.com/${data.loja.instagram}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+              >
+                <IconInstagram />
+              </a>
+            ) : null}
+            {data.loja.tiktok ? (
+              <a
+                href={`https://tiktok.com/@${data.loja.tiktok}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="TikTok"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+              >
+                <IconTikTok />
+              </a>
+            ) : null}
+            {wa ? (
+              <a
+                href={wa}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#25d366] text-white transition hover:bg-[#1fb155]"
+              >
+                <MessageCircle size={18} />
+              </a>
+            ) : null}
+          </div>
+          <div className="text-[11px] uppercase tracking-widest text-white/30">vitrine.app</div>
+        </div>
+      </footer>
     </div>
+  )
+}
+
+function IconInstagram() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function IconTikTok() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.17 8.17 0 004.78 1.52v-3.4a4.85 4.85 0 01-1.01-.12z" />
+    </svg>
   )
 }

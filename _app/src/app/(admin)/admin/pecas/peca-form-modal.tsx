@@ -12,6 +12,9 @@ import {
 } from '@/lib/validators/peca'
 import type { PecaRow } from '@/types/database'
 
+// Tamanhos-padrão conforme o design
+const TAMANHOS_PADRAO = ['PP', 'P', 'M', 'G', 'GG', '36', '38', '40', '42', '44', 'Único']
+
 export function PecaFormModal({
   open,
   peca,
@@ -25,7 +28,8 @@ export function PecaFormModal({
 }) {
   const [nome, setNome] = useState('')
   const [preco, setPreco] = useState('')
-  const [tamanho, setTamanho] = useState('')
+  const [tamanhosSel, setTamanhosSel] = useState<string[]>([])
+  const [tamanhoCustom, setTamanhoCustom] = useState('')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [existingFotos, setExistingFotos] = useState<ExistingFoto[]>([])
@@ -37,9 +41,20 @@ export function PecaFormModal({
 
     setNome(peca?.nome ?? '')
     setPreco(centavosToPrecoString(peca?.preco_centavos))
-    setTamanho(peca?.tamanho ?? '')
     setErr(null)
     setExistingFotos([])
+
+    // Parse tamanhos existentes nos chips
+    if (peca?.tamanho) {
+      const parts = peca.tamanho.split(/[,·\s]+/).map((t) => t.trim()).filter(Boolean)
+      const known = parts.filter((t) => TAMANHOS_PADRAO.includes(t))
+      const custom = parts.filter((t) => !TAMANHOS_PADRAO.includes(t))
+      setTamanhosSel(known)
+      setTamanhoCustom(custom.join(', '))
+    } else {
+      setTamanhosSel([])
+      setTamanhoCustom('')
+    }
 
     if (!peca?.id) return
 
@@ -55,6 +70,20 @@ export function PecaFormModal({
       })
       .finally(() => setLoadingFotos(false))
   }, [open, peca])
+
+  function toggleTamanho(t: string) {
+    setTamanhosSel((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+    )
+  }
+
+  function buildTamanhoString(): string | null {
+    const all = [
+      ...tamanhosSel,
+      ...tamanhoCustom.split(',').map((t) => t.trim()).filter(Boolean),
+    ]
+    return all.length > 0 ? all.join(', ') : null
+  }
 
   async function handleSave() {
     if (!nome.trim()) return
@@ -79,7 +108,7 @@ export function PecaFormModal({
         body: JSON.stringify({
           nome: nome.trim(),
           preco_centavos: precoCentavos,
-          tamanho: tamanho.trim() || null,
+          tamanho: buildTamanhoString(),
         }),
       })
 
@@ -127,6 +156,7 @@ export function PecaFormModal({
       }
     >
       <div className="space-y-4">
+        {/* Nome — único campo obrigatório */}
         <Input
           label="Nome"
           value={nome}
@@ -135,25 +165,65 @@ export function PecaFormModal({
           disabled={saving}
         />
 
-        <Input
-          label="Preço"
-          value={preco}
-          onChange={(e) => setPreco(e.target.value)}
-          placeholder="89,90"
-          disabled={saving}
-          inputMode="decimal"
-          helper="Opcional. Aceita 89,90 ou 89.90."
-        />
+        {/* Preço — opcional */}
+        <div>
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <span className="text-[13px] font-medium text-ink-2">Preço</span>
+            <span className="text-[11px] text-ink-3">opcional</span>
+          </div>
+          <Input
+            value={preco}
+            onChange={(e) => setPreco(e.target.value)}
+            placeholder="89,90"
+            disabled={saving}
+            inputMode="decimal"
+            helper="Aceita 89,90 ou 89.90"
+          />
+        </div>
 
-        <Input
-          label="Tamanho"
-          value={tamanho}
-          onChange={(e) => setTamanho(e.target.value)}
-          placeholder="Ex: P, M, 38"
-          disabled={saving}
-          helper="Opcional."
-        />
+        {/* Tamanhos — chips múltiplos, opcional */}
+        <div>
+          <div className="mb-2 flex items-center gap-1.5">
+            <span className="text-[13px] font-medium text-ink-2">Tamanhos</span>
+            <span className="text-[11px] text-ink-3">opcional</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {TAMANHOS_PADRAO.map((t) => {
+              const on = tamanhosSel.includes(t)
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  disabled={saving}
+                  onClick={() => toggleTamanho(t)}
+                  className={`rounded-full border px-3 py-1 text-[12.5px] transition ${
+                    on
+                      ? 'border-accent bg-accent-light font-semibold text-accent-dark'
+                      : 'border-border text-ink-2 hover:border-border-2'
+                  }`}
+                >
+                  {t}
+                </button>
+              )
+            })}
+          </div>
+          {tamanhosSel.length > 0 && (
+            <p className="mt-2 text-[11.5px] text-ink-3">
+              Selecionados: {tamanhosSel.join(', ')}
+            </p>
+          )}
+          {/* Campo livre para tamanhos não listados */}
+          <input
+            type="text"
+            value={tamanhoCustom}
+            onChange={(e) => setTamanhoCustom(e.target.value)}
+            placeholder="Outros (ex: 46, XGG)"
+            disabled={saving}
+            className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-3 focus:border-accent"
+          />
+        </div>
 
+        {/* Fotos */}
         <div className="rounded-card border border-border bg-surface-2 p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
