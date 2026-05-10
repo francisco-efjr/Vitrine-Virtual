@@ -44,8 +44,17 @@ export const lojaCreateSchema = z.object({
 })
 export type LojaCreateInput = z.infer<typeof lojaCreateSchema>
 
+export const provadorFundoTipoSchema = z.enum(['branco', 'personalizado'])
+
 export const lojaUpdateSchema = z.object({
   nome: z.string().trim().min(1, 'Nome da loja é obrigatório').max(80, 'Nome da loja muito longo').optional(),
+  tagline: z
+    .string()
+    .trim()
+    .max(140, 'Tagline muito longa (máx 140 caracteres)')
+    .nullable()
+    .optional()
+    .or(z.literal('')),
   instagram: z.preprocess(
     normalizeSocialHandle,
     z
@@ -68,6 +77,9 @@ export const lojaUpdateSchema = z.object({
   ),
   whatsapp_e164: whatsappE164Schema.optional().or(z.literal('')),
   exibir_preco_publico: z.boolean().optional(),
+  vitrine_publica_visivel: z.boolean().optional(),
+  provador_fundo_tipo: provadorFundoTipoSchema.optional(),
+  provador_fundo_storage_path: z.string().trim().max(500).nullable().optional(),
 })
 export type LojaUpdateInput = z.infer<typeof lojaUpdateSchema>
 

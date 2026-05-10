@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Spinner } from '@/components/ui/spinner'
+import { CATEGORIAS, categoriaNameToId } from '@/lib/categorias'
 import {
   centavosToPrecoString,
   precoStringToCentavos,
@@ -14,6 +15,8 @@ import type { PecaRow } from '@/types/database'
 
 // Tamanhos-padrão conforme o design
 const TAMANHOS_PADRAO = ['PP', 'P', 'M', 'G', 'GG', '36', '38', '40', '42', '44', 'Único']
+
+const CUSTOM_CATEGORIA_VALUE = '__custom__'
 
 export function PecaFormModal({
   open,
@@ -30,6 +33,8 @@ export function PecaFormModal({
   const [preco, setPreco] = useState('')
   const [tamanhosSel, setTamanhosSel] = useState<string[]>([])
   const [tamanhoCustom, setTamanhoCustom] = useState('')
+  const [categoriaSel, setCategoriaSel] = useState<string>('')
+  const [categoriaCustom, setCategoriaCustom] = useState('')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [existingFotos, setExistingFotos] = useState<ExistingFoto[]>([])
@@ -54,6 +59,21 @@ export function PecaFormModal({
     } else {
       setTamanhosSel([])
       setTamanhoCustom('')
+    }
+
+    // Categoria — se está nas pré-definidas, marca; se é custom, vai no input.
+    if (peca?.categoria_id) {
+      const isPredef = CATEGORIAS.some((c) => c.id === peca.categoria_id)
+      if (isPredef) {
+        setCategoriaSel(peca.categoria_id)
+        setCategoriaCustom('')
+      } else {
+        setCategoriaSel(CUSTOM_CATEGORIA_VALUE)
+        setCategoriaCustom(peca.categoria_id)
+      }
+    } else {
+      setCategoriaSel('')
+      setCategoriaCustom('')
     }
 
     if (!peca?.id) return
@@ -85,6 +105,15 @@ export function PecaFormModal({
     return all.length > 0 ? all.join(', ') : null
   }
 
+  function buildCategoriaId(): string | null {
+    if (!categoriaSel) return null
+    if (categoriaSel === CUSTOM_CATEGORIA_VALUE) {
+      const slug = categoriaNameToId(categoriaCustom)
+      return slug || null
+    }
+    return categoriaSel
+  }
+
   async function handleSave() {
     if (!nome.trim()) return
     setSaving(true)
@@ -109,6 +138,7 @@ export function PecaFormModal({
           nome: nome.trim(),
           preco_centavos: precoCentavos,
           tamanho: buildTamanhoString(),
+          categoria_id: buildCategoriaId(),
         }),
       })
 
@@ -181,6 +211,47 @@ export function PecaFormModal({
           />
         </div>
 
+        {/* Categoria — opcional, com opção custom */}
+        <div>
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <span className="text-[13px] font-medium text-ink-2">Categoria</span>
+            <span className="text-[11px] text-ink-3">opcional</span>
+          </div>
+          <div className="relative">
+            <select
+              value={categoriaSel}
+              onChange={(e) => setCategoriaSel(e.target.value)}
+              disabled={saving}
+              className="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-[9px] pr-9 text-sm text-ink outline-none transition focus:border-accent disabled:opacity-60"
+            >
+              <option value="">Sem categoria</option>
+              {CATEGORIAS.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+              <option value={CUSTOM_CATEGORIA_VALUE}>+ Adicionar categoria personalizada</option>
+            </select>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-3"
+            >
+              ▾
+            </span>
+          </div>
+          {categoriaSel === CUSTOM_CATEGORIA_VALUE ? (
+            <input
+              type="text"
+              value={categoriaCustom}
+              onChange={(e) => setCategoriaCustom(e.target.value)}
+              placeholder="Nome da categoria…"
+              disabled={saving}
+              maxLength={60}
+              className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-3 focus:border-accent"
+            />
+          ) : null}
+        </div>
+
         {/* Tamanhos — chips múltiplos, opcional */}
         <div>
           <div className="mb-2 flex items-center gap-1.5">
@@ -242,6 +313,16 @@ export function PecaFormModal({
             disabled={saving}
           />
         </div>
+
+        {/* Info: publicação automática */}
+        {!peca ? (
+          <div className="flex items-start gap-2 rounded-lg bg-accent-light px-3 py-2.5">
+            <span className="mt-0.5 text-accent-dark">◈</span>
+            <span className="text-[12px] leading-snug text-accent-dark">
+              Publicada automaticamente como <strong className="font-semibold">disponível</strong>.
+            </span>
+          </div>
+        ) : null}
 
         {err ? <p className="text-sm text-danger">{err}</p> : null}
       </div>

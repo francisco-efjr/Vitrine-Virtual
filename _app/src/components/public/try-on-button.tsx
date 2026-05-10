@@ -37,7 +37,7 @@ export function TryOnButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-dark"
+        className="vv-shine group inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition duration-200 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:-translate-y-0.5 hover:bg-accent-dark hover:shadow-card-hover active:scale-[0.98]"
       >
         {/* Hanger icon */}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

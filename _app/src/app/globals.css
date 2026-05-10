@@ -5,7 +5,41 @@
 @layer base {
   :root {
     color-scheme: light;
+    /* ── Motion design tokens (espelham o sistema do design entregue) ── */
+    --t-instant: 80ms;
+    --t-fast: 160ms;
+    --t-base: 240ms;
+    --t-slow: 380ms;
+    --t-deliberate: 560ms;
+    --t-cinematic: 900ms;
+
+    --e-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --e-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+    --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --e-in: cubic-bezier(0.55, 0.06, 0.68, 0.19);
+    --e-inout: cubic-bezier(0.65, 0, 0.35, 1);
+
+    --stagger: 55ms;
+    --motion-scale: 1;
   }
+
+  /* Intensidade de motion ajustável (Settings → Motion no design v1) */
+  [data-motion='calm'] {
+    --motion-scale: 0.7;
+    --stagger: 40ms;
+  }
+  [data-motion='playful'] {
+    --motion-scale: 1.25;
+    --stagger: 75ms;
+  }
+  [data-motion='off'] *,
+  [data-motion='off'] *::before,
+  [data-motion='off'] *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+    transition-duration: 1ms !important;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -28,9 +62,19 @@
     outline-offset: 2px;
     border-radius: 6px;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-delay: 0s !important;
+      transition-duration: 1ms !important;
+    }
+  }
 }
 
-/* Animações usadas no provador virtual */
+/* ─── Keyframes globais ─── */
 @keyframes vv-spin {
   to {
     transform: rotate(360deg);
@@ -46,4 +90,218 @@
     transform: translateY(-4px);
     opacity: 1;
   }
+}
+@keyframes vv-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes vv-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes vv-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes vv-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes vv-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes vv-pop-spring {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes vv-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes vv-breathe {
+  0%,
+  100% {
+    transform: scale(0.96);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+@keyframes vv-shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+@keyframes vv-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(14px);
+    transform: scale(1.04);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+@keyframes vv-reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes vv-tab-cross {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes vv-toast {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes vv-shine {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(220%);
+  }
+}
+@keyframes vv-draw {
+  from {
+    stroke-dashoffset: 60;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ─── Helpers reutilizáveis ─── */
+
+/* Stagger: filho ganha --i (índice) e cai em cascata */
+.vv-stagger > * {
+  opacity: 0;
+  animation: vv-reveal-up calc(var(--t-base) * var(--motion-scale)) var(--e-out) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger));
+}
+
+.vv-fade-in {
+  animation: vv-fade-in calc(var(--t-base) * var(--motion-scale)) var(--e-out) both;
+}
+.vv-reveal {
+  animation: vv-reveal-up calc(var(--t-deliberate) * var(--motion-scale)) var(--e-out) both;
+}
+.vv-blur-in {
+  animation: vv-blur-in calc(var(--t-cinematic) * var(--motion-scale)) var(--e-out) both;
+}
+.vv-pop {
+  animation: vv-pop calc(var(--t-base) * var(--motion-scale)) var(--e-out) both;
+}
+.vv-pop-spring {
+  animation: vv-pop-spring calc(var(--t-slow) * var(--motion-scale)) var(--e-spring) both;
+}
+.vv-tab-pane {
+  animation: vv-tab-cross calc(var(--t-base) * var(--motion-scale)) var(--e-out) both;
+}
+.vv-breathe {
+  animation: vv-breathe 3.6s var(--e-inout) infinite;
+}
+.vv-pulse {
+  animation: vv-pulse 1.8s var(--e-inout) infinite;
+}
+
+/* Card hover: leve elevação sem ficar pesado */
+.vv-hover-lift {
+  transition:
+    transform var(--t-base) var(--e-out),
+    box-shadow var(--t-base) var(--e-out);
+}
+.vv-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(20, 16, 14, 0.08);
+}
+
+/* Brilho que passa por cima de um botão (CTA da Cabine) */
+.vv-shine {
+  position: relative;
+  overflow: hidden;
+}
+.vv-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
+  transform: translateX(-110%);
+  animation: vv-shine 2.4s var(--e-inout) infinite;
+  pointer-events: none;
 }

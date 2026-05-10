@@ -17,7 +17,7 @@ export async function updateOwnLoja(
 
   // Trata strings vazias como null para campos opcionais
   const cleaned: Record<string, unknown> = { ...data }
-  for (const k of ['instagram', 'tiktok', 'whatsapp_e164'] as const) {
+  for (const k of ['instagram', 'tiktok', 'whatsapp_e164', 'tagline'] as const) {
     if (cleaned[k] === '') cleaned[k] = null
   }
 

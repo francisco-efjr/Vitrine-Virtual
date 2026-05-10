@@ -4,6 +4,13 @@ import { IMAGE_MAX_UPLOAD_BYTES } from '@/lib/images/upload'
 export const pecaStatusSchema = z.enum(['disponivel', 'vendida'])
 export type PecaStatus = z.infer<typeof pecaStatusSchema>
 
+export const categoriaIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(60)
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Categoria inválida')
+
 export const pecaCreateSchema = z.object({
   nome: z.string().trim().min(1, 'Nome obrigatório').max(100, 'Máximo 100 caracteres'),
   preco_centavos: z
@@ -14,6 +21,7 @@ export const pecaCreateSchema = z.object({
     .nullable()
     .optional(),
   tamanho: z.string().trim().max(60).nullable().optional(),
+  categoria_id: categoriaIdSchema.nullable().optional(),
   status: pecaStatusSchema.default('disponivel'),
 })
 export type PecaCreateInput = z.infer<typeof pecaCreateSchema>
