@@ -4,6 +4,7 @@ import { MessageCircle } from 'lucide-react'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { PublicLiveRefresh } from '@/components/public/public-live-refresh'
+import { Stagger } from '@/components/motion'
 import { formatPreco } from '@/lib/validators/peca'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 
@@ -17,6 +18,7 @@ interface VitrineData {
     tiktok: string | null
     whatsapp_e164: string | null
     exibir_preco_publico: boolean
+    tagline: string | null
   }
   pecas: Array<{
     peca_id: string
@@ -61,6 +63,7 @@ async function loadVitrine(slug: string): Promise<VitrineData | null> {
       tiktok: loja.tiktok,
       whatsapp_e164: loja.whatsapp_e164,
       exibir_preco_publico: loja.exibir_preco_publico,
+      tagline: loja.tagline ?? null,
     },
     pecas,
   }
@@ -91,8 +94,15 @@ export default async function VitrinePage({ params }: { params: { slug: string }
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-12">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <div className="font-serif text-xl font-semibold tracking-wider text-ink sm:text-2xl">
-            {data.loja.nome}
+          <div className="min-w-0">
+            <div className="truncate font-serif text-xl font-semibold tracking-wider text-ink sm:text-2xl">
+              {data.loja.nome}
+            </div>
+            {data.loja.tagline ? (
+              <div className="mt-0.5 truncate text-[11.5px] italic text-ink-3 sm:text-xs">
+                {data.loja.tagline}
+              </div>
+            ) : null}
           </div>
           <nav className="flex items-center gap-2">
             {data.loja.instagram ? (
@@ -144,21 +154,21 @@ export default async function VitrinePage({ params }: { params: { slug: string }
             <p className="text-sm text-ink-2">Nenhuma peça disponível no momento.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5">
+          <Stagger className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5" step={50}>
             {data.pecas.map((p) => (
               <Link
                 key={p.peca_id}
                 href={`/v/${data.loja.slug}/peca/${p.peca_id}`}
-                className="flex h-full flex-col overflow-hidden rounded-card bg-surface shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover"
+                className="vv-hover-lift flex h-full flex-col overflow-hidden rounded-card bg-surface shadow-card"
               >
                 {/* 3:4 portrait ratio */}
-                <div className="aspect-[3/4] w-full bg-[#f0ebe3]" aria-hidden="true">
+                <div className="aspect-[3/4] w-full overflow-hidden bg-[#f0ebe3]" aria-hidden="true">
                   {p.foto_principal_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={p.foto_principal_url}
                       alt={p.nome}
-                      className="h-full w-full object-cover object-center"
+                      className="h-full w-full object-cover object-center transition-transform duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:scale-[1.04]"
                     />
                   ) : null}
                 </div>
@@ -179,7 +189,7 @@ export default async function VitrinePage({ params }: { params: { slug: string }
                 </div>
               </Link>
             ))}
-          </div>
+          </Stagger>
         )}
       </main>
 

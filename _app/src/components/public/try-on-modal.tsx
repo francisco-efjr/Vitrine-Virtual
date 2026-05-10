@@ -528,7 +528,7 @@ export function TryOnModal({
           ) : null}
 
           {step === 'result' && resultUrl ? (
-            <div className="space-y-4">
+            <div className="vv-fade-in space-y-4">
               <div className="flex items-center gap-2">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success-light text-success">
                   <Check size={13} />
@@ -536,7 +536,7 @@ export function TryOnModal({
                 <span className="text-sm font-medium text-ink">Pronto.</span>
               </div>
 
-              <div className="relative overflow-hidden rounded-modal border border-border">
+              <div className="vv-blur-in relative overflow-hidden rounded-modal border border-border">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={resultUrl}

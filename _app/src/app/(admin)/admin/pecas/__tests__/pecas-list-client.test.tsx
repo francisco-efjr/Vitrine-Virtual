@@ -23,6 +23,7 @@ describe('PecasListClient', () => {
             foto_principal_id: null,
             created_at: '',
             vendida_em: null,
+            categoria_id: null,
             foto_principal_url: null,
           },
           {
@@ -35,6 +36,7 @@ describe('PecasListClient', () => {
             foto_principal_id: null,
             created_at: '',
             vendida_em: null,
+            categoria_id: null,
             foto_principal_url: null,
           },
         ]}

@@ -9,8 +9,8 @@ export const Card = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        'rounded-card border border-border bg-surface shadow-card transition',
-        hoverable && 'hover:-translate-y-px hover:shadow-card-hover',
+        'rounded-card border border-border bg-surface shadow-card transition duration-200 ease-[cubic-bezier(0.22,0.61,0.36,1)]',
+        hoverable && 'hover:-translate-y-0.5 hover:shadow-card-hover',
         className,
       )}
       {...props}

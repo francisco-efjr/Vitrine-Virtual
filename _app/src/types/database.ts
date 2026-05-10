@@ -20,9 +20,13 @@ export interface Database {
           logo_storage_path: string | null
           nome: string
           owner_user_id: string
+          provador_fundo_storage_path: string | null
+          provador_fundo_tipo: 'branco' | 'personalizado'
           slug: string
+          tagline: string | null
           tiktok: string | null
           updated_at: string
+          vitrine_publica_visivel: boolean
           whatsapp_e164: string | null
         }
         Insert: {
@@ -35,9 +39,13 @@ export interface Database {
           logo_storage_path?: string | null
           nome: string
           owner_user_id: string
+          provador_fundo_storage_path?: string | null
+          provador_fundo_tipo?: 'branco' | 'personalizado'
           slug: string
+          tagline?: string | null
           tiktok?: string | null
           updated_at?: string
+          vitrine_publica_visivel?: boolean
           whatsapp_e164?: string | null
         }
         Update: {
@@ -50,15 +58,20 @@ export interface Database {
           logo_storage_path?: string | null
           nome?: string
           owner_user_id?: string
+          provador_fundo_storage_path?: string | null
+          provador_fundo_tipo?: 'branco' | 'personalizado'
           slug?: string
+          tagline?: string | null
           tiktok?: string | null
           updated_at?: string
+          vitrine_publica_visivel?: boolean
           whatsapp_e164?: string | null
         }
         Relationships: []
       }
       pecas: {
         Row: {
+          categoria_id: string | null
           created_at: string
           foto_principal_id: string | null
           id: string
@@ -70,6 +83,7 @@ export interface Database {
           vendida_em: string | null
         }
         Insert: {
+          categoria_id?: string | null
           created_at?: string
           foto_principal_id?: string | null
           id?: string
@@ -81,6 +95,7 @@ export interface Database {
           vendida_em?: string | null
         }
         Update: {
+          categoria_id?: string | null
           created_at?: string
           foto_principal_id?: string | null
           id?: string
