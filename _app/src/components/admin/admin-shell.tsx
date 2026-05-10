@@ -94,9 +94,6 @@ export function AdminShell({
               <div className="truncate text-[13px] font-semibold text-ink">
                 {collapsed ? loja.nome.slice(0, 1).toUpperCase() : loja.nome}
               </div>
-              {!collapsed ? (
-                <div className="mt-0.5 truncate text-[11px] text-ink-3">vitrine.app/v/{loja.slug}</div>
-              ) : null}
             </div>
           </div>
         ) : null}

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, LayoutGrid, List } from 'lucide-react'
+import { Search, Plus, LayoutGrid, List, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -31,17 +31,58 @@ export function PecasListClient({
   const [modalOpen, setModalOpen] = useState(false)
   const [editPeca, setEditPeca] = useState<PecaListItem | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  // Confirmação de venda — sempre exigida (decisão UX do design)
+  const [confirmSale, setConfirmSale] = useState<PecaListItem | null>(null)
+  const [acting, setActing] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  const filtered = initialPecas.filter((p) => p.nome.toLowerCase().includes(search.toLowerCase()))
+  const filtered = initialPecas.filter((p) => {
+    const term = search.toLowerCase()
+    return p.nome.toLowerCase().includes(term)
+  })
 
-  async function handleMarkSold(id: string) {
-    await fetch(`/api/pecas/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'marcar_vendida' }),
-    })
-    startTransition(() => router.refresh())
+  async function handleConfirmSale() {
+    if (!confirmSale) return
+    setActing(true)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/pecas/${confirmSale.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'marcar_vendida' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) {
+        setActionError(data?.error?.message ?? 'Não foi possível marcar como vendida.')
+        return
+      }
+      setConfirmSale(null)
+      startTransition(() => router.refresh())
+    } finally {
+      setActing(false)
+    }
   }
+
+  async function handleRestore(id: string) {
+    setActing(true)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/pecas/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reabrir' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.ok) {
+        setActionError(data?.error?.message ?? 'Não foi possível restaurar a peça.')
+        return
+      }
+      startTransition(() => router.refresh())
+    } finally {
+      setActing(false)
+    }
+  }
+
   async function handleDelete(id: string) {
     await fetch(`/api/pecas/${id}`, { method: 'DELETE' })
     setDeleteId(null)
@@ -100,6 +141,10 @@ export function PecasListClient({
         </div>
       </div>
 
+      {actionError ? (
+        <p className="mb-4 rounded-lg bg-danger-light px-3 py-2 text-sm text-danger">{actionError}</p>
+      ) : null}
+
       {view === 'grid' ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           {filtered.map((p) => (
@@ -139,9 +184,19 @@ export function PecasListClient({
                   >
                     Editar
                   </Button>
-                  {p.status === 'disponivel' && (
-                    <Button variant="success" size="sm" onClick={() => handleMarkSold(p.id)}>
+                  {p.status === 'disponivel' ? (
+                    <Button variant="dark" size="sm" onClick={() => setConfirmSale(p)}>
                       Vendida
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<RotateCcw size={13} />}
+                      onClick={() => handleRestore(p.id)}
+                      disabled={acting}
+                    >
+                      Restaurar
                     </Button>
                   )}
                   <Button variant="text" size="sm" onClick={() => setDeleteId(p.id)} className="text-danger">
@@ -160,7 +215,7 @@ export function PecasListClient({
           )}
         </div>
       ) : (
-          <Card>
+        <Card>
           {filtered.map((p, i) => (
             <div
               key={p.id}
@@ -200,9 +255,19 @@ export function PecasListClient({
                 >
                   Editar
                 </Button>
-                {p.status === 'disponivel' && (
-                  <Button variant="success" size="sm" onClick={() => handleMarkSold(p.id)}>
-                    Vendida ✓
+                {p.status === 'disponivel' ? (
+                  <Button variant="dark" size="sm" onClick={() => setConfirmSale(p)}>
+                    Vendida
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<RotateCcw size={13} />}
+                    onClick={() => handleRestore(p.id)}
+                    disabled={acting}
+                  >
+                    Restaurar
                   </Button>
                 )}
               </div>
@@ -224,6 +289,29 @@ export function PecasListClient({
           startTransition(() => router.refresh())
         }}
       />
+
+      <Modal
+        open={!!confirmSale}
+        onClose={() => (acting ? null : setConfirmSale(null))}
+        title="Confirma a venda?"
+        width={420}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmSale(null)} disabled={acting}>
+              Cancelar
+            </Button>
+            <Button variant="dark" onClick={handleConfirmSale} disabled={acting}>
+              {acting ? 'Marcando…' : 'Confirmar venda'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-2">
+          A peça <strong className="font-semibold text-ink">{confirmSale?.nome ?? ''}</strong> será
+          marcada como vendida e sairá da vitrine pública. Você pode restaurá-la a qualquer momento
+          em &quot;Todas as peças&quot;.
+        </p>
+      </Modal>
 
       <Modal
         open={!!deleteId}

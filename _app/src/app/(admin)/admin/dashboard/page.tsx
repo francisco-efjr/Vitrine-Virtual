@@ -40,9 +40,9 @@ export default async function DashboardPage() {
         />
         <KpiCard label="Total" value={metrics.pecas_total} sub="cadastradas" icon={<List size={18} />} />
         <KpiCard
-          label="Provador Virtual"
+          label="Cabine"
           value={`${metrics.try_ons_mes}/${metrics.cota_mensal}`}
-          sub="usos este mês"
+          sub="experimentações este mês"
           icon={<Sparkles size={18} />}
           color="warning"
         />
@@ -50,7 +50,7 @@ export default async function DashboardPage() {
 
       <Card className="mb-5 p-6">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-ink">Cota do Provador Virtual</span>
+          <span className="text-sm font-medium text-ink">Cota da Cabine</span>
           <Badge
             label={`${metrics.try_ons_mes} de ${metrics.cota_mensal} usos`}
             variant={cotaPct > 80 ? 'warning' : 'neutral'}
