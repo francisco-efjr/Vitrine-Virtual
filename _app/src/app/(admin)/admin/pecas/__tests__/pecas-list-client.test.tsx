@@ -45,7 +45,9 @@ describe('PecasListClient', () => {
     expect(screen.getByText('Blusa')).toBeInTheDocument()
     expect(screen.getByText('Consulte')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Editar' })).toHaveLength(2)
-    const imageAreas = document.querySelectorAll('.aspect-square')
+    // Cards de peça usam proporção 3:4 (padrão fashion). O selector escapado
+    // bate com a classe Tailwind arbitrary value `aspect-[3/4]`.
+    const imageAreas = document.querySelectorAll('.aspect-\\[3\\/4\\]')
     expect(imageAreas.length).toBeGreaterThan(0)
   })
 })

@@ -108,6 +108,7 @@ export default async function PecaPublicaPage({
                 whatsappE164={loja.whatsapp_e164}
                 garmentImageUrl={garmentSignedUrl}
                 garmentThumbUrl={fotosComUrl[0]?.url ?? null}
+                vitrineHref={`/v/${params.slug}`}
               />
 
               {wa ? (

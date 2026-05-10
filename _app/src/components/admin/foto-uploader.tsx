@@ -333,7 +333,7 @@ export const FotoUploader = forwardRef<
       )}
 
       <p className="mt-2 text-[11px] text-ink-3">
-        ⭐ Estrela = foto principal (aparece na listagem e no provador virtual)
+        ⭐ Estrela = foto principal (aparece na listagem e na Cabine)
       </p>
     </div>
   )

@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Check,
+  Download,
   Image as ImageIcon,
   ImageOff,
   MessageCircle,
@@ -41,6 +42,7 @@ const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg
 export function TryOnModal({
   open,
   onClose,
+  onTryAnother,
   pecaId,
   pecaNome,
   whatsappE164,
@@ -49,6 +51,12 @@ export function TryOnModal({
 }: {
   open: boolean
   onClose: () => void
+  /**
+   * Quando o usuário clica "Experimentar outra peça" no resultado,
+   * fechamos o modal e chamamos este callback para levar de volta à
+   * tela com a grade de peças. Default: apenas fecha o modal.
+   */
+  onTryAnother?: () => void
   pecaId: string
   pecaNome: string
   whatsappE164: string | null
@@ -61,10 +69,50 @@ export function TryOnModal({
   const [progress, setProgress] = useState(0)
   const [msgIdx, setMsgIdx] = useState(0)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [validationAttempted, setValidationAttempted] = useState(false)
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
+
+  const handleTryAnother = useCallback(() => {
+    if (onTryAnother) {
+      onTryAnother()
+      return
+    }
+    onClose()
+  }, [onTryAnother, onClose])
+
+  async function handleDownload() {
+    if (!resultUrl) return
+    setDownloading(true)
+    try {
+      const res = await fetch(resultUrl, { mode: 'cors' })
+      if (!res.ok) throw new Error('download_failed')
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const safeName = pecaNome
+        .normalize('NFKD')
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .toLowerCase()
+        .slice(0, 60) || 'simulacao'
+      const ext = blob.type.includes('png') ? 'png' : 'jpg'
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `cabine-${safeName}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      // Fallback: abre em nova aba se o navegador bloquear o download CORS
+      if (resultUrl) window.open(resultUrl, '_blank', 'noopener,noreferrer')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const canContinue = agreed && !!customerPhoto
   const waUrl = whatsappE164
@@ -146,8 +194,16 @@ export function TryOnModal({
     if (step === 'result') {
       return (
         <>
-          <Button variant="ghost" onClick={() => setStep('choose')}>
+          <Button variant="ghost" onClick={handleTryAnother}>
             Experimentar outra peça
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={handleDownload}
+            disabled={!resultUrl || downloading}
+            icon={<Download size={15} />}
+          >
+            {downloading ? 'Baixando…' : 'Baixar'}
           </Button>
           {waUrl ? (
             <a
@@ -388,35 +444,57 @@ export function TryOnModal({
 
           {step === 'loading' ? (
             <div className="flex min-h-full flex-col items-center justify-center py-8 text-center">
-              <div className="relative mb-6 h-20 w-20">
+              <div className="relative mb-6 h-24 w-24">
+                {/* Halo respirando atrás */}
+                <span
+                  className="absolute inset-0 rounded-full bg-accent/15"
+                  style={{ animation: 'vv-breathe 2.6s ease-in-out infinite' }}
+                />
+                {/* Anel girando */}
                 <svg
-                  width="80"
-                  height="80"
-                  viewBox="0 0 80 80"
-                  className="animate-spin"
-                  style={{ animationDuration: '2s' }}
+                  width="96"
+                  height="96"
+                  viewBox="0 0 96 96"
+                  className="absolute inset-0"
+                  style={{ animation: 'vv-spin 2.4s linear infinite' }}
                 >
-                  <circle cx="40" cy="40" r="34" fill="none" stroke="#e6dfd6" strokeWidth="3.5" />
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="#e6dfd6" strokeWidth="3" />
                   <circle
-                    cx="40"
-                    cy="40"
-                    r="34"
+                    cx="48"
+                    cy="48"
+                    r="40"
                     fill="none"
                     stroke="#b8956a"
-                    strokeWidth="3.5"
-                    strokeDasharray="60 154"
+                    strokeWidth="3"
+                    strokeDasharray="70 181"
                     strokeLinecap="round"
-                    transform="rotate(-90 40 40)"
+                    transform="rotate(-90 48 48)"
                   />
                 </svg>
+                {/* Partículas em órbita oposta */}
+                <svg
+                  width="96"
+                  height="96"
+                  viewBox="0 0 96 96"
+                  className="absolute inset-0"
+                  style={{ animation: 'vv-spin 6s linear infinite reverse' }}
+                  aria-hidden="true"
+                >
+                  <circle cx="48" cy="8" r="2" fill="#b8956a" opacity="0.7" />
+                  <circle cx="88" cy="48" r="1.4" fill="#8b6840" opacity="0.55" />
+                  <circle cx="48" cy="88" r="1.6" fill="#b8956a" opacity="0.45" />
+                </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="font-serif text-base font-semibold text-accent" style={{ letterSpacing: '0.5px' }}>
+                  <span
+                    className="font-serif text-lg font-semibold text-accent"
+                    style={{ letterSpacing: '0.5px', animation: 'vv-pulse 1.8s ease-in-out infinite' }}
+                  >
                     vv
                   </span>
                 </div>
               </div>
 
-              <div className="mb-5 h-0.5 w-32 overflow-hidden rounded-full bg-border">
+              <div className="mb-5 h-0.5 w-40 overflow-hidden rounded-full bg-border">
                 <div
                   className="h-full rounded-full bg-accent transition-all duration-300"
                   style={{ width: `${progress}%` }}
@@ -437,6 +515,14 @@ export function TryOnModal({
                   from { opacity: 0; transform: translateY(4px); }
                   to   { opacity: 1; transform: translateY(0); }
                 }
+                @keyframes vv-breathe {
+                  0%, 100% { transform: scale(0.95); opacity: 0.6; }
+                  50%      { transform: scale(1.08); opacity: 1; }
+                }
+                @keyframes vv-pulse {
+                  0%, 100% { opacity: 0.6; }
+                  50%      { opacity: 1; }
+                }
               `}</style>
             </div>
           ) : null}
@@ -447,18 +533,27 @@ export function TryOnModal({
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success-light text-success">
                   <Check size={13} />
                 </span>
-                <span className="text-sm font-medium text-success">Visualização gerada com sucesso.</span>
+                <span className="text-sm font-medium text-ink">Pronto.</span>
               </div>
 
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={resultUrl}
-                alt="Resultado da Cabine"
-                className="aspect-[3/4] w-full rounded-modal border border-border object-cover"
-              />
+              <div className="relative overflow-hidden rounded-modal border border-border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={resultUrl}
+                  alt="Resultado da Cabine"
+                  className="aspect-[3/4] w-full object-cover"
+                />
+                {/* Watermark minimalista — sinaliza que é simulação */}
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-2 right-2 select-none rounded-full bg-black/35 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-white backdrop-blur-sm"
+                >
+                  Simulação
+                </span>
+              </div>
 
               <p className="text-center text-xs text-ink-3">
-                Esta é uma visualização de apoio. A imagem expira em até 24 horas.
+                Imagem gerada por simulação. Expira em até 24 horas.
               </p>
             </div>
           ) : null}

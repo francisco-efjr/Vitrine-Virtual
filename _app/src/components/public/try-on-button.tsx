@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useCallback, useState } from 'react'
 import { TryOnModal } from './try-on-modal'
 
 export function TryOnButton({
@@ -9,14 +10,27 @@ export function TryOnButton({
   whatsappE164,
   garmentImageUrl = null,
   garmentThumbUrl = null,
+  /**
+   * Para onde levar o cliente quando ele clicar em "Experimentar outra peça"
+   * dentro do resultado da Cabine. Default: apenas fecha o modal.
+   * Tipicamente usamos `/v/[slug]` (a grade da vitrine).
+   */
+  vitrineHref = null,
 }: {
   pecaId: string
   pecaNome: string
   whatsappE164: string | null
   garmentImageUrl?: string | null
   garmentThumbUrl?: string | null
+  vitrineHref?: string | null
 }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+
+  const handleTryAnother = useCallback(() => {
+    setOpen(false)
+    if (vitrineHref) router.push(vitrineHref)
+  }, [router, vitrineHref])
 
   return (
     <>
@@ -37,6 +51,7 @@ export function TryOnButton({
       <TryOnModal
         open={open}
         onClose={() => setOpen(false)}
+        onTryAnother={vitrineHref ? handleTryAnother : undefined}
         pecaId={pecaId}
         pecaNome={pecaNome}
         whatsappE164={whatsappE164}
