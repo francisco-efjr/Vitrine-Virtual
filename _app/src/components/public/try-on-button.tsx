@@ -10,6 +10,7 @@ export function TryOnButton({
   whatsappE164,
   garmentImageUrl = null,
   garmentThumbUrl = null,
+  cabineBackdropUrl = null,
   /**
    * Para onde levar o cliente quando ele clicar em "Experimentar outra peça"
    * dentro do resultado da Cabine. Default: apenas fecha o modal.
@@ -22,6 +23,12 @@ export function TryOnButton({
   whatsappE164: string | null
   garmentImageUrl?: string | null
   garmentThumbUrl?: string | null
+  /**
+   * Imagem de fundo personalizada da Cabine (configurada pela lojista).
+   * Aparece como pano de fundo sutil durante a tela de loading. Não afeta
+   * o resultado gerado pela IA — apenas reforça a identidade visual da loja.
+   */
+  cabineBackdropUrl?: string | null
   vitrineHref?: string | null
 }) {
   const router = useRouter()
@@ -57,6 +64,7 @@ export function TryOnButton({
         whatsappE164={whatsappE164}
         garmentImageUrl={garmentImageUrl}
         garmentThumbUrl={garmentThumbUrl}
+        cabineBackdropUrl={cabineBackdropUrl}
       />
     </>
   )

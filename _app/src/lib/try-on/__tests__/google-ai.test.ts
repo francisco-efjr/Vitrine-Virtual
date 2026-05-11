@@ -132,6 +132,12 @@ describe('googleAiProvider.generate', () => {
     expect(parts).toHaveLength(5)
     expect(parts[1]?.text).toContain('CUSTOMER_PHOTO')
     expect(parts[3]?.text).toContain('GARMENT_IMAGE')
+    // Default config = maior tamanho disponível + ratio fashion. Garante que
+    // qualquer regressão que troque o default seja pega no CI.
+    expect(requestBody.generationConfig.imageConfig).toEqual({
+      imageSize: '4K',
+      aspectRatio: '3:4',
+    })
 
     expect(storageBucket.upload).toHaveBeenCalledWith(
       expect.stringMatching(/\.jpg$/),

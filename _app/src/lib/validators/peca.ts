@@ -11,7 +11,7 @@ export const categoriaIdSchema = z
   .max(60)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Categoria inválida')
 
-export const pecaCreateSchema = z.object({
+const pecaBaseShape = {
   nome: z.string().trim().min(1, 'Nome obrigatório').max(100, 'Máximo 100 caracteres'),
   preco_centavos: z
     .number()
@@ -22,11 +22,24 @@ export const pecaCreateSchema = z.object({
     .optional(),
   tamanho: z.string().trim().max(60).nullable().optional(),
   categoria_id: categoriaIdSchema.nullable().optional(),
+} as const
+
+export const pecaCreateSchema = z.object({
+  ...pecaBaseShape,
+  // Aplicado APENAS no create. No update, status segue intocado se omitido
+  // do payload — o cliente não envia esse campo, e sem essa segregação o
+  // .partial() do z fazia o default 'disponivel' reativar peças vendidas
+  // silenciosamente ao editar nome/preço.
   status: pecaStatusSchema.default('disponivel'),
 })
 export type PecaCreateInput = z.infer<typeof pecaCreateSchema>
 
-export const pecaUpdateSchema = pecaCreateSchema.partial()
+export const pecaUpdateSchema = z
+  .object({
+    ...pecaBaseShape,
+    status: pecaStatusSchema.optional(),
+  })
+  .partial()
 export type PecaUpdateInput = z.infer<typeof pecaUpdateSchema>
 
 /**

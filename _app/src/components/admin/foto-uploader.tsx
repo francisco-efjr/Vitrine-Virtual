@@ -58,6 +58,11 @@ export const FotoUploader = forwardRef<
   const [dragging, setDragging] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  // Identifica a peça atualmente associada ao uploader. Quando o pai
+  // troca de peça (abrir outra "Editar" sem fechar o modal antes), zera
+  // pending; mas atualizações de initialFotos para a MESMA peça não
+  // apagam o que o usuário já adicionou.
+  const trackedPecaIdRef = useRef<string | null>(pecaId)
 
   // Carregar fotos quando pecaId muda (modo edição)
   useEffect(() => {
@@ -73,12 +78,21 @@ export const FotoUploader = forwardRef<
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pecaId])
 
-  // Sincroniza quando initialFotos muda (reabre modal com peca diferente)
+  // Sincroniza quando o pai entrega novas initialFotos. Importante:
+  //   • se a PEÇA mudou → reset completo (existing + pending + errors).
+  //   • se a peça é a mesma → só atualiza `existing`. O pending do usuário
+  //     fica preservado mesmo que o fetch inicial das fotos chegue depois
+  //     dele já ter arrastado uma foto nova (regressão observada no QA:
+  //     "ao atualizar/inserir peça nova, foto somia").
   useEffect(() => {
+    const pecaChanged = trackedPecaIdRef.current !== pecaId
+    trackedPecaIdRef.current = pecaId
     setExisting(initialFotos.map((f) => ({ ...f, toDelete: false })))
-    setPending([])
-    setErrors([])
-  }, [initialFotos])
+    if (pecaChanged) {
+      setPending([])
+      setErrors([])
+    }
+  }, [initialFotos, pecaId])
 
   // Revoga blob URLs ao desmontar
   useEffect(() => {

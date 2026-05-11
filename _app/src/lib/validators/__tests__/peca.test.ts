@@ -4,6 +4,7 @@ import {
   fotoBase64UploadSchema,
   formatPreco,
   pecaCreateSchema,
+  pecaUpdateSchema,
   precoStringToCentavos,
 } from '../peca'
 
@@ -68,6 +69,25 @@ describe('pecaCreateSchema', () => {
     expect(
       pecaCreateSchema.safeParse({ nome: 'X', preco_centavos: -1 }).success,
     ).toBe(false)
+  })
+})
+
+describe('pecaUpdateSchema', () => {
+  it('NÃO injeta default de status no update — peça vendida fica vendida', () => {
+    // Regressão: antes, pecaCreateSchema.partial() preservava `.default('disponivel')`,
+    // e qualquer PATCH /api/pecas/[id] sem campo status silenciosamente reabria
+    // peças vendidas. Veja registro em tests/qa/bugs.md.
+    const result = pecaUpdateSchema.parse({ nome: 'Blusa atualizada' })
+    expect(result).not.toHaveProperty('status')
+  })
+
+  it('aceita status explícito quando enviado', () => {
+    const result = pecaUpdateSchema.parse({ status: 'vendida' })
+    expect(result.status).toBe('vendida')
+  })
+
+  it('mantém demais campos opcionais', () => {
+    expect(pecaUpdateSchema.safeParse({}).success).toBe(true)
   })
 })
 

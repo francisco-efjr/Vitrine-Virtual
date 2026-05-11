@@ -9,6 +9,7 @@ import { formatPreco } from '@/lib/validators/peca'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
+import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,18 @@ export default async function PecaPublicaPage({
   const loja = lojaArr?.[0]
   const peca = pecaArr?.[0]
   if (!loja || !peca) notFound()
+
+  // `get_vitrine_publica` ainda não retorna o caminho do fundo personalizado.
+  // Buscamos separado para não bloquear o launch do design.
+  const { data: cabineCfg } = await createServiceClient()
+    .from('lojas')
+    .select('provador_fundo_storage_path, provador_fundo_tipo')
+    .eq('slug', params.slug)
+    .maybeSingle()
+  const cabineBackdropUrl =
+    cabineCfg?.provador_fundo_tipo === 'personalizado'
+      ? buildLojaAssetPublicUrl(cabineCfg?.provador_fundo_storage_path ?? null)
+      : null
 
   const fotos = Array.isArray(peca.fotos) ? (peca.fotos as FotoItem[]) : []
   let fotosComUrl: Array<{ id: string; url: string; storage_path: string }> = []
@@ -68,7 +81,7 @@ export default async function PecaPublicaPage({
     <div className="min-h-screen bg-bg">
       <PublicLiveRefresh />
       <header className="sticky top-0 z-10 border-b border-border bg-surface px-4 py-3 sm:px-12">
-        <div className="mx-auto flex max-w-4xl items-center justify-between">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
           <Link
             href={`/v/${params.slug}`}
             className="inline-flex items-center gap-1 text-sm text-ink-2 hover:text-ink"
@@ -76,7 +89,22 @@ export default async function PecaPublicaPage({
             <ArrowLeft size={14} />
             Voltar a vitrine
           </Link>
-          <div className="font-serif text-sm font-semibold sm:text-base">{loja.nome}</div>
+          <div className="flex items-center gap-2">
+            {loja.logo_storage_path
+              ? (() => {
+                  const url = buildLojaAssetPublicUrl(loja.logo_storage_path)
+                  return url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={url}
+                      alt=""
+                      className="h-7 w-7 rounded-full border border-border object-cover"
+                    />
+                  ) : null
+                })()
+              : null}
+            <div className="font-serif text-sm font-semibold sm:text-base">{loja.nome}</div>
+          </div>
         </div>
       </header>
 
@@ -108,6 +136,7 @@ export default async function PecaPublicaPage({
                 whatsappE164={loja.whatsapp_e164}
                 garmentImageUrl={garmentSignedUrl}
                 garmentThumbUrl={fotosComUrl[0]?.url ?? null}
+                cabineBackdropUrl={cabineBackdropUrl}
                 vitrineHref={`/v/${params.slug}`}
               />
 

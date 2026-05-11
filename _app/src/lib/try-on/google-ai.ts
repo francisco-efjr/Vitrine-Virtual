@@ -102,8 +102,8 @@ export const googleAiProvider: TryOnProvider = {
         temperature: 0.4,
         responseModalities: ['IMAGE', 'TEXT'],
         imageConfig: {
-          imageSize: '4K',
-          aspectRatio: '3:4',
+          imageSize: env.GOOGLE_AI_IMAGE_SIZE,
+          aspectRatio: env.GOOGLE_AI_ASPECT_RATIO,
         },
       },
       contents: [
