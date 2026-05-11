@@ -40,6 +40,13 @@ const serverSchema = z.object({
   // Google AI (Gemini Nano Banana) — provider de try-on via Google AI Studio
   GOOGLE_AI_API_KEY: z.string().min(1).optional(),
   GOOGLE_AI_MODEL: z.string().min(1).default('gemini-2.5-flash-image'),
+  // Tamanho da imagem gerada. Valores válidos no API atual do Nano Banana
+  // (gemini-2.5-flash-image): "1K", "2K", "4K". Default = 4K (máximo).
+  GOOGLE_AI_IMAGE_SIZE: z.enum(['1K', '2K', '4K']).default('4K'),
+  // Aspect ratio do resultado. Fashion typicamente usa 3:4 (vertical).
+  GOOGLE_AI_ASPECT_RATIO: z
+    .enum(['1:1', '9:16', '16:9', '3:4', '4:3', '4:5', '5:4', '21:9', '9:21'])
+    .default('3:4'),
   // OpenAI — provider de try-on via gpt-image-1 (multi-image edits API)
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_IMAGE_MODEL: z.string().min(1).default('gpt-image-1'),

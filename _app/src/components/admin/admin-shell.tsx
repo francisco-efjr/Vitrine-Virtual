@@ -27,7 +27,7 @@ export function AdminShell({
   loja,
   children,
 }: {
-  loja: { nome: string; slug: string } | null
+  loja: { nome: string; slug: string; logo_url: string | null } | null
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -88,12 +88,28 @@ export function AdminShell({
         {loja ? (
           <div className="px-4 pb-5">
             <div
-              className={`rounded-[10px] bg-surface-2 p-3 ${collapsed ? 'text-center' : ''}`}
+              className={`flex items-center gap-2 rounded-[10px] bg-surface-2 p-3 ${
+                collapsed ? 'justify-center text-center' : ''
+              }`}
               title={loja.nome}
             >
-              <div className="truncate text-[13px] font-semibold text-ink">
-                {collapsed ? loja.nome.slice(0, 1).toUpperCase() : loja.nome}
-              </div>
+              {loja.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={loja.logo_url}
+                  alt=""
+                  className="h-7 w-7 shrink-0 rounded-full border border-border object-cover"
+                />
+              ) : null}
+              {!collapsed ? (
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold text-ink">{loja.nome}</div>
+                </div>
+              ) : !loja.logo_url ? (
+                <div className="truncate text-[13px] font-semibold text-ink">
+                  {loja.nome.slice(0, 1).toUpperCase()}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}

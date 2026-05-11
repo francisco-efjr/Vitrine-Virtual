@@ -48,6 +48,7 @@ export function TryOnModal({
   whatsappE164,
   garmentImageUrl,
   garmentThumbUrl,
+  cabineBackdropUrl = null,
 }: {
   open: boolean
   onClose: () => void
@@ -62,6 +63,11 @@ export function TryOnModal({
   whatsappE164: string | null
   garmentImageUrl: string | null
   garmentThumbUrl: string | null
+  /**
+   * URL pública da imagem de fundo personalizada da Cabine (configurada
+   * pela lojista). Usada como pano de fundo sutil na tela de loading.
+   */
+  cabineBackdropUrl?: string | null
 }) {
   const [step, setStep] = useState<Step>('choose')
   const [agreed, setAgreed] = useState(false)
@@ -443,7 +449,14 @@ export function TryOnModal({
           ) : null}
 
           {step === 'loading' ? (
-            <div className="flex min-h-full flex-col items-center justify-center py-8 text-center">
+            <div className="relative flex min-h-full flex-col items-center justify-center py-8 text-center">
+              {cabineBackdropUrl ? (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 -m-4 rounded-modal bg-cover bg-center opacity-15"
+                  style={{ backgroundImage: `url("${cabineBackdropUrl}")` }}
+                />
+              ) : null}
               <div className="relative mb-6 h-24 w-24">
                 {/* Halo respirando atrás */}
                 <span

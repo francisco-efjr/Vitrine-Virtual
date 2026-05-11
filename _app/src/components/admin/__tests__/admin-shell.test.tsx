@@ -5,7 +5,7 @@ import { AdminShell } from '../admin-shell'
 describe('AdminShell', () => {
   it('permite recolher e expandir a barra lateral', () => {
     render(
-      <AdminShell loja={{ nome: 'Atelier Clara', slug: 'atelier-clara' }}>
+      <AdminShell loja={{ nome: 'Atelier Clara', slug: 'atelier-clara', logo_url: null }}>
         <div>Conteúdo</div>
       </AdminShell>,
     )

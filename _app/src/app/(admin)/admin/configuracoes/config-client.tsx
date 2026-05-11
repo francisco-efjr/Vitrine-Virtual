@@ -1,46 +1,152 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, ImageIcon, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Toggle } from '@/components/ui/toggle'
 import { Reveal } from '@/components/motion'
+import { preparePreviewableImage } from '@/lib/images/client-standardize'
+import { IMAGE_INVALID_FORMAT_MESSAGE } from '@/lib/images/upload'
 import type { LojaRow } from '@/types/database'
 
-export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
+interface ConfigClientProps {
+  initialLoja: LojaRow
+  initialLogoUrl: string | null
+  initialFundoUrl: string | null
+}
+
+export function ConfigClient({
+  initialLoja,
+  initialLogoUrl,
+  initialFundoUrl,
+}: ConfigClientProps) {
   const [loja, setLoja] = useState(initialLoja)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  // Local logo preview (upload da logo ainda em TODO)
-  const [logoPreview, setLogoPreview] = useState<string | null>(null)
-  const [fundoPreview, setFundoPreview] = useState<string | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl)
+  const [fundoUrl, setFundoUrl] = useState<string | null>(initialFundoUrl)
+  const [logoBusy, setLogoBusy] = useState(false)
+  const [fundoBusy, setFundoBusy] = useState(false)
+  const [logoErr, setLogoErr] = useState<string | null>(null)
+  const [fundoErr, setFundoErr] = useState<string | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const fundoInputRef = useRef<HTMLInputElement>(null)
 
-  function handleLogoFile(file: File | null) {
-    if (!file || !file.type.startsWith('image/')) return
-    const url = URL.createObjectURL(file)
-    setLogoPreview(url)
-    // TODO: upload logo to storage e atualizar loja.logo_storage_path
+  // Limpa qualquer blob: que tenhamos criado para o preview otimista
+  useEffect(() => {
+    return () => {
+      if (logoUrl?.startsWith('blob:')) URL.revokeObjectURL(logoUrl)
+      if (fundoUrl?.startsWith('blob:')) URL.revokeObjectURL(fundoUrl)
+    }
+  }, [logoUrl, fundoUrl])
+
+  async function uploadAsset(
+    file: File,
+    kind: 'logo' | 'provador_fundo',
+  ): Promise<{ public_url: string; storage_path: string; loja: LojaRow }> {
+    const prepared = await preparePreviewableImage(file)
+    const dataUrl = await fileToDataUrl(prepared.file)
+    const res = await fetch('/api/loja/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kind,
+        filename: prepared.file.name,
+        contentType: prepared.file.type,
+        size: prepared.file.size,
+        data_url: dataUrl,
+      }),
+    })
+    const data = await res.json()
+    URL.revokeObjectURL(prepared.previewUrl)
+    if (!res.ok || !data.ok) {
+      throw new Error(data?.error?.message ?? 'Falha ao enviar imagem')
+    }
+    return data.data as {
+      public_url: string
+      storage_path: string
+      loja: LojaRow
+    }
   }
 
-  function handleFundoFile(file: File | null) {
+  async function handleLogoFile(file: File | null) {
     if (!file || !file.type.startsWith('image/')) return
-    const url = URL.createObjectURL(file)
-    setFundoPreview(url)
-    setLoja((prev) => ({ ...prev, provador_fundo_tipo: 'personalizado' }))
-    // TODO: upload da imagem para o bucket lojas-logos e setar provador_fundo_storage_path
+    setLogoBusy(true)
+    setLogoErr(null)
+    try {
+      const result = await uploadAsset(file, 'logo')
+      setLoja(result.loja)
+      setLogoUrl(`${result.public_url}?t=${Date.now()}`)
+    } catch (error) {
+      setLogoErr(
+        error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE,
+      )
+    } finally {
+      setLogoBusy(false)
+    }
   }
 
-  function clearFundo() {
-    setFundoPreview(null)
-    setLoja((prev) => ({
-      ...prev,
-      provador_fundo_tipo: 'branco',
-      provador_fundo_storage_path: null,
-    }))
+  async function handleFundoFile(file: File | null) {
+    if (!file || !file.type.startsWith('image/')) return
+    setFundoBusy(true)
+    setFundoErr(null)
+    try {
+      const result = await uploadAsset(file, 'provador_fundo')
+      setLoja(result.loja)
+      setFundoUrl(`${result.public_url}?t=${Date.now()}`)
+    } catch (error) {
+      setFundoErr(
+        error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE,
+      )
+    } finally {
+      setFundoBusy(false)
+    }
+  }
+
+  async function clearFundo() {
+    setFundoBusy(true)
+    setFundoErr(null)
+    try {
+      const res = await fetch('/api/loja/assets?kind=provador_fundo', {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) {
+        throw new Error(data?.error?.message ?? 'Falha ao remover')
+      }
+      setLoja(data.data as LojaRow)
+      setFundoUrl(null)
+    } catch (error) {
+      setFundoErr(
+        error instanceof Error ? error.message : 'Falha ao remover fundo.',
+      )
+    } finally {
+      setFundoBusy(false)
+    }
+  }
+
+  async function removeLogo() {
+    setLogoBusy(true)
+    setLogoErr(null)
+    try {
+      const res = await fetch('/api/loja/assets?kind=logo', {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) {
+        throw new Error(data?.error?.message ?? 'Falha ao remover')
+      }
+      setLoja(data.data as LojaRow)
+      setLogoUrl(null)
+    } catch (error) {
+      setLogoErr(
+        error instanceof Error ? error.message : 'Falha ao remover logo.',
+      )
+    } finally {
+      setLogoBusy(false)
+    }
   }
 
   async function save() {
@@ -67,6 +173,7 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
       setErr(data?.error?.message ?? 'Falha ao salvar')
       return
     }
+    setLoja(data.data as LojaRow)
     setSaved(true)
     setTimeout(() => setSaved(false), 2200)
   }
@@ -93,14 +200,15 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
           <div className="flex items-start gap-4">
             <button
               type="button"
-              onClick={() => logoInputRef.current?.click()}
-              title="Clique para enviar o logo"
-              className="group relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-border bg-surface-2 transition hover:border-accent"
+              onClick={() => !logoBusy && logoInputRef.current?.click()}
+              disabled={logoBusy}
+              title={logoUrl ? 'Clique para trocar o logo' : 'Clique para enviar o logo'}
+              className="group relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-border bg-surface-2 transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-70"
               aria-label="Enviar logo da loja"
             >
-              {logoPreview ? (
+              {logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
+                <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-1">
                   <ImageIcon size={18} className="text-ink-3" />
@@ -108,15 +216,27 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
                 </div>
               )}
               <div className="absolute inset-0 flex items-center justify-center bg-ink/0 transition group-hover:bg-ink/25">
-                <ImageIcon size={14} className="text-white opacity-0 transition group-hover:opacity-100" />
+                <ImageIcon
+                  size={14}
+                  className="text-white opacity-0 transition group-hover:opacity-100"
+                />
               </div>
+              {logoBusy ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-[10px] text-ink-2">
+                  Enviando…
+                </div>
+              ) : null}
             </button>
             <input
               ref={logoInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
               hidden
-              onChange={(e) => handleLogoFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null
+                e.target.value = ''
+                handleLogoFile(file)
+              }}
             />
 
             <div className="flex flex-1 flex-col gap-3">
@@ -126,6 +246,33 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
                 onChange={(e) => setLoja({ ...loja, nome: e.target.value })}
                 maxLength={80}
               />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={logoBusy}
+                >
+                  <Upload size={12} />
+                  {logoUrl ? 'Trocar logo' : 'Enviar logo'}
+                </Button>
+                {logoUrl ? (
+                  <Button
+                    size="sm"
+                    variant="text"
+                    onClick={removeLogo}
+                    disabled={logoBusy}
+                    className="text-ink-3 hover:text-danger"
+                  >
+                    <Trash2 size={12} />
+                    Remover
+                  </Button>
+                ) : null}
+                <div className="text-[11px] text-ink-3">
+                  PNG, JPG ou WEBP · até 10 MB
+                </div>
+              </div>
+              {logoErr ? <p className="text-xs text-danger">{logoErr}</p> : null}
             </div>
           </div>
           <Input
@@ -247,13 +394,15 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
           <button
             type="button"
             onClick={() => {
-              if (fundoPreview) {
+              if (fundoBusy) return
+              if (fundoUrl) {
                 setLoja({ ...loja, provador_fundo_tipo: 'personalizado' })
               } else {
                 fundoInputRef.current?.click()
               }
             }}
-            className={`group flex flex-col items-center transition ${
+            disabled={fundoBusy}
+            className={`group flex flex-col items-center transition disabled:cursor-not-allowed ${
               loja.provador_fundo_tipo === 'personalizado' ? '' : 'opacity-90'
             }`}
           >
@@ -264,16 +413,21 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
                   : 'border-border group-hover:border-border-2'
               }`}
             >
-              {fundoPreview ? (
+              {fundoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={fundoPreview} alt="Fundo" className="h-full w-full object-cover" />
+                <img src={fundoUrl} alt="Fundo" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex flex-col items-center gap-1 text-ink-3">
                   <Upload size={18} />
                   <span className="text-[10px]">Enviar foto</span>
                 </div>
               )}
-              {loja.provador_fundo_tipo === 'personalizado' && fundoPreview ? <SelectedDot /> : null}
+              {loja.provador_fundo_tipo === 'personalizado' && fundoUrl ? <SelectedDot /> : null}
+              {fundoBusy ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-[10px] text-ink-2">
+                  Enviando…
+                </div>
+              ) : null}
             </div>
             <span
               className={`mt-2 text-xs ${
@@ -286,12 +440,13 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
             </span>
           </button>
 
-          {fundoPreview ? (
+          {fundoUrl ? (
             <div className="flex flex-col gap-2 self-center">
               <button
                 type="button"
                 onClick={() => fundoInputRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11.5px] text-ink-2 transition hover:border-accent hover:text-accent"
+                disabled={fundoBusy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11.5px] text-ink-2 transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCw size={11} />
                 Trocar
@@ -299,7 +454,8 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
               <button
                 type="button"
                 onClick={clearFundo}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11.5px] text-ink-3 transition hover:text-danger"
+                disabled={fundoBusy}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11.5px] text-ink-3 transition hover:text-danger disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Trash2 size={11} />
                 Remover
@@ -310,11 +466,16 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
           <input
             ref={fundoInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
             hidden
-            onChange={(e) => handleFundoFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null
+              e.target.value = ''
+              handleFundoFile(file)
+            }}
           />
         </div>
+        {fundoErr ? <p className="mb-3 text-xs text-danger">{fundoErr}</p> : null}
       </Reveal>
 
       <div className="flex items-center gap-3">
@@ -331,6 +492,21 @@ export function ConfigClient({ initialLoja }: { initialLoja: LojaRow }) {
       </div>
     </div>
   )
+}
+
+async function fileToDataUrl(file: File): Promise<string> {
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Falha ao converter imagem'))
+        return
+      }
+      resolve(reader.result)
+    }
+    reader.onerror = () => reject(new Error('Falha ao ler imagem'))
+    reader.readAsDataURL(file)
+  })
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

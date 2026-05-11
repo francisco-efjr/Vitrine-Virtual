@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { AdminShell } from '@/components/admin/admin-shell'
 import { getSession } from '@/server/auth/session'
+import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession()
@@ -26,7 +27,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <AdminShell
-      loja={session.loja ? { nome: session.loja.nome, slug: session.loja.slug } : null}
+      loja={
+        session.loja
+          ? {
+              nome: session.loja.nome,
+              slug: session.loja.slug,
+              logo_url: buildLojaAssetPublicUrl(session.loja.logo_storage_path),
+            }
+          : null
+      }
     >
       {children}
     </AdminShell>

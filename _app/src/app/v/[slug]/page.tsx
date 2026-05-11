@@ -7,6 +7,7 @@ import { PublicLiveRefresh } from '@/components/public/public-live-refresh'
 import { Stagger } from '@/components/motion'
 import { formatPreco } from '@/lib/validators/peca'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
+import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ interface VitrineData {
     whatsapp_e164: string | null
     exibir_preco_publico: boolean
     tagline: string | null
+    logo_url: string | null
   }
   pecas: Array<{
     peca_id: string
@@ -64,6 +66,7 @@ async function loadVitrine(slug: string): Promise<VitrineData | null> {
       whatsapp_e164: loja.whatsapp_e164,
       exibir_preco_publico: loja.exibir_preco_publico,
       tagline: loja.tagline ?? null,
+      logo_url: buildLojaAssetPublicUrl(loja.logo_storage_path ?? null),
     },
     pecas,
   }
@@ -94,15 +97,25 @@ export default async function VitrinePage({ params }: { params: { slug: string }
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-12">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="truncate font-serif text-xl font-semibold tracking-wider text-ink sm:text-2xl">
-              {data.loja.nome}
-            </div>
-            {data.loja.tagline ? (
-              <div className="mt-0.5 truncate text-[11.5px] italic text-ink-3 sm:text-xs">
-                {data.loja.tagline}
-              </div>
+          <div className="flex min-w-0 items-center gap-3">
+            {data.loja.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={data.loja.logo_url}
+                alt={`Logo ${data.loja.nome}`}
+                className="h-10 w-10 shrink-0 rounded-full border border-border bg-surface-2 object-cover sm:h-12 sm:w-12"
+              />
             ) : null}
+            <div className="min-w-0">
+              <div className="truncate font-serif text-xl font-semibold tracking-wider text-ink sm:text-2xl">
+                {data.loja.nome}
+              </div>
+              {data.loja.tagline ? (
+                <div className="mt-0.5 truncate text-[11.5px] italic text-ink-3 sm:text-xs">
+                  {data.loja.tagline}
+                </div>
+              ) : null}
+            </div>
           </div>
           <nav className="flex items-center gap-2">
             {data.loja.instagram ? (
