@@ -1,5 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { preparePreviewableImage } from '@/lib/images/client-standardize'
+import {
+  IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES,
+  IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_DIMENSION,
+  IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB,
+} from '@/lib/images/upload'
 import { TryOnModal } from '../try-on-modal'
 
 vi.mock('@/lib/images/client-standardize', () => ({
@@ -37,11 +43,16 @@ describe('TryOnModal', () => {
     const photoFile = new File(['foto'], 'foto.jpg', { type: 'image/jpeg' })
     fireEvent.change(fileInputs[1] as HTMLInputElement, { target: { files: [photoFile] } })
 
+    await waitFor(() =>
+      expect(preparePreviewableImage).toHaveBeenCalledWith(photoFile, {
+        maxSizeMB: IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB,
+        maxUploadBytes: IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES,
+        maxWidthOrHeight: IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_DIMENSION,
+      }),
+    )
     await waitFor(() => expect(continueButton).toBeEnabled())
     fireEvent.click(continueButton)
-    await waitFor(() =>
-      expect(screen.getByText(/confira sua foto e a peça/i)).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByText(/confira sua foto e a peça/i)).toBeInTheDocument())
   })
 
   it('envia apenas uma foto do cliente em customerPhoto', async () => {
@@ -75,9 +86,7 @@ describe('TryOnModal', () => {
     await waitFor(() => expect(continueButton).toBeEnabled())
     fireEvent.click(continueButton)
 
-    await waitFor(() =>
-      expect(screen.getByText(/confira sua foto e a peça/i)).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByText(/confira sua foto e a peça/i)).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: /gerar prévia/i }))
 

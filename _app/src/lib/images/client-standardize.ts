@@ -2,6 +2,7 @@
 
 import imageCompression from 'browser-image-compression'
 import {
+  buildImageMaxUploadMessage,
   IMAGE_INVALID_FORMAT_MESSAGE,
   IMAGE_MAX_UPLOAD_BYTES,
   IMAGE_STANDARD_MAX_DIMENSION,
@@ -16,12 +17,29 @@ export interface StandardizedImage {
   previewUrl: string
 }
 
-export async function standardizeImageFile(file: File): Promise<File> {
-  const validation = validateImageUploadMeta({
-    filename: file.name,
-    contentType: file.type,
-    size: file.size,
-  })
+export interface ImageStandardizationOptions {
+  maxSizeMB?: number
+  maxUploadBytes?: number
+  maxWidthOrHeight?: number
+}
+
+export async function standardizeImageFile(
+  file: File,
+  options: ImageStandardizationOptions = {},
+): Promise<File> {
+  const maxUploadBytes = options.maxUploadBytes ?? IMAGE_MAX_UPLOAD_BYTES
+  const maxSizeMB = options.maxSizeMB ?? 2
+  const maxWidthOrHeight = options.maxWidthOrHeight ?? IMAGE_STANDARD_MAX_DIMENSION
+  const validation = validateImageUploadMeta(
+    {
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+    },
+    {
+      maxBytes: maxUploadBytes,
+    },
+  )
 
   if (!validation.ok) {
     throw new Error(validation.message)
@@ -29,8 +47,8 @@ export async function standardizeImageFile(file: File): Promise<File> {
 
   try {
     const compressed = await imageCompression(file, {
-      maxSizeMB: 2,
-      maxWidthOrHeight: IMAGE_STANDARD_MAX_DIMENSION,
+      maxSizeMB,
+      maxWidthOrHeight,
       useWebWorker: true,
       initialQuality: IMAGE_STANDARD_QUALITY,
       preserveExif: false,
@@ -42,8 +60,8 @@ export async function standardizeImageFile(file: File): Promise<File> {
       lastModified: Date.now(),
     })
   } catch {
-    if (file.size > IMAGE_MAX_UPLOAD_BYTES) {
-      throw new Error('A imagem deve ter no máximo 10 MB.')
+    if (file.size > maxUploadBytes) {
+      throw new Error(buildImageMaxUploadMessage(maxUploadBytes))
     }
 
     throw new Error(
@@ -54,8 +72,11 @@ export async function standardizeImageFile(file: File): Promise<File> {
   }
 }
 
-export async function preparePreviewableImage(file: File): Promise<StandardizedImage> {
-  const standardized = await standardizeImageFile(file)
+export async function preparePreviewableImage(
+  file: File,
+  options: ImageStandardizationOptions = {},
+): Promise<StandardizedImage> {
+  const standardized = await standardizeImageFile(file, options)
   return {
     file: standardized,
     previewUrl: URL.createObjectURL(standardized),

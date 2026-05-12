@@ -18,6 +18,9 @@ describe('buildTryOnProviderInput', () => {
       product: {
         productImage: 'https://cdn.example.com/product.webp',
       },
+      background: {
+        mode: 'white',
+      },
     })
   })
 
@@ -30,5 +33,21 @@ describe('buildTryOnProviderInput', () => {
 
     expect(payload.customer.photoImage).toBe(photo)
     expect(payload.references.customerReferenceImage).toBe(photo)
+  })
+
+  it('inclui fundo personalizado quando configurado', () => {
+    const payload = buildTryOnProviderInput({
+      customerPhoto: 'data:image/jpeg;base64,abc123',
+      productImage: 'https://cdn.example.com/p.jpg',
+      background: {
+        mode: 'custom',
+        backgroundImage: 'https://cdn.example.com/background.jpg',
+      },
+    })
+
+    expect(payload.background).toEqual({
+      mode: 'custom',
+      backgroundImage: 'https://cdn.example.com/background.jpg',
+    })
   })
 })

@@ -1,6 +1,9 @@
 import type { NextRequest } from 'next/server'
 import { z } from 'zod'
-import { validateImageUploadMeta } from '@/lib/images/upload'
+import {
+  IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES,
+  validateImageUploadMeta,
+} from '@/lib/images/upload'
 import { extractClientIp } from '@/lib/security/ip-hash'
 import { runTryOn } from '@/server/try-on/use-case'
 import { mapProviderFailure } from '@/server/try-on/provider-errors'
@@ -12,7 +15,7 @@ import { logger } from '@/lib/logger'
  *
  * - Aceita multipart com: customerPhoto, peca_id, turnstile_token, consent.
  * - A foto vive APENAS aqui em memória — descartada após response (ADR 0006).
- * - Tamanho máx: 10 MB (validação extra além das 4 camadas anti-abuso).
+ * - Tamanho máx: 60 MB (validação extra além das 4 camadas anti-abuso).
  *
  * Roda em Node runtime (não Edge) porque o polling do FASHN pode passar de 25s.
  */
@@ -45,16 +48,21 @@ export async function POST(req: NextRequest) {
     return fail('Envie uma foto para continuar.', 'NO_CUSTOMER_PHOTO', 400)
   }
 
-  const photoValidation = validateImageUploadMeta({
-    filename: customerPhoto instanceof File ? customerPhoto.name : 'foto.webp',
-    contentType: customerPhoto.type,
-    size: customerPhoto.size,
-  })
+  const photoValidation = validateImageUploadMeta(
+    {
+      filename: customerPhoto instanceof File ? customerPhoto.name : 'foto.webp',
+      contentType: customerPhoto.type,
+      size: customerPhoto.size,
+    },
+    {
+      maxBytes: IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES,
+    },
+  )
   if (!photoValidation.ok) {
     return fail(
       photoValidation.message,
       'BAD_CUSTOMER_PHOTO',
-      photoValidation.message.includes('10 MB') ? 413 : 415,
+      photoValidation.message.includes('MB') ? 413 : 415,
     )
   }
 
@@ -84,11 +92,7 @@ export async function POST(req: NextRequest) {
           429,
         )
       case 'quota_exceeded':
-        return fail(
-          'O provador desta loja atingiu o limite mensal',
-          'QUOTA_EXCEEDED',
-          429,
-        )
+        return fail('O provador desta loja atingiu o limite mensal', 'QUOTA_EXCEEDED', 429)
       case 'peca_unavailable':
         return fail('Peça indisponível', 'PECA_UNAVAILABLE', 404)
       case 'provider_failed': {

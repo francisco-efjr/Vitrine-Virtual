@@ -14,7 +14,12 @@ import {
 } from 'lucide-react'
 import { VVLogo } from '@/components/brand/vv-logo'
 import { preparePreviewableImage } from '@/lib/images/client-standardize'
-import { IMAGE_INVALID_FORMAT_MESSAGE } from '@/lib/images/upload'
+import {
+  IMAGE_INVALID_FORMAT_MESSAGE,
+  IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES,
+  IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_DIMENSION,
+  IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB,
+} from '@/lib/images/upload'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 
 type Step = 'upload' | 'confirm' | 'processing' | 'result' | 'error'
@@ -170,13 +175,15 @@ export function TryOnModal({
     if (!file) return
     setUploadError(null)
     try {
-      const prepared = await preparePreviewableImage(file)
+      const prepared = await preparePreviewableImage(file, {
+        maxSizeMB: IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB,
+        maxUploadBytes: IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES,
+        maxWidthOrHeight: IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_DIMENSION,
+      })
       cleanupSelection(customerPhoto)
       setCustomerPhoto(prepared)
     } catch (error) {
-      setUploadError(
-        error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE,
-      )
+      setUploadError(error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE)
     }
   }
 
@@ -290,9 +297,7 @@ export function TryOnModal({
             <div className="mt-5 flex flex-wrap items-center gap-2.5">
               {whatsappE164 ? (
                 <a
-                  href={
-                    buildWhatsAppUrl(whatsappE164, buildVitrineMessage({ pecaNome })) ?? '#'
-                  }
+                  href={buildWhatsAppUrl(whatsappE164, buildVitrineMessage({ pecaNome })) ?? '#'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-sans text-sm font-semibold text-ink transition hover:opacity-90"
@@ -443,11 +448,7 @@ function CabineStepper({ step }: { step: Exclude<Step, 'error'> }) {
               key={i}
               className="relative h-[2px] flex-1 overflow-hidden rounded-sm"
               style={{
-                background: done
-                  ? '#1e1a17'
-                  : active
-                    ? 'transparent'
-                    : 'rgba(30,26,23,0.10)',
+                background: done ? '#1e1a17' : active ? 'transparent' : 'rgba(30,26,23,0.10)',
               }}
             >
               {active ? (
@@ -538,9 +539,7 @@ function UploadStep({
           <div className="truncate font-serif text-[17px] font-normal tracking-tight text-ink">
             {pecaNome}
           </div>
-          {pecaTamanho ? (
-            <div className="mt-px text-[11.5px] text-ink-3">{pecaTamanho}</div>
-          ) : null}
+          {pecaTamanho ? <div className="mt-px text-[11.5px] text-ink-3">{pecaTamanho}</div> : null}
         </div>
       </div>
 
@@ -584,11 +583,7 @@ function UploadStep({
               border: `1px ${drag ? 'solid' : 'dashed'} ${
                 uploadError ? '#c47a7a' : drag ? '#1e1a17' : 'rgba(30,26,23,0.10)'
               }`,
-              background: drag
-                ? 'rgba(184,149,106,0.06)'
-                : uploadError
-                  ? '#f7ebeb'
-                  : 'transparent',
+              background: drag ? 'rgba(184,149,106,0.06)' : uploadError ? '#f7ebeb' : 'transparent',
             }}
           >
             <div
@@ -708,11 +703,7 @@ function UploadPreview({
         style={{ background: 'linear-gradient(180deg, #f5f0ea 0%, #ede6dc 100%)' }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={value.previewUrl}
-          alt="Sua foto"
-          className="block h-full w-full object-contain"
-        />
+        <img src={value.previewUrl} alt="Sua foto" className="block h-full w-full object-contain" />
         <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/45 via-transparent to-transparent p-3.5 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
           <div className="flex gap-1.5">
             <button
@@ -792,11 +783,7 @@ function ConfirmStep({
             >
               {item.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={item.url}
-                  alt={item.alt}
-                  className="h-full w-full object-contain"
-                />
+                <img src={item.url} alt={item.alt} className="h-full w-full object-contain" />
               ) : (
                 <div className="flex h-full items-center justify-center text-ink-3">
                   <ImageIcon size={20} />
@@ -942,8 +929,7 @@ function ProcessingStep({ progress, message }: { progress: number; message: stri
           <div
             className="absolute inset-0"
             style={{
-              background:
-                'linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)',
+              background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)',
               transform: 'translateX(-100%)',
               animation: 'vv-shine 1.6s var(--e-inout) infinite',
             }}

@@ -22,6 +22,9 @@ export const fashnProvider: TryOnProvider = {
     if (!env.FASHN_API_KEY) {
       throw new TryOnProviderError('FASHN_API_KEY não configurada', 'fashn', false)
     }
+    if (input.background.mode === 'custom') {
+      throw new TryOnProviderError('FASHN não suporta fundo personalizado', 'fashn', true)
+    }
     const t0 = Date.now()
 
     // 1. Submit job

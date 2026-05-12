@@ -20,6 +20,9 @@ export const replicateProvider: TryOnProvider = {
     if (!env.REPLICATE_API_TOKEN || !env.REPLICATE_VTON_MODEL) {
       throw new TryOnProviderError('Replicate não configurado', 'replicate', false)
     }
+    if (input.background.mode === 'custom') {
+      throw new TryOnProviderError('Replicate não suporta fundo personalizado', 'replicate', true)
+    }
     const t0 = Date.now()
 
     // Replicate cria predictions e nós fazemos polling

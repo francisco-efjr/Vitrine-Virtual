@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { _resetEnvCache } from '@/lib/env'
-import { TryOnProviderError } from '../types'
+import { TryOnProviderError, type TryOnProviderInput } from '../types'
 import { openAiProvider } from '../openai'
 
 const ORIGINAL_ENV = { ...process.env }
@@ -18,7 +18,7 @@ vi.mock('@/lib/supabase/service', () => ({
   }),
 }))
 
-const SINGLE_PHOTO_INPUT = {
+const SINGLE_PHOTO_INPUT: TryOnProviderInput = {
   customer: {
     photoImage: `data:image/jpeg;base64,${Buffer.from('customer-photo').toString('base64')}`,
   },
@@ -27,6 +27,9 @@ const SINGLE_PHOTO_INPUT = {
   },
   product: {
     productImage: 'https://example.com/garment.jpg',
+  },
+  background: {
+    mode: 'white',
   },
 }
 
@@ -119,5 +122,70 @@ describe('openAiProvider.generate', () => {
     expect(storageBucket.createSignedUrl).toHaveBeenCalledOnce()
     expect(result.resultUrl).toBe('https://cdn.example.com/result.png')
     expect(result.requestId).toBeTruthy()
+  })
+
+  it('inclui o fundo personalizado da loja no request de edição', async () => {
+    process.env.OPENAI_API_KEY = 'openai-test-key'
+    process.env.OPENAI_IMAGE_MODEL = 'gpt-image-1'
+    _resetEnvCache()
+
+    const customInput: TryOnProviderInput = {
+      ...SINGLE_PHOTO_INPUT,
+      background: {
+        mode: 'custom',
+        backgroundImage: 'https://example.com/store-background.webp',
+      },
+    }
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      // garment download
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([1, 2, 3, 4]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/jpeg' },
+        }),
+      )
+      // store background download
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([9, 8, 7, 6]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/webp' },
+        }),
+      )
+      // OpenAI images/edits
+      .mockResolvedValueOnce(
+        Response.json({
+          data: [{ b64_json: Buffer.from('generated-image').toString('base64') }],
+        }),
+      )
+
+    storageBucket.upload.mockResolvedValue({ error: null })
+    storageBucket.createSignedUrl.mockResolvedValue({
+      data: { signedUrl: 'https://cdn.example.com/result.png' },
+      error: null,
+    })
+
+    await openAiProvider.generate(customInput)
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/store-background.webp',
+      expect.objectContaining({ cache: 'no-store' }),
+    )
+
+    const requestBody = fetchMock.mock.calls[2]?.[1]?.body as FormData
+    const images = requestBody.getAll('image[]') as File[]
+    expect(images).toHaveLength(3)
+    expect(images.map((image) => image.name)).toEqual([
+      'customer-photo.jpg',
+      'garment-image.jpg',
+      'background-image.webp',
+    ])
+    expect(String(requestBody.get('prompt'))).toContain('BACKGROUND_IMAGE')
+    expect(String(requestBody.get('prompt'))).not.toContain(
+      'Always use a pure white studio background',
+    )
   })
 })
