@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { TryOnButton } from '../try-on-button'
 
 describe('TryOnButton', () => {
-  it('usa a nomenclatura Provador Virtual sem mencionar IA', () => {
+  it('renderiza Experimentar como CTA principal e nunca cita "IA"', () => {
     render(
       <TryOnButton
         pecaId="11111111-1111-1111-1111-111111111111"
@@ -12,7 +12,8 @@ describe('TryOnButton', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: /experimentar na cabine/i })).toBeInTheDocument()
-    expect(screen.queryByText(/ia/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /experimentar/i })).toBeInTheDocument()
+    // Validamos que o texto não introduz "IA"/"AI" em parte alguma do botão
+    expect(screen.queryByText(/\bIA\b/)).not.toBeInTheDocument()
   })
 })

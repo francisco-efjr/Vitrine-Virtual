@@ -27,24 +27,20 @@ describe('TryOnModal', () => {
       />,
     )
 
-    const confirmButton = screen.getByRole('button', { name: /confirmar foto/i })
-    expect(confirmButton).toBeDisabled()
+    const continueButton = screen.getByRole('button', { name: /^continuar$/i })
+    expect(continueButton).toBeDisabled()
+
+    fireEvent.click(screen.getByText(/concordo com o uso temporário/i))
+    expect(continueButton).toBeDisabled() // still no photo
 
     const fileInputs = Array.from(container.querySelectorAll('input[type="file"]'))
     const photoFile = new File(['foto'], 'foto.jpg', { type: 'image/jpeg' })
+    fireEvent.change(fileInputs[1] as HTMLInputElement, { target: { files: [photoFile] } })
 
-    fireEvent.click(screen.getByText(/concordo que minha foto/i))
-    expect(confirmButton).toBeEnabled()
-
-    fireEvent.click(confirmButton)
-    expect(screen.getAllByText('Envie uma foto para continuar.').length).toBeGreaterThan(0)
-
-    fireEvent.change(fileInputs[0] as HTMLInputElement, { target: { files: [photoFile] } })
-    await waitFor(() => expect(screen.getAllByAltText('Sua foto').length).toBeGreaterThan(0))
-
-    fireEvent.click(confirmButton)
+    await waitFor(() => expect(continueButton).toBeEnabled())
+    fireEvent.click(continueButton)
     await waitFor(() =>
-      expect(screen.getByText(/confirme a foto antes de continuar/i)).toBeInTheDocument(),
+      expect(screen.getByText(/confira sua foto e a peça/i)).toBeInTheDocument(),
     )
   })
 
@@ -72,18 +68,18 @@ describe('TryOnModal', () => {
 
     const fileInputs = Array.from(container.querySelectorAll('input[type="file"]'))
     const photoFile = new File(['foto'], 'foto.jpg', { type: 'image/jpeg' })
+    fireEvent.change(fileInputs[1] as HTMLInputElement, { target: { files: [photoFile] } })
 
-    fireEvent.change(fileInputs[0] as HTMLInputElement, { target: { files: [photoFile] } })
-    await waitFor(() => expect(screen.getAllByAltText('Sua foto').length).toBeGreaterThan(0))
-
-    fireEvent.click(screen.getByText(/concordo que minha foto/i))
-    fireEvent.click(screen.getByRole('button', { name: /confirmar foto/i }))
+    fireEvent.click(screen.getByText(/concordo com o uso temporário/i))
+    const continueButton = screen.getByRole('button', { name: /^continuar$/i })
+    await waitFor(() => expect(continueButton).toBeEnabled())
+    fireEvent.click(continueButton)
 
     await waitFor(() =>
-      expect(screen.getByText(/confirme a foto antes de continuar/i)).toBeInTheDocument(),
+      expect(screen.getByText(/confira sua foto e a peça/i)).toBeInTheDocument(),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /entrar na cabine/i }))
+    fireEvent.click(screen.getByRole('button', { name: /gerar prévia/i }))
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
 

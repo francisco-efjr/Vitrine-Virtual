@@ -25,6 +25,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     )
   }
 
+  const userNome =
+    session.profile.nome_completo?.trim() ||
+    session.user.email.split('@')[0]?.replace(/[._]/g, ' ') ||
+    'Lojista'
+
   return (
     <AdminShell
       loja={
@@ -36,6 +41,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             }
           : null
       }
+      user={{ nome: userNome, email: session.user.email }}
     >
       {children}
     </AdminShell>

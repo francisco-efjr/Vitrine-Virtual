@@ -51,10 +51,12 @@ const config: Config = {
         },
       },
       fontFamily: {
-        serif: ['var(--font-cormorant)', 'Georgia', 'serif'],
-        sans: ['var(--font-dmsans)', 'system-ui', 'sans-serif'],
+        serif: ['var(--font-bodoni)', 'Didot', 'Georgia', 'serif'],
+        sans: ['var(--font-manrope)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       letterSpacing: {
+        tight: '-0.01em',
+        snug: '-0.005em',
         wider: '0.04em',
         widest: '0.06em',
       },

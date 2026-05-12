@@ -2,42 +2,46 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Camera,
   Check,
   Download,
   Image as ImageIcon,
-  ImageOff,
   MessageCircle,
-  UserRound,
+  RefreshCcw,
+  Trash2,
+  Upload,
   X,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { VVLogo } from '@/components/brand/vv-logo'
 import { preparePreviewableImage } from '@/lib/images/client-standardize'
 import { IMAGE_INVALID_FORMAT_MESSAGE } from '@/lib/images/upload'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 
-type Step = 'choose' | 'preview' | 'loading' | 'result' | 'error'
+type Step = 'upload' | 'confirm' | 'processing' | 'result' | 'error'
 
 type SelectedPhoto = {
   file: File
   previewUrl: string
 }
 
-const STEPS: Array<{ id: Exclude<Step, 'error'>; label: string }> = [
-  { id: 'choose', label: 'Sua foto' },
-  { id: 'preview', label: 'Confirmar' },
-  { id: 'loading', label: 'Gerando' },
-  { id: 'result', label: 'Resultado' },
-]
+const STEP_INDEX: Record<Exclude<Step, 'error'>, number> = {
+  upload: 0,
+  confirm: 1,
+  processing: 2,
+  result: 2,
+}
+const STEP_LABELS = ['Sua foto', 'Conferir', 'Pronto']
 
 const LOADING_MESSAGES = [
-  'Preparando sua visualização…',
-  'Analisando a peça…',
-  'Combinando looks…',
+  'Preparando sua simulação…',
+  'Analisando proporções…',
+  'Vestindo a peça…',
+  'Ajustando os detalhes…',
   'Quase lá…',
-  'Finalizando os detalhes…',
 ]
 
-const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif'
+const ACCEPT =
+  'image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif'
 
 export function TryOnModal({
   open,
@@ -45,6 +49,9 @@ export function TryOnModal({
   onTryAnother,
   pecaId,
   pecaNome,
+  pecaTamanho = null,
+  pecaPrecoCentavos = null,
+  exibirPreco = false,
   whatsappE164,
   garmentImageUrl,
   garmentThumbUrl,
@@ -52,24 +59,19 @@ export function TryOnModal({
 }: {
   open: boolean
   onClose: () => void
-  /**
-   * Quando o usuário clica "Experimentar outra peça" no resultado,
-   * fechamos o modal e chamamos este callback para levar de volta à
-   * tela com a grade de peças. Default: apenas fecha o modal.
-   */
+  /** Levar de volta para a grade de peças quando o usuário clica "Experimentar outra peça". */
   onTryAnother?: () => void
   pecaId: string
   pecaNome: string
+  pecaTamanho?: string | null
+  pecaPrecoCentavos?: number | null
+  exibirPreco?: boolean
   whatsappE164: string | null
   garmentImageUrl: string | null
   garmentThumbUrl: string | null
-  /**
-   * URL pública da imagem de fundo personalizada da Cabine (configurada
-   * pela lojista). Usada como pano de fundo sutil na tela de loading.
-   */
   cabineBackdropUrl?: string | null
 }) {
-  const [step, setStep] = useState<Step>('choose')
+  const [step, setStep] = useState<Step>('upload')
   const [agreed, setAgreed] = useState(false)
   const [customerPhoto, setCustomerPhoto] = useState<SelectedPhoto | null>(null)
   const [progress, setProgress] = useState(0)
@@ -77,7 +79,7 @@ export function TryOnModal({
   const [resultUrl, setResultUrl] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [validationAttempted, setValidationAttempted] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
 
@@ -97,13 +99,14 @@ export function TryOnModal({
       if (!res.ok) throw new Error('download_failed')
       const blob = await res.blob()
       const objectUrl = URL.createObjectURL(blob)
-      const safeName = pecaNome
-        .normalize('NFKD')
-        .replace(/[^\w\s-]/g, '')
-        .trim()
-        .replace(/\s+/g, '-')
-        .toLowerCase()
-        .slice(0, 60) || 'simulacao'
+      const safeName =
+        pecaNome
+          .normalize('NFKD')
+          .replace(/[^\w\s-]/g, '')
+          .trim()
+          .replace(/\s+/g, '-')
+          .toLowerCase()
+          .slice(0, 60) || 'simulacao'
       const ext = blob.type.includes('png') ? 'png' : 'jpg'
       const a = document.createElement('a')
       a.href = objectUrl
@@ -113,25 +116,18 @@ export function TryOnModal({
       a.remove()
       URL.revokeObjectURL(objectUrl)
     } catch {
-      // Fallback: abre em nova aba se o navegador bloquear o download CORS
       if (resultUrl) window.open(resultUrl, '_blank', 'noopener,noreferrer')
     } finally {
       setDownloading(false)
     }
   }
 
-  const canContinue = agreed && !!customerPhoto
-  const waUrl = whatsappE164
-    ? buildWhatsAppUrl(whatsappE164, buildVitrineMessage({ pecaNome }))
-    : null
-  const currentStepIndex = Math.max(0, STEPS.findIndex((item) => item.id === step))
-
   useEffect(() => {
-    if (step !== 'loading') return
+    if (step !== 'processing') return
     setMsgIdx(0)
     const iv = window.setInterval(() => {
       setMsgIdx((i) => (i + 1) % LOADING_MESSAGES.length)
-    }, 2200)
+    }, 2000)
     return () => window.clearInterval(iv)
   }, [step])
 
@@ -159,120 +155,34 @@ export function TryOnModal({
     if (open) return
     const timer = window.setTimeout(() => {
       cleanupSelection(customerPhoto)
-      setStep('choose')
+      setStep('upload')
       setAgreed(false)
       setCustomerPhoto(null)
       setProgress(0)
       setResultUrl(null)
       setErrorMsg(null)
-      setValidationAttempted(false)
-    }, 180)
+      setUploadError(null)
+    }, 250)
     return () => window.clearTimeout(timer)
   }, [open, customerPhoto])
 
-  function renderFooter() {
-    if (step === 'choose') {
-      return (
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Fechar
-          </Button>
-          <Button variant="dark" onClick={handlePreviewStep} disabled={!agreed}>
-            Confirmar foto
-          </Button>
-        </>
-      )
-    }
-
-    if (step === 'preview') {
-      return (
-        <>
-          <Button variant="ghost" onClick={() => setStep('choose')}>
-            Ajustar foto
-          </Button>
-          <Button variant="dark" onClick={handleGenerate} disabled={!canContinue}>
-            Entrar na Cabine
-          </Button>
-        </>
-      )
-    }
-
-    if (step === 'result') {
-      return (
-        <>
-          <Button variant="ghost" onClick={handleTryAnother}>
-            Experimentar outra peça
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={handleDownload}
-            disabled={!resultUrl || downloading}
-            icon={<Download size={15} />}
-          >
-            {downloading ? 'Baixando…' : 'Baixar'}
-          </Button>
-          {waUrl ? (
-            <a
-              href={waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#25d366] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1da855]"
-            >
-              <MessageCircle size={15} />
-              Falar com a loja
-            </a>
-          ) : null}
-        </>
-      )
-    }
-
-    if (step === 'error') {
-      return (
-        <>
-          <Button variant="ghost" onClick={() => setStep('choose')}>
-            Voltar
-          </Button>
-          <Button variant="dark" onClick={handleGenerate} disabled={!customerPhoto}>
-            Tentar novamente
-          </Button>
-        </>
-      )
-    }
-
-    return null
-  }
-
   async function onPick(file: File | null) {
     if (!file) return
+    setUploadError(null)
     try {
       const prepared = await preparePreviewableImage(file)
       cleanupSelection(customerPhoto)
       setCustomerPhoto(prepared)
-      setErrorMsg(null)
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE)
+      setUploadError(
+        error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE,
+      )
     }
-  }
-
-  function handlePreviewStep() {
-    setValidationAttempted(true)
-    if (!customerPhoto) {
-      setErrorMsg('Envie uma foto para continuar.')
-      return
-    }
-    setErrorMsg(null)
-    setStep('preview')
   }
 
   async function handleGenerate() {
-    if (!customerPhoto) {
-      setValidationAttempted(true)
-      setErrorMsg('A foto é obrigatória para usar a Cabine.')
-      setStep('choose')
-      return
-    }
-
-    setStep('loading')
+    if (!customerPhoto) return
+    setStep('processing')
     setProgress(0)
     setErrorMsg(null)
 
@@ -302,7 +212,7 @@ export function TryOnModal({
 
       setProgress(100)
       setResultUrl(data.data.result_url)
-      window.setTimeout(() => setStep('result'), 200)
+      window.setTimeout(() => setStep('result'), 250)
     } catch {
       window.clearInterval(interval)
       setErrorMsg('Erro de conexão. Tente novamente em instantes.')
@@ -312,366 +222,786 @@ export function TryOnModal({
 
   if (!open) return null
 
+  // ─── Result screen — full-bleed dark, emotional, minimal ───
+  if (step === 'result' && resultUrl) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Resultado da Cabine"
+        className="vv-fade-in fixed inset-0 z-[2000] flex flex-col bg-[#0e0c0a]"
+      >
+        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-4 py-4 sm:px-5">
+          <VVLogo size={22} variant="light" />
+          <button
+            onClick={onClose}
+            className="rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs text-white/75 backdrop-blur transition hover:bg-white/20 sm:text-[12.5px]"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <div className="relative flex-1 overflow-hidden">
+          {cabineBackdropUrl ? (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-15"
+              style={{ backgroundImage: `url("${cabineBackdropUrl}")` }}
+            />
+          ) : null}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={resultUrl}
+            alt="Resultado da Cabine"
+            className="vv-blur-in absolute inset-0 h-full w-full object-cover object-center"
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-[#0e0c0a]/95 via-[#0e0c0a]/40 to-transparent" />
+
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute right-4 top-[78px] flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 backdrop-blur-md"
+            style={{ animation: 'vv-fade 0.6s var(--e-out) 0.5s both' }}
+          >
+            <span className="block h-1 w-1 rounded-full bg-white/70" />
+            <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80">
+              Simulação gerada
+            </span>
+          </div>
+
+          <div
+            className="absolute inset-x-0 bottom-0 px-5 pb-7 pt-6 sm:px-7 sm:pb-8"
+            style={{ animation: 'vv-fade-up 0.55s var(--e-out) 0.25s both' }}
+          >
+            <div className="font-serif text-[15px] italic tracking-wide text-white/55">
+              Veja como ficou em você
+            </div>
+            <div className="mt-2 font-serif text-[24px] font-semibold leading-tight tracking-tight text-white sm:text-[26px]">
+              {pecaNome}
+            </div>
+            {pecaTamanho ? (
+              <div className="mt-1 font-sans text-[13px] text-white/50">{pecaTamanho}</div>
+            ) : null}
+            {exibirPreco && pecaPrecoCentavos != null ? (
+              <div className="mt-3 font-serif text-[20px] font-medium text-white/85">
+                {formatPreco(pecaPrecoCentavos)}
+              </div>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap items-center gap-2.5">
+              {whatsappE164 ? (
+                <a
+                  href={
+                    buildWhatsAppUrl(whatsappE164, buildVitrineMessage({ pecaNome })) ?? '#'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-sans text-sm font-semibold text-ink transition hover:opacity-90"
+                  style={{ minWidth: 180 }}
+                >
+                  <MessageCircle size={16} />
+                  Falar com a loja
+                </a>
+              ) : null}
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-4 py-3 font-sans text-[13.5px] font-medium text-white/90 backdrop-blur transition hover:bg-white/20 disabled:opacity-60"
+              >
+                <Download size={14} />
+                {downloading ? 'Baixando…' : 'Baixar'}
+              </button>
+              <button
+                onClick={handleTryAnother}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-4 py-3 font-sans text-[13.5px] text-white/70 transition hover:bg-white/10 hover:text-white"
+              >
+                Experimentar outra peça
+              </button>
+            </div>
+            <div className="mt-3 text-center font-sans text-[11px] text-white/35">
+              Imagem gerada por simulação · expira em 24h e não é armazenada
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Bottom-sheet for upload / confirm / processing / error ───
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Cabine Virtual"
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(20,16,14,0.7)] p-0 backdrop-blur sm:items-center sm:p-5"
+      className="fixed inset-0 z-[2000] flex items-end justify-center bg-[rgba(18,14,12,0.68)] p-0 backdrop-blur"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[92vh] min-h-[60vh] w-full max-w-[680px] flex-col overflow-hidden rounded-t-[22px] bg-surface shadow-modal sm:min-h-0 sm:rounded-modal"
+        className="flex max-h-[94vh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[22px] bg-surface shadow-[0_-8px_60px_rgba(0,0,0,0.22)]"
+        style={{ animation: 'vv-slide-up 0.35s var(--e-out-soft)' }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-4 sm:px-6">
-          <div>
-            <div className="font-serif text-xl font-semibold">Cabine</div>
-            <div className="mt-0.5 text-xs text-ink-3">{pecaNome}</div>
+        <div className="flex justify-center pb-1 pt-2.5">
+          <div className="h-1 w-10 rounded-full bg-border-2" />
+        </div>
+
+        <div className="flex items-start justify-between gap-3.5 px-5 pb-1.5 pt-2 sm:px-6">
+          <div className="min-w-0 flex-1">
+            <div className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-ink-3">
+              Cabine Virtual
+            </div>
+            <div className="mt-1 truncate font-serif text-[21px] font-normal leading-tight tracking-tight text-ink">
+              {pecaNome}
+            </div>
           </div>
           <button
-            type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="rounded p-1 text-ink-3 hover:text-ink"
+            className="-mt-0.5 flex items-center justify-center rounded-lg p-1.5 text-ink-3 transition hover:bg-surface-2"
           >
-            <X size={18} />
+            <X size={17} />
           </button>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-1.5 px-4 py-3 sm:px-6">
-          {STEPS.map((item, index) => {
-            const done = index < currentStepIndex || step === 'result'
-            const active = index === currentStepIndex && step !== 'error'
+        <CabineStepper step={step === 'error' ? 'upload' : step} />
 
-            return (
-              <div key={item.id} className="flex flex-1 items-center gap-1.5">
-                <div
-                  className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                    done
-                      ? 'bg-success text-white'
-                      : active
-                        ? 'bg-accent text-white'
-                        : 'bg-border text-ink-3'
-                  }`}
-                >
-                  {done ? <Check size={11} /> : index + 1}
-                </div>
-                <span className={`hidden text-xs sm:inline ${active ? 'font-semibold text-ink' : 'text-ink-3'}`}>
-                  {item.label}
-                </span>
-                {index < STEPS.length - 1 ? (
-                  <div className={`h-px flex-1 ${done ? 'bg-success' : 'bg-border'}`} />
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Content */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-2 sm:px-6 sm:pb-6">
-          {step === 'choose' ? (
-            <div className="space-y-5">
-              <div>
-                <div className="text-sm font-medium">Envie uma foto sua para continuar.</div>
-                <div className="mt-1 text-[13px] text-ink-3">
-                  Sua foto é usada apenas para gerar a visualização e descartada em seguida.
-                </div>
-              </div>
-
-              <PhotoField
-                title="Sua foto"
-                helper="Envie uma foto mostrando o corpo inteiro, de preferência em boa iluminação e fundo neutro."
-                previewUrl={customerPhoto?.previewUrl ?? null}
-                error={validationAttempted && !customerPhoto ? 'Envie uma foto para continuar.' : null}
-                onCamera={() => cameraRef.current?.click()}
-                onGallery={() => galleryRef.current?.click()}
-              />
-
-              <input
-                ref={cameraRef}
-                type="file"
-                accept={ACCEPT}
-                capture="user"
-                hidden
-                onChange={(e) => onPick(e.target.files?.[0] ?? null)}
-              />
-              <input
-                ref={galleryRef}
-                type="file"
-                accept={ACCEPT}
-                hidden
-                onChange={(e) => onPick(e.target.files?.[0] ?? null)}
-              />
-
-              <button
-                type="button"
-                onClick={() => setAgreed((value) => !value)}
-                className="flex w-full items-start gap-2.5 rounded-[10px] bg-accent-light p-3 text-left"
-              >
-                <span
-                  className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border-2 ${
-                    agreed ? 'border-accent bg-accent' : 'border-border bg-white'
-                  }`}
-                >
-                  {agreed ? <Check size={11} className="text-white" /> : null}
-                </span>
-                <span className="text-xs leading-relaxed text-ink-2">
-                  Concordo que minha foto seja usada apenas para gerar a visualização e descartada após o processamento.
-                </span>
-              </button>
-
-              <p className="text-center text-[11px] text-ink-3">
-                Leia nossa{' '}
-                <a href="/privacidade" className="text-accent underline" target="_blank" rel="noreferrer">
-                  política de privacidade
-                </a>
-                .
-              </p>
-
-              {errorMsg ? <p className="text-center text-sm text-danger">{errorMsg}</p> : null}
-            </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-7 pt-1 sm:px-6">
+          {step === 'upload' ? (
+            <UploadStep
+              mirrorPhoto={customerPhoto}
+              setMirrorPhoto={(p) => {
+                cleanupSelection(customerPhoto)
+                setCustomerPhoto(p)
+                setUploadError(null)
+              }}
+              uploadError={uploadError}
+              pecaNome={pecaNome}
+              pecaTamanho={pecaTamanho}
+              garmentThumbUrl={garmentThumbUrl}
+              agreed={agreed}
+              setAgreed={setAgreed}
+              onNext={() => setStep('confirm')}
+              onCamera={() => cameraRef.current?.click()}
+              onGallery={() => galleryRef.current?.click()}
+              onPick={onPick}
+            />
           ) : null}
 
-          {step === 'preview' ? (
-            <div className="space-y-4">
-              <div className="text-sm text-ink-2">Confirme a foto antes de continuar.</div>
-              <div className="grid grid-cols-2 gap-3">
-                <PreviewCard label="Sua foto" src={customerPhoto?.previewUrl ?? null} alt="Sua foto" />
-                <PreviewCard label="Peça" src={garmentThumbUrl} alt={pecaNome} fallback={pecaNome} />
-              </div>
-              <div className="rounded-[10px] bg-surface-2 px-4 py-3 text-xs text-ink-2">
-                Foto pronta. Clique em &quot;Entrar na Cabine&quot; para gerar a visualização.
-              </div>
-            </div>
+          {step === 'confirm' ? (
+            <ConfirmStep
+              mirrorPhoto={customerPhoto}
+              garmentThumbUrl={garmentThumbUrl}
+              pecaNome={pecaNome}
+              onBack={() => setStep('upload')}
+              onGenerate={handleGenerate}
+            />
           ) : null}
 
-          {step === 'loading' ? (
-            <div className="relative flex min-h-full flex-col items-center justify-center py-8 text-center">
-              {cabineBackdropUrl ? (
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 -m-4 rounded-modal bg-cover bg-center opacity-15"
-                  style={{ backgroundImage: `url("${cabineBackdropUrl}")` }}
-                />
-              ) : null}
-              <div className="relative mb-6 h-24 w-24">
-                {/* Halo respirando atrás */}
-                <span
-                  className="absolute inset-0 rounded-full bg-accent/15"
-                  style={{ animation: 'vv-breathe 2.6s ease-in-out infinite' }}
-                />
-                {/* Anel girando */}
-                <svg
-                  width="96"
-                  height="96"
-                  viewBox="0 0 96 96"
-                  className="absolute inset-0"
-                  style={{ animation: 'vv-spin 2.4s linear infinite' }}
-                >
-                  <circle cx="48" cy="48" r="40" fill="none" stroke="#e6dfd6" strokeWidth="3" />
-                  <circle
-                    cx="48"
-                    cy="48"
-                    r="40"
-                    fill="none"
-                    stroke="#b8956a"
-                    strokeWidth="3"
-                    strokeDasharray="70 181"
-                    strokeLinecap="round"
-                    transform="rotate(-90 48 48)"
-                  />
-                </svg>
-                {/* Partículas em órbita oposta */}
-                <svg
-                  width="96"
-                  height="96"
-                  viewBox="0 0 96 96"
-                  className="absolute inset-0"
-                  style={{ animation: 'vv-spin 6s linear infinite reverse' }}
-                  aria-hidden="true"
-                >
-                  <circle cx="48" cy="8" r="2" fill="#b8956a" opacity="0.7" />
-                  <circle cx="88" cy="48" r="1.4" fill="#8b6840" opacity="0.55" />
-                  <circle cx="48" cy="88" r="1.6" fill="#b8956a" opacity="0.45" />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span
-                    className="font-serif text-lg font-semibold text-accent"
-                    style={{ letterSpacing: '0.5px', animation: 'vv-pulse 1.8s ease-in-out infinite' }}
-                  >
-                    vv
-                  </span>
-                </div>
-              </div>
-
-              <div className="mb-5 h-0.5 w-40 overflow-hidden rounded-full bg-border">
-                <div
-                  className="h-full rounded-full bg-accent transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-
-              <div className="font-serif text-lg font-semibold text-ink">Preparando sua Cabine</div>
-              <div
-                key={msgIdx}
-                className="mt-2 text-[13px] text-ink-3 transition-opacity"
-                style={{ animation: 'vv-fade-msg 0.4s ease' }}
-              >
-                {LOADING_MESSAGES[msgIdx]}
-              </div>
-
-              <style>{`
-                @keyframes vv-fade-msg {
-                  from { opacity: 0; transform: translateY(4px); }
-                  to   { opacity: 1; transform: translateY(0); }
-                }
-                @keyframes vv-breathe {
-                  0%, 100% { transform: scale(0.95); opacity: 0.6; }
-                  50%      { transform: scale(1.08); opacity: 1; }
-                }
-                @keyframes vv-pulse {
-                  0%, 100% { opacity: 0.6; }
-                  50%      { opacity: 1; }
-                }
-              `}</style>
-            </div>
-          ) : null}
-
-          {step === 'result' && resultUrl ? (
-            <div className="vv-fade-in space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success-light text-success">
-                  <Check size={13} />
-                </span>
-                <span className="text-sm font-medium text-ink">Pronto.</span>
-              </div>
-
-              <div className="vv-blur-in relative overflow-hidden rounded-modal border border-border">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={resultUrl}
-                  alt="Resultado da Cabine"
-                  className="aspect-[3/4] w-full object-cover"
-                />
-                {/* Watermark minimalista — sinaliza que é simulação */}
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute bottom-2 right-2 select-none rounded-full bg-black/35 px-2.5 py-1 text-[10px] font-medium uppercase tracking-widest text-white backdrop-blur-sm"
-                >
-                  Simulação
-                </span>
-              </div>
-
-              <p className="text-center text-xs text-ink-3">
-                Imagem gerada por simulação. Expira em até 24 horas.
-              </p>
-            </div>
+          {step === 'processing' ? (
+            <ProcessingStep progress={progress} message={LOADING_MESSAGES[msgIdx] ?? ''} />
           ) : null}
 
           {step === 'error' ? (
-            <div className="flex min-h-full flex-col items-center justify-center py-8 text-center">
-              <div className="mb-3 font-serif text-lg font-semibold">Não foi possível gerar agora</div>
-              <p className="mb-4 max-w-[340px] text-sm text-ink-3">
-                {errorMsg ?? 'Tente novamente em instantes com outra foto.'}
-              </p>
-            </div>
+            <ErrorStep
+              message={errorMsg}
+              onBack={() => setStep('upload')}
+              onRetry={handleGenerate}
+              canRetry={!!customerPhoto}
+            />
           ) : null}
         </div>
 
-        {step !== 'loading' ? (
-          <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-surface px-4 py-4 sm:px-6">
-            {renderFooter()}
+        <input
+          ref={cameraRef}
+          type="file"
+          accept={ACCEPT}
+          capture="user"
+          hidden
+          onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+        />
+        <input
+          ref={galleryRef}
+          type="file"
+          accept={ACCEPT}
+          hidden
+          onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+        />
+      </div>
+    </div>
+  )
+}
+
+function CabineStepper({ step }: { step: Exclude<Step, 'error'> }) {
+  const idx = STEP_INDEX[step] ?? 0
+  return (
+    <div className="px-5 pb-5 pt-4 sm:px-6">
+      <div className="mb-2.5 flex gap-1.5">
+        {[0, 1, 2].map((i) => {
+          const done = i < idx
+          const active = i === idx
+          return (
+            <div
+              key={i}
+              className="relative h-[2px] flex-1 overflow-hidden rounded-sm"
+              style={{
+                background: done
+                  ? '#1e1a17'
+                  : active
+                    ? 'transparent'
+                    : 'rgba(30,26,23,0.10)',
+              }}
+            >
+              {active ? (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      'linear-gradient(90deg, #1e1a17 0%, #1e1a17 50%, rgba(30,26,23,0.10) 50%, rgba(30,26,23,0.10) 100%)',
+                    backgroundSize: '200% 100%',
+                    backgroundPosition: 'right center',
+                    animation: 'vv-step-fill 480ms var(--e-out) forwards',
+                  }}
+                />
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex gap-1.5">
+        {STEP_LABELS.map((label, i) => {
+          const done = i < idx
+          const active = i === idx
+          return (
+            <div
+              key={label}
+              className="flex-1 font-sans text-[10px] uppercase tracking-[0.16em] transition"
+              style={{
+                fontWeight: done || active ? 600 : 400,
+                color: done || active ? '#1e1a17' : '#b0a59d',
+              }}
+            >
+              {label}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function UploadStep({
+  mirrorPhoto,
+  setMirrorPhoto,
+  uploadError,
+  pecaNome,
+  pecaTamanho,
+  garmentThumbUrl,
+  agreed,
+  setAgreed,
+  onNext,
+  onCamera,
+  onGallery,
+  onPick,
+}: {
+  mirrorPhoto: SelectedPhoto | null
+  setMirrorPhoto: (p: SelectedPhoto | null) => void
+  uploadError: string | null
+  pecaNome: string
+  pecaTamanho?: string | null
+  garmentThumbUrl: string | null
+  agreed: boolean
+  setAgreed: (v: boolean) => void
+  onNext: () => void
+  onCamera: () => void
+  onGallery: () => void
+  onPick: (file: File | null) => Promise<void>
+}) {
+  const [drag, setDrag] = useState(false)
+  const canConfirm = !!mirrorPhoto && agreed
+
+  return (
+    <div className="flex flex-col gap-[22px]" style={{ animation: 'vv-fade 0.25s var(--e-out)' }}>
+      <div className="flex items-center gap-3 border-b border-border pb-[18px]">
+        <div className="h-14 w-11 shrink-0 overflow-hidden rounded-md bg-surface-2">
+          {garmentThumbUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={garmentThumbUrl}
+              alt=""
+              className="h-full w-full object-cover object-center"
+            />
+          ) : null}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+            Experimentando
+          </div>
+          <div className="truncate font-serif text-[17px] font-normal tracking-tight text-ink">
+            {pecaNome}
+          </div>
+          {pecaTamanho ? (
+            <div className="mt-px text-[11.5px] text-ink-3">{pecaTamanho}</div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3.5">
+        <div>
+          <div className="font-serif text-[22px] font-normal leading-snug tracking-tight text-ink">
+            Sua foto no espelho
+          </div>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-2">
+            Uma selfie de corpo inteiro, em frente ao espelho, com boa iluminação.
+          </p>
+        </div>
+
+        {mirrorPhoto ? (
+          <UploadPreview
+            value={mirrorPhoto}
+            onChange={onPick}
+            onRemove={() => setMirrorPhoto(null)}
+          />
+        ) : (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={onGallery}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') onGallery()
+            }}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDrag(true)
+            }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={async (e) => {
+              e.preventDefault()
+              setDrag(false)
+              const f = e.dataTransfer.files?.[0] ?? null
+              if (f) await onPick(f)
+            }}
+            className="flex aspect-[3/4] w-full cursor-pointer flex-col items-center justify-center gap-3.5 rounded-xl transition"
+            style={{
+              border: `1px ${drag ? 'solid' : 'dashed'} ${
+                uploadError ? '#c47a7a' : drag ? '#1e1a17' : 'rgba(30,26,23,0.10)'
+              }`,
+              background: drag
+                ? 'rgba(184,149,106,0.06)'
+                : uploadError
+                  ? '#f7ebeb'
+                  : 'transparent',
+            }}
+          >
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-full"
+              style={{
+                background: uploadError ? '#f7ebeb' : '#f5f0ea',
+                color: uploadError ? '#c47a7a' : '#6d6460',
+              }}
+            >
+              <Upload size={15} />
+            </div>
+            <div className="max-w-[280px] px-4 text-center">
+              <div
+                className="font-sans text-[13px] font-medium"
+                style={{ color: uploadError ? '#c47a7a' : '#1e1a17' }}
+              >
+                {uploadError ?? 'Toque para selecionar uma foto'}
+              </div>
+              <div className="mt-1 font-sans text-[11.5px] text-ink-3">
+                {uploadError ? 'tente novamente' : 'ou arraste para esta área · JPEG · PNG · WebP'}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!mirrorPhoto ? (
+          <div className="flex flex-wrap gap-4 px-0.5">
+            {['Corpo inteiro', 'Boa luz natural', 'Fundo neutro'].map((t, i) => (
+              <span
+                key={t}
+                className="inline-flex items-center gap-1.5 font-sans text-[10.5px] uppercase tracking-wider text-ink-3"
+                style={{ animation: `vv-fade-up 0.3s ease-out ${i * 60}ms both` }}
+              >
+                <span className="h-[3px] w-[3px] rounded-full bg-ink-3" />
+                {t}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {!mirrorPhoto ? (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onCamera}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2.5 text-[12.5px] font-medium text-ink transition hover:border-accent"
+            >
+              <Camera size={14} />
+              Câmera
+            </button>
+            <button
+              type="button"
+              onClick={onGallery}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2.5 text-[12.5px] font-medium text-ink transition hover:border-accent"
+            >
+              <ImageIcon size={14} />
+              Galeria
+            </button>
           </div>
         ) : null}
       </div>
-    </div>
-  )
-}
 
-function PhotoField({
-  title,
-  helper,
-  previewUrl,
-  error,
-  onCamera,
-  onGallery,
-}: {
-  title: string
-  helper: string
-  previewUrl: string | null
-  error: string | null
-  onCamera: () => void
-  onGallery: () => void
-}) {
-  return (
-    <div className="rounded-modal border border-border bg-surface-2 p-4">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium text-ink">{title}</div>
-          <div className="mt-1 text-xs leading-relaxed text-ink-3">{helper}</div>
-        </div>
-        <span className="rounded-full bg-white p-2 text-accent">
-          <UserRound size={16} />
+      <button
+        type="button"
+        onClick={() => setAgreed(!agreed)}
+        className="flex items-start gap-2.5 py-0.5 text-left"
+      >
+        <span
+          className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded transition"
+          style={{
+            border: `1.5px solid ${agreed ? '#1e1a17' : 'rgba(30,26,23,0.25)'}`,
+            background: agreed ? '#1e1a17' : 'transparent',
+          }}
+        >
+          {agreed ? <Check size={9} className="text-white" /> : null}
         </span>
-      </div>
+        <span className="font-sans text-[11.5px] leading-relaxed text-ink-2">
+          Concordo com o uso temporário da minha foto para gerar a simulação. A imagem não é
+          armazenada.{' '}
+          <a
+            href="/privacidade"
+            target="_blank"
+            rel="noreferrer"
+            className="text-ink underline underline-offset-2"
+          >
+            Política de privacidade
+          </a>
+        </span>
+      </button>
 
-      <div className="mb-3 overflow-hidden rounded-modal bg-[#efe7de]">
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt={title} className="aspect-[3/4] w-full object-cover object-center" />
-        ) : (
-          <div className="flex aspect-[3/4] items-center justify-center text-ink-3">
-            <ImageIcon size={24} />
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={!canConfirm}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-ink px-7 py-3.5 font-sans text-[15px] font-medium text-white transition hover:bg-[#2d2825] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Continuar
+      </button>
+    </div>
+  )
+}
+
+function UploadPreview({
+  value,
+  onChange,
+  onRemove,
+}: {
+  value: SelectedPhoto
+  onChange: (file: File | null) => Promise<void>
+  onRemove: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  return (
+    <div className="flex flex-col gap-2.5" style={{ animation: 'vv-fade 0.32s var(--e-out)' }}>
+      <div
+        className="group relative aspect-[3/4] w-full overflow-hidden rounded-2xl"
+        style={{ background: 'linear-gradient(180deg, #f5f0ea 0%, #ede6dc 100%)' }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={value.previewUrl}
+          alt="Sua foto"
+          className="block h-full w-full object-contain"
+        />
+        <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/45 via-transparent to-transparent p-3.5 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1.5 text-[11.5px] font-medium text-ink"
+            >
+              <RefreshCcw size={11} />
+              Trocar
+            </button>
+            <button
+              type="button"
+              onClick={onRemove}
+              className="inline-flex items-center justify-center rounded-full bg-white/95 p-2 text-danger"
+            >
+              <Trash2 size={11} />
+            </button>
           </div>
-        )}
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 px-0.5">
+        <span className="flex-1 truncate font-sans text-[11.5px] text-ink-3">
+          {value.file.name}
+        </span>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="font-sans text-[11.5px] text-ink-2"
+        >
+          Trocar imagem
+        </button>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPT}
+        hidden
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+      />
+    </div>
+  )
+}
+
+function ConfirmStep({
+  mirrorPhoto,
+  garmentThumbUrl,
+  pecaNome,
+  onBack,
+  onGenerate,
+}: {
+  mirrorPhoto: SelectedPhoto | null
+  garmentThumbUrl: string | null
+  pecaNome: string
+  onBack: () => void
+  onGenerate: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-[22px]" style={{ animation: 'vv-fade 0.25s var(--e-out)' }}>
+      <div>
+        <div className="font-serif text-[22px] font-normal leading-snug tracking-tight text-ink">
+          Vamos lá?
+        </div>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-2">
+          Confira sua foto e a peça antes de gerar a prévia.
+        </p>
       </div>
 
-      {error ? <p className="mb-3 text-xs text-danger">{error}</p> : null}
+      <div className="grid grid-cols-2 gap-3.5">
+        {[
+          { label: 'Sua foto', url: mirrorPhoto?.previewUrl ?? null, alt: 'Sua foto' },
+          { label: 'Peça', url: garmentThumbUrl, alt: pecaNome },
+        ].map((item) => (
+          <div key={item.label} className="flex flex-col gap-2">
+            <div
+              className="aspect-[3/4] overflow-hidden rounded-xl"
+              style={{ background: 'linear-gradient(180deg, #f5f0ea 0%, #ede6dc 100%)' }}
+            >
+              {item.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.url}
+                  alt={item.alt}
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-ink-3">
+                  <ImageIcon size={20} />
+                </div>
+              )}
+            </div>
+            <div className="text-center font-sans text-[9.5px] font-semibold uppercase tracking-[0.16em] text-ink-3">
+              {item.label}
+            </div>
+          </div>
+        ))}
+      </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <Button variant="ghost" onClick={onCamera}>
-          <ImageIcon size={15} />
-          Tirar foto
-        </Button>
-        <Button variant="ghost" onClick={onGallery}>
-          <ImageIcon size={15} />
-          Escolher arquivo
-        </Button>
+      <p className="px-2 text-center font-serif text-[13px] italic leading-relaxed text-ink-3">
+        “O resultado é uma simulação visual — uma prévia inspiradora, não uma fotografia.”
+      </p>
+
+      <div className="flex gap-2.5">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex-1 rounded-full border border-border bg-transparent px-5 py-3 font-sans text-[13.5px] text-ink transition hover:bg-surface-2"
+        >
+          Voltar
+        </button>
+        <button
+          type="button"
+          onClick={onGenerate}
+          className="flex-[2] rounded-full bg-ink px-5 py-3 font-sans text-[13.5px] font-medium text-white transition hover:bg-[#2d2825]"
+        >
+          Gerar prévia
+        </button>
       </div>
     </div>
   )
 }
 
-function PreviewCard({
-  label,
-  src,
-  alt,
-  fallback,
+function ProcessingStep({ progress, message }: { progress: number; message: string }) {
+  const barW = Math.min(progress, 100)
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-[30px] py-10 sm:py-8"
+      style={{ animation: 'vv-fade 0.3s var(--e-out)' }}
+    >
+      <div className="relative h-[104px] w-[104px]">
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: 'radial-gradient(circle, #b8956a22 0%, transparent 65%)',
+            animation: 'vv-breathe 3.2s var(--e-inout) infinite',
+          }}
+        />
+        <svg
+          width="104"
+          height="104"
+          viewBox="0 0 104 104"
+          className="absolute inset-0"
+          style={{ overflow: 'visible' }}
+        >
+          <defs>
+            <linearGradient id="vv-cabine-arc" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#b8956a" stopOpacity="0" />
+              <stop offset="100%" stopColor="#b8956a" stopOpacity="1" />
+            </linearGradient>
+          </defs>
+          <circle cx="52" cy="52" r="44" fill="none" stroke="#e6dfd6" strokeWidth="1.5" />
+          <circle
+            cx="52"
+            cy="52"
+            r="44"
+            fill="none"
+            stroke="url(#vv-cabine-arc)"
+            strokeWidth="2.5"
+            strokeDasharray="60 220"
+            strokeLinecap="round"
+            style={{
+              transformOrigin: '52px 52px',
+              animation: 'vv-spin 1.6s linear infinite',
+            }}
+          />
+          <circle
+            cx="52"
+            cy="52"
+            r="30"
+            fill="none"
+            stroke="#b8956a"
+            strokeWidth="1"
+            strokeOpacity="0.35"
+            strokeDasharray="3 8"
+            style={{
+              transformOrigin: '52px 52px',
+              animation: 'vv-spin 6s linear infinite reverse',
+            }}
+          />
+        </svg>
+        <div
+          className="absolute inset-[28%] flex items-center justify-center rounded-full bg-surface"
+          style={{
+            boxShadow: '0 4px 18px #b8956a30',
+            animation: 'vv-breathe 2.4s var(--e-inout) infinite',
+          }}
+        >
+          <span className="font-serif text-[18px] font-semibold italic tracking-wider text-ink">
+            vv
+          </span>
+        </div>
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="absolute left-1/2 top-1/2 h-[5px] w-[5px] rounded-full bg-accent"
+            style={{
+              marginLeft: '-2.5px',
+              marginTop: '-2.5px',
+              opacity: 0.55,
+              animation: `vv-orbit ${3.4 + i * 0.7}s linear infinite`,
+              transformOrigin: `0 ${44 + i * 4}px`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="max-w-[260px] text-center">
+        <div className="font-serif text-[20px] font-medium leading-snug text-ink">
+          Criando sua experiência
+        </div>
+        <div
+          key={message}
+          className="mt-2 min-h-[20px] font-sans text-[13px] leading-relaxed text-ink-3"
+          style={{ animation: 'vv-fade-up 0.45s var(--e-out)' }}
+        >
+          {message}
+        </div>
+      </div>
+
+      <div className="relative h-[3px] w-full max-w-[220px] overflow-hidden rounded-sm bg-border">
+        <div
+          className="relative h-full overflow-hidden rounded-sm transition-[width] duration-500"
+          style={{
+            width: `${barW}%`,
+            background: 'linear-gradient(90deg, #b8956a, #8b6840)',
+          }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)',
+              transform: 'translateX(-100%)',
+              animation: 'vv-shine 1.6s var(--e-inout) infinite',
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ErrorStep({
+  message,
+  onBack,
+  onRetry,
+  canRetry,
 }: {
-  label: string
-  src: string | null
-  alt: string
-  fallback?: string
+  message: string | null
+  onBack: () => void
+  onRetry: () => void
+  canRetry: boolean
 }) {
   return (
-    <div>
-      <div className="mb-1.5 text-xs font-medium text-ink-3">{label}</div>
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt} className="aspect-[3/4] w-full rounded-modal object-cover object-center" />
-      ) : (
-        <div className="flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-modal bg-[#f0ebe3]">
-          <ImageOff size={20} className="text-ink-3" />
-          {fallback ? <span className="px-2 text-center text-xs text-ink-3">{fallback}</span> : null}
-        </div>
-      )}
+    <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 py-8 text-center">
+      <div className="font-serif text-[18px] font-semibold text-ink">
+        Não foi possível gerar agora
+      </div>
+      <p className="max-w-[340px] text-[13px] leading-relaxed text-ink-3">
+        {message ?? 'Tente novamente em instantes com outra foto.'}
+      </p>
+      <div className="mt-4 flex gap-2.5">
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded-full border border-border bg-transparent px-5 py-2.5 font-sans text-[13px] text-ink transition hover:bg-surface-2"
+        >
+          Voltar
+        </button>
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={!canRetry}
+          className="rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-medium text-white transition hover:bg-[#2d2825] disabled:opacity-50"
+        >
+          Tentar novamente
+        </button>
+      </div>
     </div>
   )
 }
 
 function cleanupSelection(photo: SelectedPhoto | null) {
   if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl)
+}
+
+function formatPreco(centavos: number): string {
+  const reais = centavos / 100
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(reais)
 }
