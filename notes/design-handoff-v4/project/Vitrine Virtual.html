@@ -1,0 +1,2433 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>vitrine — vv</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7.5' fill='%231e1a17'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Bodoni Moda,Didot,Georgia,serif' font-style='italic' font-weight='600' font-size='20' fill='%23fff' letter-spacing='0.02em'%3Evv%3C/text%3E%3C/svg%3E"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;0,6..96,700;1,6..96,400;1,6..96,500&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%}
+body{background:#faf7f3;font-family:'Manrope',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.005em}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#d4cbc0;border-radius:3px}
+
+/* ─── Motion System ─── */
+:root{
+  /* Durations */
+  --t-instant:80ms; --t-fast:160ms; --t-base:240ms; --t-slow:380ms; --t-deliberate:560ms; --t-cinematic:900ms;
+  /* Easings */
+  --e-out:cubic-bezier(.22,.61,.36,1);          /* default UI */
+  --e-out-soft:cubic-bezier(.32,.72,0,1);        /* drawer, sheet */
+  --e-spring:cubic-bezier(.34,1.56,.64,1);       /* playful pop */
+  --e-in:cubic-bezier(.55,.06,.68,.19);
+  --e-inout:cubic-bezier(.65,0,.35,1);
+  /* Stagger step */
+  --stagger:55ms;
+  /* Motion intensity scale (set by JS via data-motion attr) */
+  --motion-scale:1;
+}
+[data-motion="calm"]{--motion-scale:.7;--stagger:40ms}
+[data-motion="playful"]{--motion-scale:1.25;--stagger:75ms}
+[data-motion="off"] *,[data-motion="off"] *::before,[data-motion="off"] *::after{
+  animation-duration:1ms!important;animation-delay:0s!important;transition-duration:1ms!important;
+}
+
+@keyframes vv-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes vv-bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+@keyframes vv-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes vv-fade-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes vv-fade-down{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes vv-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes vv-slide-up{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+@keyframes vv-slide-right{from{opacity:0;transform:translateX(32px)}to{opacity:1;transform:translateX(0)}}
+@keyframes vv-slide-in-r{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes vv-pop{from{opacity:0;transform:scale(0.93)}to{opacity:1;transform:scale(1)}}
+@keyframes vv-pop-spring{0%{opacity:0;transform:scale(.85)}60%{opacity:1;transform:scale(1.03)}100%{transform:scale(1)}}
+@keyframes vv-pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+@keyframes vv-breathe{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.04);opacity:.9}}
+@keyframes vv-shimmer{from{background-position:-200% 0}to{background-position:200% 0}}
+@keyframes vv-blur-in{from{opacity:0;filter:blur(14px);transform:scale(1.04)}to{opacity:1;filter:blur(0);transform:scale(1)}}
+@keyframes vv-reveal-up{from{opacity:0;transform:translateY(22px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes vv-glow{0%,100%{box-shadow:0 0 0 0 rgba(184,149,106,0)}50%{box-shadow:0 0 0 8px rgba(184,149,106,.18)}}
+@keyframes vv-shine{from{transform:translateX(-110%)}to{transform:translateX(220%)}}
+@keyframes vv-draw{from{stroke-dashoffset:60}to{stroke-dashoffset:0}}
+@keyframes vv-orbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes vv-tab-cross{from{opacity:0;transform:translateY(6px) scale(.995)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes vv-toast{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes vv-marquee-fade{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes vv-step-fill{from{background-position:right center}to{background-position:left center}}
+
+/* Stagger helper: child gets --i index, animates with cumulative delay */
+.vv-stagger>*{opacity:0;animation:vv-reveal-up calc(var(--t-base)*var(--motion-scale)) var(--e-out) both;animation-delay:calc(var(--i,0) * var(--stagger))}
+.vv-fade-in{animation:vv-fade-in calc(var(--t-base)*var(--motion-scale)) var(--e-out) both}
+.vv-reveal{animation:vv-reveal-up calc(var(--t-deliberate)*var(--motion-scale)) var(--e-out) both}
+.vv-blur-in{animation:vv-blur-in calc(var(--t-cinematic)*var(--motion-scale)) var(--e-out) both}
+.vv-breathe{animation:vv-breathe 3.6s var(--e-inout) infinite}
+.vv-orbit{animation:vv-orbit 8s linear infinite}
+.vv-shine{position:relative;overflow:hidden}
+.vv-shine::after{content:"";position:absolute;top:0;bottom:0;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);transform:translateX(-110%);animation:vv-shine 2.4s var(--e-inout) infinite;pointer-events:none}
+.vv-marquee-fade{animation:vv-marquee-fade 2.4s var(--e-inout) infinite}
+
+/* Tab content cross-fade */
+.vv-tab-pane{animation:vv-tab-cross calc(var(--t-base)*var(--motion-scale)) var(--e-out) both}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:1ms!important;animation-delay:0s!important;transition-duration:1ms!important}
+}
+
+.vv-tab{display:flex;align-items:center;gap:7px;padding:8px 16px;border:none;background:transparent;cursor:pointer;border-radius:8px;transition:all 0.15s;font-family:'Manrope',sans-serif;font-size:13.5px;font-weight:500;white-space:nowrap;letter-spacing:-0.005em}
+.vv-tab:hover{background:#f5f0ea}
+.vv-tab.on{background:#1e1a17;color:#fff}
+.vv-tab:not(.on){color:#6d6460}
+
+input,select,textarea,button{font-family:inherit}
+
+/* Shimmer skeleton */
+.vv-shimmer{background:linear-gradient(90deg,#ede8e0 25%,#e4ddd5 50%,#ede8e0 75%);background-size:200% 100%;animation:vv-shimmer 1.6s infinite}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ① Tokens + shared primitives -->
+<script type="text/babel">
+const C={
+  bg:'#faf7f3',surface:'#ffffff',surface2:'#f5f0ea',surface3:'#ede6dc',
+  text:'#1e1a17',text2:'#6d6460',text3:'#b0a59d',
+  accent:'#b8956a',accentDark:'#8b6840',accentLight:'#f2e8d8',
+  border:'#e6dfd6',border2:'#d4cbc0',
+  success:'#6b9b78',successLight:'#e8f3eb',
+  danger:'#c47a7a',dangerLight:'#f7ebeb',
+  warning:'#c49a5a',warningLight:'#faf0e0',
+};
+const F={serif:"'Bodoni Moda','Didot','Bodoni 72',Georgia,serif",sans:"'Manrope',ui-sans-serif,system-ui,sans-serif",mono:"'JetBrains Mono','SF Mono',ui-monospace,monospace"};
+
+const CATEGORIAS=[
+  {id:'blusas',label:'Blusas & Tops'},{id:'calcas',label:'Calças & Shorts'},
+  {id:'vestidos',label:'Vestidos'},{id:'saias',label:'Saias'},
+  {id:'casacos',label:'Casacos & Jaquetas'},{id:'tricos',label:'Tricôs & Moletons'},
+  {id:'acessorios',label:'Acessórios'},{id:'outros',label:'Outros'},
+];
+function getCatLabel(id){const c=CATEGORIAS.find(x=>x.id===id);return c?c.label:id;}
+function trunc(str,max=32){if(!str)return'';return str.length>max?str.slice(0,max-1)+'…':str;}
+function formatPrice(c){return'R$ '+(c/100).toFixed(2).replace('.',',');}
+
+// Brand mark — "vv" minúsculo itálico em serif: a identidade da Vitrine Virtual.
+// Quadrado preto com vv branco (dark=true / default) ou inverso (dark=false).
+function VVLogo({size=28,dark=true,showWordmark=false}){
+  const bg=dark?C.text:'#fff';
+  const fg=dark?'#fff':C.text;
+  return<div style={{display:'inline-flex',alignItems:'center',gap:9}}>
+    <div style={{width:size,height:size,background:bg,borderRadius:Math.round(size*0.235),
+      display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,
+      transition:'transform 500ms var(--e-spring)',cursor:'default'}}
+      onMouseEnter={e=>{e.currentTarget.style.transform='rotate(-4deg)';}}
+      onMouseLeave={e=>{e.currentTarget.style.transform='none';}}>
+      <span style={{fontFamily:F.serif,fontSize:Math.round(size*0.62),fontWeight:600,fontStyle:'italic',
+        color:fg,letterSpacing:'0.02em',lineHeight:1,display:'block',transform:'translateY(-1px)'}}>vv</span>
+    </div>
+    {showWordmark&&<span style={{fontFamily:F.serif,fontSize:size*0.78,fontWeight:400,fontStyle:'italic',color:dark?C.text:'#fff',letterSpacing:'-0.01em',lineHeight:1}}>vitrine</span>}
+  </div>;
+}
+
+// Loja brand mark — if the shop has uploaded a logoUrl, show it; otherwise show monogram initials.
+function LojaMark({loja,size=34,radius=10,style={}}){
+  const initials=(loja?.nome||'').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'·';
+  if(loja?.logoUrl){
+    return<img src={loja.logoUrl} alt={loja.nome} style={{width:size,height:size,borderRadius:radius,objectFit:'cover',display:'block',flexShrink:0,background:C.surface2,...style}}/>;
+  }
+  return<div style={{width:size,height:size,borderRadius:radius,background:C.text,color:C.surface,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F.serif,fontSize:size*0.42,fontWeight:500,letterSpacing:'-0.01em',flexShrink:0,...style}}>{initials}</div>;
+}
+
+// Helpers de canvas: round rect + desenho do monograma VV
+function _vvRoundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function _drawVVMonogram(ctx,x,y,size){
+  // Black rounded square + "vv" italic serif white — matches VVLogo identity
+  const r=Math.round(size*0.235);
+  ctx.fillStyle='#0e0c0a';
+  _vvRoundRect(ctx,x,y,size,size,r);
+  ctx.fill();
+  ctx.fillStyle='#ffffff';
+  ctx.font=`italic 600 ${Math.round(size*0.62)}px "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillText('vv',x+size/2,y+size/2+1);
+  ctx.textAlign='start';
+}
+// Compõe a simulação final em 1080×1920 (Instagram 9:16) e baixa como JPEG
+// com marca d'água minimalista (monograma VV + wordmark) no rodapé.
+function downloadSimulacaoComMarca(peca){
+  const W=1080,H=1920;
+  const c=document.createElement('canvas');
+  c.width=W;c.height=H;
+  const ctx=c.getContext('2d');
+
+  // Fundo branco (preview da simulação — no app real, aqui entraria a imagem gerada)
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,W,H);
+
+  // Padrão diagonal sutil = mesmo placeholder da UI
+  ctx.save();
+  ctx.fillStyle='#ede8e0';
+  ctx.fillRect(0,0,W,H);
+  ctx.translate(W/2,H/2);
+  ctx.rotate(Math.PI/4);
+  const stripe=44,reach=Math.max(W,H)*1.6;
+  ctx.fillStyle='#e4ddd5';
+  for(let xi=-reach;xi<reach;xi+=stripe*2){
+    ctx.fillRect(xi,-reach,stripe,reach*2);
+  }
+  ctx.restore();
+
+  // Etiqueta canônica (top-left, discreta)
+  ctx.fillStyle='rgba(255,255,255,0.7)';
+  _vvRoundRect(ctx,28,28,210,38,8);
+  ctx.fill();
+  ctx.fillStyle='#9a9189';
+  ctx.font='600 18px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textBaseline='middle';
+  ctx.fillText('9:16 · 1080×1920',46,48);
+
+  // Nome da peça (canto inferior esquerdo, sobre o gradiente)
+  // Gradiente sutil para legibilidade da marca
+  const grad=ctx.createLinearGradient(0,H-280,0,H);
+  grad.addColorStop(0,'rgba(14,12,10,0)');
+  grad.addColorStop(1,'rgba(14,12,10,0.55)');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,H-280,W,280);
+
+  // Marca d'água minimalista — centralizada no rodapé
+  const monoSize=58;
+  const gap=14;
+  ctx.font='italic 500 44px "Bodoni Moda", "Didot", Georgia, serif';
+  const wordW=ctx.measureText('vitrine').width;
+  const totalW=monoSize+gap+wordW;
+  const baseX=Math.round((W-totalW)/2);
+  const baseY=H-monoSize-58;
+  _drawVVMonogram(ctx,baseX,baseY,monoSize);
+  ctx.fillStyle='rgba(255,255,255,0.96)';
+  ctx.textBaseline='middle';
+  ctx.fillText('vitrine',baseX+monoSize+gap,baseY+monoSize/2+2);
+
+  // Nome da peça acima da marca (opcional, bem discreto)
+  if(peca?.nome){
+    ctx.fillStyle='rgba(255,255,255,0.78)';
+    ctx.font='400 26px Manrope, system-ui, sans-serif';
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText(peca.nome,W/2,baseY-30);
+    ctx.textAlign='start';
+  }
+
+  // Download
+  c.toBlob(blob=>{
+    if(!blob)return;
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`vitrine-${(peca?.nome||'simulacao').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}.jpg`;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  },'image/jpeg',0.92);
+}
+
+function IconInstagram({size=18,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill={color} stroke="none"/></svg>;}
+function IconTikTok({size=18,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.27 8.27 0 0 0 4.84 1.55V6.78a4.85 4.85 0 0 1-1.07-.09z"/></svg>;}
+function IconWhatsApp({size=18,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>;}
+function IconEye({size=18,open=true,color='currentColor'}){return open
+  ?<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+  :<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;}
+function IconChevron({dir='down',size=16,color='currentColor'}){
+  const rots={down:0,up:180,left:90,right:-90};
+  return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" style={{transform:`rotate(${rots[dir]}deg)`,transition:'transform 0.2s'}}>
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>;
+}
+function IconUpload({size=22,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;}
+function IconCheck({size=16,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>;}
+function IconX({size=16,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;}
+function IconCamera({size=20,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>;}
+function IconImage({size=20,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;}
+function IconTrash({size=15,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>;}
+function IconRefresh({size=15,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;}
+function IconStar({size=14,color='currentColor',filled=false}){return<svg width={size} height={size} viewBox="0 0 24 24" fill={filled?color:'none'} stroke={color} strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;}
+
+function Btn({children,variant='primary',size='md',onClick,disabled,style={},icon,loading=false}){
+  const[hov,setHov]=React.useState(false);
+  const base={display:'inline-flex',alignItems:'center',gap:6,border:'none',cursor:disabled||loading?'not-allowed':'pointer',
+    fontFamily:F.sans,fontWeight:500,transition:'all 0.18s',borderRadius:8,opacity:disabled||loading?0.6:1,whiteSpace:'nowrap',
+    fontSize:size==='sm'?12.5:size==='lg'?15:13.5,padding:size==='sm'?'6px 13px':size==='lg'?'13px 26px':'9px 18px'};
+  const vs={
+    primary:{background:hov?C.accentDark:C.accent,color:'#fff'},
+    dark:{background:hov?'#2d2825':C.text,color:'#fff'},
+    ghost:{background:hov?C.surface2:'transparent',color:C.text,border:`1px solid ${C.border}`},
+    danger:{background:hov?'#b56b6b':C.danger,color:'#fff'},
+    success:{background:hov?'#5a8a67':C.success,color:'#fff'},
+    text:{background:'transparent',color:hov?C.accent:C.text2,padding:size==='sm'?'4px 6px':'6px 8px'},
+  };
+  return<button onClick={disabled||loading?undefined:onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    style={{...base,...vs[variant],...style}}>
+    {loading?<Spinner size={13} color={variant==='ghost'?C.text2:'#fff'}/>:icon&&<span style={{display:'flex'}}>{icon}</span>}
+    {children}
+  </button>;
+}
+
+function Badge({label,variant='neutral'}){
+  const vs={
+    disponivel:{bg:C.accentLight,color:C.accentDark,dot:C.accent},
+    vendida:{bg:'#f0edea',color:'#a09890',dot:'#c8c0b8'},
+    admin:{bg:C.accentLight,color:C.accentDark,dot:C.accent},
+    neutral:{bg:C.surface2,color:C.text2,dot:C.text3},
+    warning:{bg:C.warningLight,color:C.warning,dot:C.warning},
+    success:{bg:C.successLight,color:C.success,dot:C.success},
+  };
+  const v=vs[variant]||vs.neutral;
+  return<span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px',borderRadius:20,
+    background:v.bg,color:v.color,fontSize:11.5,fontFamily:F.sans,fontWeight:500,letterSpacing:'0.01em'}}>
+    <span style={{width:5,height:5,borderRadius:'50%',background:v.dot,flexShrink:0}}/>
+    <span style={variant==='vendida'?{textDecoration:'line-through',textDecorationColor:'#c8c0b8'}:{}}>{label}</span>
+  </span>;
+}
+
+function VVInput({label,value,onChange,placeholder,type='text',prefix,suffix,error,helper,rows=3,as:As='input',style={},required=false,readOnly=false}){
+  const[focus,setFocus]=React.useState(false);
+  const[showPw,setShowPw]=React.useState(false);
+  const isPw=type==='password';
+  const actualType=isPw?(showPw?'text':'password'):type;
+  const hasSuffix=suffix||isPw;
+  const paddingR=hasSuffix?'38px':'12px';
+  const ist={width:'100%',padding:prefix?`9px ${paddingR} 9px 38px`:`9px ${paddingR} 9px 12px`,
+    border:`1.5px solid ${error?C.danger:focus?C.accent:C.border}`,
+    borderRadius:8,fontFamily:F.sans,fontSize:14,color:C.text,background:readOnly?C.surface2:C.surface,outline:'none',
+    boxSizing:'border-box',transition:'border-color 0.15s',resize:As==='textarea'?'vertical':undefined};
+  return<div style={{display:'flex',flexDirection:'column',gap:5,...style}}>
+    {label&&<label style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text2,display:'flex',gap:4}}>
+      {label}{required&&<span style={{color:C.accent}}>*</span>}
+    </label>}
+    <div style={{position:'relative'}}>
+      {prefix&&<span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:C.text3,fontSize:14}}>{prefix}</span>}
+      <As value={value} onChange={onChange} placeholder={placeholder} type={actualType} rows={rows} readOnly={readOnly}
+        style={ist} onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)}/>
+      {isPw&&<button type="button" onClick={()=>setShowPw(p=>!p)}
+        style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:C.text3,display:'flex',padding:2}}>
+        <IconEye size={16} open={showPw} color={C.text3}/>
+      </button>}
+      {!isPw&&suffix&&<span style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',color:C.text3,fontSize:12}}>{suffix}</span>}
+    </div>
+    {(error||helper)&&<span style={{fontSize:12,color:error?C.danger:C.text3,fontFamily:F.sans,lineHeight:1.4}}>{error||helper}</span>}
+  </div>;
+}
+
+function VVSelect({label,value,onChange,options=[],style={}}){
+  return<div style={{display:'flex',flexDirection:'column',gap:5,...style}}>
+    {label&&<label style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text2}}>{label}</label>}
+    <select value={value} onChange={onChange} style={{padding:'9px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,
+      fontFamily:F.sans,fontSize:14,color:C.text,background:C.surface,outline:'none',cursor:'pointer',appearance:'none',
+      backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23b0a59d' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E")`,
+      backgroundRepeat:'no-repeat',backgroundPosition:'right 12px center'}}>
+      {options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  </div>;
+}
+
+function VVModal({open,onClose,title,children,width=520,footer,noPad=false}){
+  if(!open)return null;
+  return<div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(30,26,23,0.52)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:20,backdropFilter:'blur(4px)'}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:'100%',
+      maxWidth:width,maxHeight:'92vh',display:'flex',flexDirection:'column',
+      boxShadow:'0 24px 80px rgba(0,0,0,0.18)',animation:'vv-pop 0.2s ease-out'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+        padding:'20px 26px 16px',borderBottom:`1px solid ${C.border}`}}>
+        <span style={{fontFamily:F.serif,fontSize:22,fontWeight:600,color:C.text,letterSpacing:'0.01em'}}>{title}</span>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',
+          color:C.text3,fontSize:18,lineHeight:1,padding:4,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <IconX size={18} color={C.text3}/>
+        </button>
+      </div>
+      <div style={{padding:noPad?0:'24px 26px',overflowY:'auto',flex:1}}>{children}</div>
+      {footer&&<div style={{padding:'16px 26px',borderTop:`1px solid ${C.border}`,
+        display:'flex',justifyContent:'flex-end',gap:10}}>{footer}</div>}
+    </div>
+  </div>;
+}
+
+function VVCard({children,style={},onClick,hover=false}){
+  const[hov,setHov]=React.useState(false);
+  return<div onClick={onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    style={{background:C.surface,borderRadius:12,border:`1px solid ${C.border}`,
+      boxShadow:hov&&hover?'0 6px 24px rgba(0,0,0,0.08)':'0 1px 4px rgba(0,0,0,0.04)',
+      transition:'all 0.2s',cursor:onClick?'pointer':'default',
+      transform:hov&&hover?'translateY(-2px)':'none',...style}}>
+    {children}
+  </div>;
+}
+
+function KpiCard({label,value,sub,icon,animateValue=true}){
+  return<VVCard style={{padding:'20px 22px',flex:1,minWidth:130}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+      <div>
+        <div style={{fontFamily:F.sans,fontSize:11,color:C.text3,fontWeight:500,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:8}}>{label}</div>
+        <div style={{fontFamily:F.serif,fontSize:30,fontWeight:600,color:C.text,lineHeight:1}}>
+          {animateValue&&typeof value==='number'?<CountUp value={value} duration={1100}/>:value}
+        </div>
+        {sub&&<div style={{fontFamily:F.sans,fontSize:12,color:C.text3,marginTop:6,lineHeight:1.4}}>{sub}</div>}
+      </div>
+      <div style={{width:38,height:38,borderRadius:10,background:C.accentLight,display:'flex',alignItems:'center',justifyContent:'center',color:C.accent,fontSize:17,flexShrink:0,transition:'transform var(--t-base) var(--e-spring)'}}
+        onMouseEnter={e=>e.currentTarget.style.transform='scale(1.08) rotate(-3deg)'}
+        onMouseLeave={e=>e.currentTarget.style.transform='none'}>{icon}</div>
+    </div>
+  </VVCard>;
+}
+
+function Divider({style={}}){return<div style={{height:1,background:C.border,...style}}/>;}
+
+function Spinner({size=20,color=C.accent}){
+  return<svg width={size} height={size} viewBox="0 0 24 24" style={{animation:'vv-spin 0.8s linear infinite',flexShrink:0}}>
+    <circle cx="12" cy="12" r="10" fill="none" stroke={color} strokeWidth="2.5" strokeDasharray="31 31" strokeLinecap="round"/>
+  </svg>;
+}
+
+// Padrão do sistema: 9:16 a 2160×3840 (override com prop `ratio={null}` quando preciso burlar)
+function ImgPlaceholder({width='100%',height,label='',style={},rounded=false,ratio='9 / 16'}){
+  const uid=React.useId();
+  // Se altura não foi passada, usa aspect-ratio 9:16
+  const sized=height!=null?{width,height}:{width,aspectRatio:ratio||'9 / 16'};
+  return<div style={{...sized,overflow:'hidden',position:'relative',background:'#ede8e0',
+    display:'flex',alignItems:'center',justifyContent:'center',borderRadius:rounded?8:0,...style}}>
+    <svg width="100%" height="100%" style={{position:'absolute',inset:0}} preserveAspectRatio="xMidYMid slice">
+      <defs><pattern id={`s${uid}`} width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="14" height="14" fill="#ede8e0"/><rect width="7" height="14" fill="#e4ddd5"/>
+      </pattern></defs>
+      <rect width="100%" height="100%" fill={`url(#s${uid})`}/>
+    </svg>
+    {label&&<span style={{position:'relative',fontFamily:'monospace',fontSize:10,color:'#b8afa5',
+      textAlign:'center',padding:'0 12px',lineHeight:1.6,whiteSpace:'pre-line'}}>{label}</span>}
+    {/* Marca canônica do sistema: 9:16 · 2160×3840 */}
+    <span aria-hidden="true" style={{position:'absolute',top:6,left:6,padding:'2px 6px',borderRadius:4,background:'rgba(255,255,255,0.6)',color:'#9a9189',fontFamily:'monospace',fontSize:8.5,letterSpacing:'0.04em',pointerEvents:'none'}}>9:16 · 2160×3840</span>
+  </div>;
+}
+
+function Toggle({checked,onChange}){
+  return<div onClick={()=>onChange(!checked)} style={{width:38,height:21,borderRadius:11,
+    background:checked?C.accent:C.border,cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0}}>
+    <div style={{position:'absolute',top:3,left:checked?20:3,width:15,height:15,borderRadius:'50%',
+      background:'#fff',transition:'left 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.2)'}}/>
+  </div>;
+}
+
+function Avatar({name='',size=34}){
+  const initials=name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  return<div style={{width:size,height:size,borderRadius:'50%',background:C.accentLight,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:F.sans,fontSize:size*0.34,fontWeight:600,color:C.accentDark,flexShrink:0}}>{initials||'?'}</div>;
+}
+
+// Radio option card
+function RadioCard({selected,onSelect,title,desc,children,extra}){
+  return<div onClick={onSelect} style={{border:`1.5px solid ${selected?C.accent:C.border}`,borderRadius:12,padding:'14px 16px',
+    cursor:'pointer',background:selected?C.accentLight:C.surface,transition:'all 0.15s',userSelect:'none'}}>
+    <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
+      <div style={{width:18,height:18,borderRadius:'50%',border:`2px solid ${selected?C.accent:C.border2}`,
+        background:selected?C.accent:C.surface,display:'flex',alignItems:'center',justifyContent:'center',marginTop:1,flexShrink:0,transition:'all 0.15s'}}>
+        {selected&&<div style={{width:7,height:7,borderRadius:'50%',background:'#fff'}}/>}
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:F.sans,fontSize:13.5,fontWeight:600,color:selected?C.accentDark:C.text,marginBottom:3}}>{title}</div>
+        <div style={{fontFamily:F.sans,fontSize:12.5,color:selected?C.accentDark:C.text2,lineHeight:1.55,opacity:selected?0.85:1}}>{desc}</div>
+        {extra&&<div style={{marginTop:10}}>{extra}</div>}
+      </div>
+    </div>
+    {children&&<div style={{marginTop:12,marginLeft:30}}>{children}</div>}
+  </div>;
+}
+</script>
+
+<!-- ②a Motion module — tokens-aware hooks + components -->
+<script type="text/babel">
+// useReveal — adds .vv-reveal once element scrolls into view
+function useReveal(opts={}){
+  const ref=React.useRef(null);
+  const[shown,setShown]=React.useState(false);
+  React.useEffect(()=>{
+    if(!ref.current||shown)return;
+    const io=new IntersectionObserver(([e])=>{
+      if(e.isIntersecting){setShown(true);io.disconnect();}
+    },{threshold:opts.threshold??0.12,rootMargin:opts.rootMargin||'0px 0px -40px 0px'});
+    io.observe(ref.current);
+    return()=>io.disconnect();
+  },[shown]);
+  return[ref,shown];
+}
+
+// Stagger — wraps children, applies --i index, plays vv-reveal-up cascading
+function Stagger({children,delay=0,step,startWhenVisible=false,as:As='div',style={},className=''}){
+  const[ref,shown]=useReveal();
+  const stepStr=step?{'--stagger':typeof step==='number'?`${step}ms`:step}:{};
+  const visible=startWhenVisible?shown:true;
+  return<As ref={startWhenVisible?ref:null} className={visible?`vv-stagger ${className}`:className}
+    style={{...stepStr,'--motion-delay':`${delay}ms`,...style}}>
+    {React.Children.map(children,(c,i)=>c&&React.cloneElement(c,{
+      style:{...(c.props.style||{}),'--i':i+(delay?delay/55:0)}
+    }))}
+  </As>;
+}
+
+// Reveal — single element fades+rises in once visible
+function Reveal({children,delay=0,as:As='div',variant='up',style={},className=''}){
+  const[ref,shown]=useReveal();
+  const cls=variant==='blur'?'vv-blur-in':'vv-reveal';
+  return<As ref={ref} className={shown?`${cls} ${className}`:className}
+    style={{opacity:shown?undefined:0,animationDelay:`${delay}ms`,...style}}>
+    {children}
+  </As>;
+}
+
+// CountUp — animates a number from 0 to value
+function CountUp({value=0,duration=900,format=v=>Math.round(v),style={}}){
+  const[v,setV]=React.useState(0);
+  const[ref,shown]=useReveal({threshold:0.4});
+  React.useEffect(()=>{
+    if(!shown)return;
+    let raf,start;const from=0,to=value,d=duration;
+    const tick=t=>{if(!start)start=t;const p=Math.min(1,(t-start)/d);
+      // easeOutCubic
+      const e=1-Math.pow(1-p,3);
+      setV(from+(to-from)*e);
+      if(p<1)raf=requestAnimationFrame(tick);};
+    raf=requestAnimationFrame(tick);
+    return()=>cancelAnimationFrame(raf);
+  },[shown,value,duration]);
+  return<span ref={ref} style={style}>{format(v)}</span>;
+}
+
+// AnimatedCheck — SVG checkmark that draws on mount
+function AnimatedCheck({size=18,color='#fff',duration=380}){
+  return<svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <polyline points="20 6 9 17 4 12" stroke={color} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+      style={{strokeDasharray:60,animation:`vv-draw ${duration}ms var(--e-out) forwards`}}/>
+  </svg>;
+}
+
+// Toast — bottom-center transient notification with motion-in/out
+function Toast({open,children,variant='neutral',onClose,duration=2400}){
+  React.useEffect(()=>{
+    if(!open||!duration)return;
+    const t=setTimeout(()=>onClose&&onClose(),duration);
+    return()=>clearTimeout(t);
+  },[open,duration]);
+  if(!open)return null;
+  const bg=variant==='success'?C.text:variant==='danger'?C.danger:C.text;
+  return<div style={{position:'fixed',bottom:24,left:'50%',transform:'translateX(-50%)',zIndex:3000,
+    background:bg,color:'#fff',padding:'10px 18px',borderRadius:24,fontFamily:F.sans,fontSize:13,fontWeight:500,
+    boxShadow:'0 12px 40px rgba(0,0,0,0.22)',animation:'vv-toast 0.32s var(--e-spring) both',
+    display:'flex',alignItems:'center',gap:8}}>
+    {variant==='success'&&<AnimatedCheck size={14} color="#fff"/>}
+    {children}
+  </div>;
+}
+
+// Hover-lift — wrap a child to add a managed hover transform without conflicts
+function HoverLift({children,scale=1.02,lift=2,style={}}){
+  const[h,setH]=React.useState(false);
+  return<div onMouseEnter={()=>setH(true)} onMouseLeave={()=>setH(false)}
+    style={{transition:'transform var(--t-base) var(--e-out)',transform:h?`translateY(-${lift}px) scale(${scale})`:'none',...style}}>
+    {children}
+  </div>;
+}
+
+// Page transition wrapper — fades content when key changes
+function PageTransition({k,children,style={}}){
+  return<div key={k} className="vv-tab-pane" style={style}>{children}</div>;
+}
+</script>
+
+<!-- ② Upload component (shared, reusable) -->
+<script type="text/babel">
+// Reusable upload zone — minimal empty state, full-bleed preview after upload
+function UploadZone({title,desc,value,onChange,onRemove,compact=false,accept='image/*',shape='rect',hint='JPEG, PNG ou WebP · até 5 MB'}){
+  const[drag,setDrag]=React.useState(false);
+  const[loading,setLoading]=React.useState(false);
+  const[error,setError]=React.useState(null);
+  const fileRef=React.useRef(null);
+
+  function simulateUpload(file){
+    setLoading(true);setError(null);
+    setTimeout(()=>{
+      setLoading(false);
+      onChange({name:file.name,url:URL.createObjectURL(file),size:file.size});
+    },900);
+  }
+
+  function handleFile(file){
+    if(!file)return;
+    if(!file.type.startsWith('image/')){setError('Formato inválido. Use JPEG, PNG ou WebP.');return;}
+    if(file.size>5*1024*1024){setError('Arquivo muito grande. Máx 5 MB.');return;}
+    simulateUpload(file);
+  }
+
+  function handleDrop(e){
+    e.preventDefault();setDrag(false);
+    const file=e.dataTransfer.files[0];
+    handleFile(file);
+  }
+
+  const isCircle=shape==='circle';
+  // Empty: minimal/compact (sem aspect alto). Preview: 9:16 (1080×1920) contido.
+  const baseW=compact&&isCircle?92:'100%';
+  const baseH=compact&&isCircle?92:undefined;
+  const aspectPreview=isCircle?undefined:'9 / 16';
+  const aspectEmpty=isCircle?undefined:(compact?'4 / 3':undefined);
+
+  // ── Preview state ──
+  if(value){
+    return<div style={{display:'flex',flexDirection:'column',gap:10,alignItems:'stretch',width:'100%',animation:'vv-fade 0.32s var(--e-out)'}}>
+      <div style={{position:'relative',borderRadius:isCircle?'50%':14,overflow:'hidden',
+        width:baseW,height:baseH,aspectRatio:aspectPreview,
+        maxWidth:isCircle?undefined:300,maxHeight:isCircle?undefined:'52vh',
+        alignSelf:'center',
+        background:`linear-gradient(180deg, ${C.surface2} 0%, ${C.surface3} 100%)`}}>
+        {/* object-fit:contain garante imagem inteira visível sem cortes — independente da proporção */}
+        <img src={value.url} alt={value.name} style={{width:'100%',height:'100%',objectFit:isCircle?'cover':'contain',display:'block'}}/>
+        {/* Badge canônico 9:16 (top-left, discreto) */}
+        {!isCircle&&<span aria-hidden="true" style={{position:'absolute',top:8,left:8,padding:'3px 7px',borderRadius:5,background:'rgba(255,255,255,0.7)',color:'#9a9189',fontFamily:F.mono,fontSize:9,letterSpacing:'0.04em',pointerEvents:'none'}}>9:16 · 1080×1920</span>}
+        {/* Hover overlay com ações */}
+        <div className="upload-actions-wrap" style={{position:'absolute',inset:0,display:'flex',alignItems:'flex-end',justifyContent:'center',padding:14,background:'linear-gradient(to top, rgba(20,16,14,0.45) 0%, rgba(20,16,14,0) 35%)',opacity:0,transition:'opacity 0.2s'}}
+          onMouseEnter={e=>{e.currentTarget.style.opacity='1'}}
+          onMouseLeave={e=>{e.currentTarget.style.opacity='0'}}>
+          <div style={{display:'flex',gap:6}}>
+            <button onClick={()=>fileRef.current?.click()} style={{background:'rgba(255,255,255,0.95)',border:'none',borderRadius:99,padding:'7px 14px',fontFamily:F.sans,fontSize:11.5,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',gap:5,color:C.text,letterSpacing:'-0.005em'}}>
+              <IconRefresh size={11} color={C.text}/>Trocar
+            </button>
+            <button onClick={onRemove} style={{background:'rgba(255,255,255,0.95)',border:'none',borderRadius:99,padding:'7px 10px',fontFamily:F.sans,fontSize:11.5,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',gap:5,color:C.danger}}>
+              <IconTrash size={11} color={C.danger}/>
+            </button>
+          </div>
+        </div>
+      </div>
+      {/* Discreto file chip — mostrado abaixo, fora da imagem, para não interferir no preview */}
+      {!compact&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'0 2px'}}>
+        <span style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{value.name}</span>
+        <button onClick={()=>fileRef.current?.click()} style={{background:'none',border:'none',cursor:'pointer',color:C.text2,fontFamily:F.sans,fontSize:11.5,padding:0,letterSpacing:'-0.005em'}}>Trocar imagem</button>
+      </div>}
+      <input ref={fileRef} type="file" accept={accept} style={{display:'none'}} onChange={e=>handleFile(e.target.files[0])}/>
+    </div>;
+  }
+
+  // ── Empty state — minimalista (sem ocupar uma área 3:4 enorme antes do upload) ──
+  const borderColor=error?C.danger:drag?C.text:'rgba(30,26,23,0.10)';
+  return<div style={{width:'100%'}}>
+    <div onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)} onDrop={handleDrop}
+      onClick={()=>!loading&&fileRef.current?.click()}
+      style={{border:`1px ${drag?'solid':'dashed'} ${borderColor}`,borderRadius:isCircle?'50%':12,
+        width:baseW,height:baseH,aspectRatio:aspectEmpty,
+        minHeight:isCircle?undefined:(compact?undefined:128),
+        display:'flex',flexDirection:isCircle||compact?'column':'row',alignItems:'center',justifyContent:'center',
+        gap:isCircle||compact?12:14,padding:isCircle||compact?'0':'18px 22px',position:'relative',
+        cursor:loading?'wait':'pointer',transition:'all 0.18s var(--e-out)',
+        background:drag?'rgba(184,149,106,0.06)':error?C.dangerLight:'transparent'}}
+      onMouseEnter={e=>{if(!drag&&!error)e.currentTarget.style.borderColor='rgba(30,26,23,0.22)'}}
+      onMouseLeave={e=>{if(!drag&&!error)e.currentTarget.style.borderColor=borderColor}}>
+      {loading?<>
+          <Spinner size={20} color={C.text2}/>
+          <span style={{fontFamily:F.sans,fontSize:12,color:C.text3,letterSpacing:'-0.005em'}}>Enviando</span>
+        </>
+        :<>
+          <div style={{width:isCircle||compact?36:42,height:isCircle||compact?36:42,borderRadius:'50%',background:error?C.dangerLight:C.surface2,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            <IconUpload size={isCircle||compact?15:17} color={error?C.danger:C.text2}/>
+          </div>
+          {!compact&&!isCircle&&<div style={{textAlign:'left',flex:1,minWidth:0}}>
+            <div style={{fontFamily:F.sans,fontSize:13.5,fontWeight:500,color:error?C.danger:C.text,marginBottom:2,letterSpacing:'-0.005em'}}>{error||'Toque para selecionar'}</div>
+            <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,letterSpacing:'-0.005em'}}>{error?'tente novamente':`ou arraste · ${hint}`}</div>
+          </div>}
+          {!compact&&isCircle&&<div style={{textAlign:'center',padding:'0 16px',maxWidth:280}}>
+            <div style={{fontFamily:F.sans,fontSize:13,fontWeight:500,color:error?C.danger:C.text,marginBottom:4,letterSpacing:'-0.005em'}}>{error||'Toque para selecionar uma foto'}</div>
+            <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,letterSpacing:'-0.005em'}}>{error?'tente novamente':'ou arraste para esta área · '+hint}</div>
+          </div>}
+          {compact&&<span style={{fontFamily:F.sans,fontSize:11,color:C.text3,letterSpacing:'-0.005em'}}>Adicionar foto</span>}
+        </>}
+    </div>
+    <input ref={fileRef} type="file" accept={accept} style={{display:'none'}} onChange={e=>handleFile(e.target.files[0])}/>
+  </div>;
+}
+</script>
+
+<!-- ③ Cabine redesigned — Feature 3, 4, 5 -->
+<script type="text/babel">
+// Cabine redesigned — Feature 3, 4, 5
+// CabineStepper — minimal premium step indicator: three thin segments + uppercase tiny labels
+function CabineStepper({step,style={}}){
+  // Mapeia o step interno para um índice 0..2 (Pronto = última etapa, visualmente já cheia ao chegar no resultado)
+  const order={upload:0,confirm:1,processing:2,result:2};
+  const idx=order[step]??0;
+  const labels=['Sua foto','Conferir','Pronto'];
+  return<div style={{...style}}>
+    {/* Segmented bar */}
+    <div style={{display:'flex',gap:6,marginBottom:10}}>
+      {[0,1,2].map(i=>{
+        const done=i<idx,active=i===idx;
+        return<div key={i} style={{flex:1,height:2,borderRadius:1,background:done?C.text:active?'transparent':'rgba(30,26,23,0.10)',position:'relative',overflow:'hidden'}}>
+          {active&&<div style={{position:'absolute',inset:0,background:`linear-gradient(90deg, ${C.text} 0%, ${C.text} 50%, rgba(30,26,23,0.10) 50%, rgba(30,26,23,0.10) 100%)`,backgroundSize:'200% 100%',backgroundPosition:'right center',animation:'vv-step-fill 480ms var(--e-out) forwards'}}/>}
+        </div>;
+      })}
+    </div>
+    {/* Labels */}
+    <div style={{display:'flex',gap:6}}>
+      {labels.map((l,i)=>{
+        const done=i<idx,active=i===idx;
+        return<div key={l} style={{flex:1,fontFamily:F.sans,fontSize:10,fontWeight:done||active?600:400,color:done?C.text:active?C.text:C.text3,letterSpacing:'0.16em',textTransform:'uppercase',transition:'color 0.3s'}}>{l}</div>;
+      })}
+    </div>
+  </div>;
+}
+function CabineModal({open,onClose,peca,lojaConfig={}}){
+  // step: 'upload' | 'confirm' | 'processing' | 'result'
+  const[step,setStep]=React.useState('upload');
+  const[mirrorPhoto,setMirrorPhoto]=React.useState(null);
+  const[progress,setProgress]=React.useState(0);
+  const[agreed,setAgreed]=React.useState(false);
+
+  React.useEffect(()=>{
+    if(!open){
+      setTimeout(()=>{setStep('upload');setMirrorPhoto(null);setProgress(0);setAgreed(false);},350);
+    }
+  },[open]);
+
+  React.useEffect(()=>{
+    if(step==='processing'){
+      setProgress(0);let p=0;
+      const iv=setInterval(()=>{
+        p+=Math.random()*14+4;
+        if(p>=100){p=100;clearInterval(iv);setTimeout(()=>setStep('result'),600);}
+        setProgress(Math.min(p,100));
+      },250);
+      return()=>clearInterval(iv);
+    }
+  },[step]);
+
+  const canConfirm=mirrorPhoto&&agreed;
+
+  if(!open)return null;
+
+  // Result screen — imagem em 9:16 contida (sem distorcer), com fundo branco/loja garantindo visibilidade.
+  if(step==='result'){
+    return<div style={{position:'fixed',inset:0,zIndex:2000,background:'#0e0c0a',display:'flex',flexDirection:'column',animation:'vv-fade 0.4s ease-out',overflowY:'auto'}}>
+      {/* Top bar */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 22px',flexShrink:0,zIndex:5}}>
+        <VVLogo size={26} dark={false}/>
+        <button onClick={onClose} style={{background:'rgba(255,255,255,0.12)',border:'none',borderRadius:20,padding:'6px 14px',color:'rgba(255,255,255,0.78)',fontFamily:F.sans,fontSize:12.5,cursor:'pointer',backdropFilter:'blur(8px)',transition:'background 0.15s'}}
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.22)'}
+          onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,0.12)'}>
+          Fechar
+        </button>
+      </div>
+
+      {/* Body: centered 9:16 card + info + CTAs below */}
+      <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'4px 20px 28px',gap:20,minHeight:0}}>
+
+        {/* Eyebrow */}
+        <div style={{fontFamily:F.serif,fontSize:13,fontStyle:'italic',color:'rgba(255,255,255,0.55)',letterSpacing:'0.02em',animation:'vv-fade 0.5s ease-out 0.1s both'}}>
+          Veja como ficou em você
+        </div>
+
+        {/* Imagem 9:16 contida — fundo branco para garantir leitura sobre qualquer cenário */}
+        <div style={{position:'relative',aspectRatio:'9 / 16',height:'min(64vh, 720px)',maxWidth:'min(92vw, 405px)',
+          background:'#ffffff',borderRadius:14,overflow:'hidden',boxShadow:'0 22px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
+          animation:'vv-fade-up 0.5s var(--e-out) 0.2s both'}}>
+          <ImgPlaceholder ratio={null} width="100%" height="100%" label={"simulação\nfinal\n1080×1920"} style={{height:'100%',borderRadius:0}}/>
+
+          {/* Badge minimal — "simulação" */}
+          <div style={{position:'absolute',top:12,right:12,display:'flex',alignItems:'center',gap:6,padding:'5px 10px',background:'rgba(14,12,10,0.78)',backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',borderRadius:99,pointerEvents:'none'}}>
+            <span style={{display:'inline-block',width:5,height:5,borderRadius:'50%',background:'#fff',opacity:.8}}/>
+            <span style={{fontFamily:F.sans,fontSize:9.5,fontWeight:600,color:'rgba(255,255,255,0.9)',letterSpacing:'0.14em',textTransform:'uppercase'}}>Simulação</span>
+          </div>
+        </div>
+
+        {/* Info + CTAs */}
+        <div style={{width:'min(92vw, 520px)',display:'flex',flexDirection:'column',gap:14,animation:'vv-fade-up 0.5s ease-out 0.35s both'}}>
+          <div style={{textAlign:'center'}}>
+            <div style={{fontFamily:F.serif,fontSize:22,fontWeight:600,color:'#fff',lineHeight:1.2,letterSpacing:'0.01em'}}>{peca?.nome}</div>
+            <div style={{fontFamily:F.sans,fontSize:12.5,color:'rgba(255,255,255,0.5)',marginTop:4}}>
+              {peca?.tamanho}
+              {lojaConfig?.exibirPreco&&peca?.preco&&<span style={{color:'rgba(255,255,255,0.78)',marginLeft:10}}>· {formatPrice(peca.preco)}</span>}
+            </div>
+          </div>
+
+          <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',justifyContent:'center'}}>
+            <button onClick={()=>window.open(`https://wa.me/${peca?.whatsapp||'5511998765432'}?text=${encodeURIComponent(`Olá! Quero saber mais sobre "${peca?.nome}" da vitrine.`)}`,'')}
+              style={{flex:'1 1 200px',display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'13px 20px',
+                background:'#fff',color:C.text,border:'none',borderRadius:10,fontFamily:F.sans,fontSize:14,fontWeight:600,cursor:'pointer',transition:'opacity 0.15s'}}
+              onMouseEnter={e=>e.currentTarget.style.opacity='0.88'}
+              onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
+              <IconWhatsApp size={16} color={C.text}/>Falar com a loja
+            </button>
+            <button onClick={()=>downloadSimulacaoComMarca(peca)}
+              title="Baixar foto com marca d'água"
+              style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'13px 16px',
+                background:'rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.9)',border:'1px solid rgba(255,255,255,0.18)',borderRadius:10,fontFamily:F.sans,fontSize:13.5,fontWeight:500,cursor:'pointer',backdropFilter:'blur(8px)',transition:'background 0.15s',whiteSpace:'nowrap'}}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.2)'}
+              onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,0.1)'}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5v8m0 0L4 6.5m3 3l3-3M2 11.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Baixar
+            </button>
+            <button onClick={onClose}
+              style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'13px 16px',
+                background:'transparent',color:'rgba(255,255,255,0.7)',border:'1px solid rgba(255,255,255,0.15)',borderRadius:10,fontFamily:F.sans,fontSize:13.5,cursor:'pointer',transition:'all 0.15s',whiteSpace:'nowrap'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.1)';e.currentTarget.style.color='#fff';}}
+              onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='rgba(255,255,255,0.7)';}}>
+              Outra peça
+            </button>
+          </div>
+
+          <div style={{fontFamily:F.sans,fontSize:11,color:'rgba(255,255,255,0.32)',textAlign:'center'}}>
+            Imagem 1080×1920 · simulação visual · expira em 24h e não é armazenada
+          </div>
+        </div>
+      </div>
+    </div>;
+  }
+
+  return<div onClick={onClose} style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(18,14,12,0.68)',
+    display:'flex',alignItems:'flex-end',justifyContent:'center',backdropFilter:'blur(8px)'}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:'22px 22px 0 0',width:'100%',maxWidth:520,
+      maxHeight:'94vh',display:'flex',flexDirection:'column',
+      boxShadow:'0 -8px 60px rgba(0,0,0,0.22)',animation:'vv-slide-up 0.35s cubic-bezier(0.32,0.72,0,1)'}}>
+
+      {/* Drag handle */}
+      <div style={{display:'flex',justifyContent:'center',padding:'10px 0 4px'}}>
+        <div style={{width:40,height:4,borderRadius:2,background:C.border2}}/>
+      </div>
+
+      {/* Header — minimal, premium fashion vibe */}
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',padding:'10px 26px 6px',gap:14}}>
+        <div style={{minWidth:0,flex:1}}>
+          <div style={{fontFamily:F.sans,fontSize:9.5,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.18em',marginBottom:4}}>Cabine Virtual</div>
+          {peca&&<div style={{fontFamily:F.serif,fontSize:21,fontWeight:400,color:C.text,letterSpacing:'-0.01em',lineHeight:1.15,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{peca.nome}</div>}
+        </div>
+        <button onClick={onClose} aria-label="Fechar" style={{background:'none',border:'none',cursor:'pointer',color:C.text3,display:'flex',padding:6,marginTop:-2,borderRadius:8,transition:'background 0.15s'}}
+          onMouseEnter={e=>e.currentTarget.style.background=C.surface2}
+          onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+          <IconX size={17} color={C.text3}/>
+        </button>
+      </div>
+
+      {/* Minimal stepper — thin segments + tiny labels */}
+      <CabineStepper step={step} style={{padding:'18px 26px 22px'}}/>
+
+      <div style={{flex:1,overflowY:'auto',padding:'0 26px 28px'}}>
+        {step==='upload'&&<UploadStep mirrorPhoto={mirrorPhoto} setMirrorPhoto={setMirrorPhoto} peca={peca} agreed={agreed} setAgreed={setAgreed} onNext={()=>setStep('confirm')} canConfirm={canConfirm}/>}
+        {step==='confirm'&&<ConfirmStep mirrorPhoto={mirrorPhoto} peca={peca} onBack={()=>setStep('upload')} onGenerate={()=>setStep('processing')}/>}
+        {step==='processing'&&<ProcessingStep progress={progress}/>}
+      </div>
+    </div>
+  </div>;
+}
+
+// Upload step — single mirror photo
+function UploadStep({mirrorPhoto,setMirrorPhoto,peca,agreed,setAgreed,onNext,canConfirm}){
+  return<div style={{display:'flex',flexDirection:'column',gap:22,animation:'vv-fade 0.25s ease-out'}}>
+    {/* Piece selected — minimal row, no card */}
+    <div style={{display:'flex',alignItems:'center',gap:12,paddingBottom:18,borderBottom:`1px solid ${C.border}`}}>
+      <ImgPlaceholder width={44} height={56} style={{borderRadius:6,flexShrink:0}} label={peca?.label||'peça'}/>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:F.sans,fontSize:9.5,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.14em',marginBottom:3}}>Experimentando</div>
+        <div style={{fontFamily:F.serif,fontSize:17,fontWeight:400,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'-0.01em'}}>{peca?.nome}</div>
+        <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,marginTop:1,letterSpacing:'-0.005em'}}>{peca?.tamanho}</div>
+      </div>
+    </div>
+
+    {/* Mirror photo upload */}
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div>
+        <div style={{fontFamily:F.serif,fontSize:22,fontWeight:400,color:C.text,marginBottom:6,letterSpacing:'-0.015em',lineHeight:1.2}}>Sua foto no espelho</div>
+        <div style={{fontFamily:F.sans,fontSize:12.5,color:C.text2,lineHeight:1.6,letterSpacing:'-0.005em'}}>Uma selfie de corpo inteiro, em frente ao espelho, com boa iluminação.</div>
+      </div>
+      <UploadZone value={mirrorPhoto} onChange={setMirrorPhoto} onRemove={()=>setMirrorPhoto(null)} shape="rect" hint="JPEG · PNG · WebP"/>
+
+      {/* Tips — line text, not chips */}
+      {!mirrorPhoto&&<div style={{display:'flex',gap:16,padding:'2px 2px',flexWrap:'wrap'}}>
+        {['Corpo inteiro','Boa luz natural','Fundo neutro'].map((t,i)=>(
+          <span key={t} style={{fontFamily:F.sans,fontSize:10.5,color:C.text3,letterSpacing:'0.06em',textTransform:'uppercase',animation:`vv-fade-up 0.3s ease-out ${i*60}ms both`,display:'inline-flex',alignItems:'center',gap:6}}>
+            <span style={{width:3,height:3,borderRadius:'50%',background:C.text3}}/>{t}
+          </span>
+        ))}
+      </div>}
+    </div>
+
+    {/* Privacy consent — minimal inline */}
+    <div onClick={()=>setAgreed(!agreed)} style={{display:'flex',alignItems:'flex-start',gap:10,cursor:'pointer',padding:'2px 0',userSelect:'none'}}>
+      <div style={{width:16,height:16,border:`1.5px solid ${agreed?C.text:'rgba(30,26,23,0.25)'}`,borderRadius:4,
+        background:agreed?C.text:'transparent',display:'flex',alignItems:'center',justifyContent:'center',
+        flexShrink:0,marginTop:1,transition:'all 0.15s'}}>
+        {agreed&&<IconCheck size={9} color="#fff"/>}
+      </div>
+      <span style={{fontFamily:F.sans,fontSize:11.5,color:C.text2,lineHeight:1.65,letterSpacing:'-0.005em'}}>
+        Concordo com o uso temporário da minha foto para gerar a simulação. A imagem não é armazenada. <a href="#" onClick={e=>e.preventDefault()} style={{color:C.text,textDecoration:'underline',textUnderlineOffset:2}}>Política de privacidade</a>
+      </span>
+    </div>
+
+    {/* CTA */}
+    <Btn variant="dark" size="lg" disabled={!canConfirm} onClick={onNext} style={{width:'100%',justifyContent:'center',borderRadius:99,padding:'14px 26px'}}>
+      Continuar
+    </Btn>
+  </div>;
+}
+
+// Confirm step — minimal premium summary before generating
+function ConfirmStep({mirrorPhoto,peca,onBack,onGenerate}){
+  return<div style={{animation:'vv-fade 0.25s ease-out',display:'flex',flexDirection:'column',gap:22}}>
+    <div>
+      <div style={{fontFamily:F.serif,fontSize:22,fontWeight:400,color:C.text,marginBottom:6,letterSpacing:'-0.015em',lineHeight:1.2}}>Vamos lá?</div>
+      <div style={{fontFamily:F.sans,fontSize:12.5,color:C.text2,lineHeight:1.6,letterSpacing:'-0.005em'}}>Confira sua foto e a peça antes de gerar a prévia.</div>
+    </div>
+
+    {/* Two cards side by side — clean, minimal borders */}
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+      {[
+        {label:'Sua foto',photo:mirrorPhoto,fallback:'sua foto'},
+        {label:'Peça',photo:null,fallback:peca?.label||'peça'},
+      ].map((item,i)=><div key={i} style={{display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{borderRadius:12,overflow:'hidden',aspectRatio:'3 / 4',background:`linear-gradient(180deg, ${C.surface2} 0%, ${C.surface3} 100%)`}}>
+          {item.photo
+            ?<img src={item.photo.url} alt="" style={{width:'100%',height:'100%',objectFit:'contain',display:'block'}}/>
+            :<ImgPlaceholder height="100%" label={item.fallback} style={{borderRadius:0,height:'100%'}}/>}
+        </div>
+        <div style={{fontFamily:F.sans,fontSize:9.5,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.16em',textAlign:'center'}}>{item.label}</div>
+      </div>)}
+    </div>
+
+    {/* Info note — no box, just italic text */}
+    <div style={{fontFamily:F.serif,fontSize:13,fontStyle:'italic',color:C.text3,lineHeight:1.65,letterSpacing:'-0.005em',textAlign:'center',padding:'0 8px'}}>
+      “O resultado é uma simulação visual — uma prévia inspiradora, não uma fotografia.”
+    </div>
+
+    <div style={{display:'flex',gap:10}}>
+      <Btn variant="ghost" onClick={onBack} style={{flex:1,justifyContent:'center',borderRadius:99,padding:'13px 20px'}}>Voltar</Btn>
+      <Btn variant="dark" onClick={onGenerate} style={{flex:2,justifyContent:'center',borderRadius:99,padding:'13px 20px'}}>Gerar prévia</Btn>
+    </div>
+  </div>;
+}
+
+// Processing step — rich, layered motion
+function ProcessingStep({progress}){
+  const[msg,setMsg]=React.useState(0);
+  const msgs=[
+    'Preparando sua simulação…',
+    'Analisando proporções…',
+    'Vestindo a peça…',
+    'Ajustando os detalhes…',
+    'Quase lá…',
+  ];
+  React.useEffect(()=>{
+    const iv=setInterval(()=>setMsg(m=>(m+1)%msgs.length),2000);
+    return()=>clearInterval(iv);
+  },[]);
+  const barW=Math.min(progress,100);
+
+  return<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 16px 32px',gap:30,animation:'vv-fade 0.3s ease-out'}}>
+    {/* Layered motion mark */}
+    <div style={{position:'relative',width:104,height:104}}>
+      {/* Outer breathing halo */}
+      <div style={{position:'absolute',inset:0,borderRadius:'50%',background:`radial-gradient(circle, ${C.accent}22 0%, transparent 65%)`,animation:'vv-breathe 3.2s var(--e-inout) infinite'}}/>
+      {/* Soft rotating arc */}
+      <svg width="104" height="104" viewBox="0 0 104 104" style={{position:'absolute',inset:0,overflow:'visible'}}>
+        <defs>
+          <linearGradient id="vv-arc" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={C.accent} stopOpacity="0"/>
+            <stop offset="100%" stopColor={C.accent} stopOpacity="1"/>
+          </linearGradient>
+        </defs>
+        <circle cx="52" cy="52" r="44" fill="none" stroke={C.border} strokeWidth="1.5"/>
+        <circle cx="52" cy="52" r="44" fill="none" stroke="url(#vv-arc)" strokeWidth="2.5"
+          strokeDasharray="60 220" strokeLinecap="round"
+          style={{transformOrigin:'52px 52px',animation:'vv-spin 1.6s linear infinite'}}/>
+        <circle cx="52" cy="52" r="30" fill="none" stroke={C.accent} strokeWidth="1" strokeOpacity="0.35"
+          strokeDasharray="3 8"
+          style={{transformOrigin:'52px 52px',animation:'vv-spin 6s linear infinite reverse'}}/>
+      </svg>
+      {/* Inner pulse disc */}
+      <div style={{position:'absolute',inset:'28%',borderRadius:'50%',background:C.surface,boxShadow:`0 4px 18px ${C.accent}30`,display:'flex',alignItems:'center',justifyContent:'center',animation:'vv-breathe 2.4s var(--e-inout) infinite'}}>
+        <span style={{fontFamily:F.serif,fontSize:18,fontWeight:600,color:C.text,letterSpacing:'0.04em',fontStyle:'italic'}}>vv</span>
+      </div>
+      {/* Floating particles */}
+      {[0,1,2].map(i=>(
+        <div key={i} style={{position:'absolute',top:'50%',left:'50%',width:5,height:5,marginLeft:-2.5,marginTop:-2.5,borderRadius:'50%',background:C.accent,opacity:.55,
+          animation:`vv-orbit ${3.4+i*0.7}s linear infinite`,transformOrigin:`0 ${44+i*4}px`}}/>
+      ))}
+    </div>
+
+    {/* Message */}
+    <div style={{textAlign:'center',maxWidth:260}}>
+      <div style={{fontFamily:F.serif,fontSize:20,fontWeight:500,color:C.text,marginBottom:8,letterSpacing:'0.01em',lineHeight:1.3}}>
+        Criando sua experiência
+      </div>
+      <div key={msg} style={{fontFamily:F.sans,fontSize:13,color:C.text3,lineHeight:1.6,animation:'vv-fade-up 0.45s var(--e-out)',minHeight:20}}>{msgs[msg]}</div>
+    </div>
+
+    {/* Progress bar with shimmer */}
+    <div style={{width:'100%',maxWidth:220,height:3,background:C.border,borderRadius:2,overflow:'hidden',position:'relative'}}>
+      <div style={{height:'100%',width:`${barW}%`,background:`linear-gradient(90deg, ${C.accent}, ${C.accentDark})`,borderRadius:2,transition:'width 0.5s ease',position:'relative',overflow:'hidden'}}>
+        <div style={{position:'absolute',inset:0,background:'linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)',transform:'translateX(-100%)',animation:'vv-shine 1.6s ease-in-out infinite'}}/>
+      </div>
+    </div>
+  </div>;
+}
+</script>
+
+<!-- ④ Feature 2: Piece Detail Drawer -->
+<script type="text/babel">
+// Feature 2: Instead of opening cabine directly, show a bottom sheet with piece detail first
+function PecaDrawer({open,onClose,peca,onCabine,showPrice}){
+  const[hov,setHov]=React.useState(false);
+  if(!open||!peca)return null;
+
+  return<div onClick={onClose} style={{position:'fixed',inset:0,zIndex:1500,
+    background:'rgba(18,14,12,0.5)',backdropFilter:'blur(6px)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+    <div onClick={e=>e.stopPropagation()}
+      style={{background:C.surface,borderRadius:'20px 20px 0 0',width:'100%',maxWidth:520,
+        maxHeight:'88vh',display:'flex',flexDirection:'column',
+        boxShadow:'0 -8px 48px rgba(0,0,0,0.18)',animation:'vv-slide-up 0.32s cubic-bezier(0.32,0.72,0,1)'}}>
+
+      {/* Drag handle */}
+      <div style={{display:'flex',justifyContent:'center',paddingTop:10,paddingBottom:4}}>
+        <div style={{width:40,height:4,borderRadius:2,background:C.border2}}/>
+      </div>
+
+      <div style={{overflowY:'auto',flex:1}}>
+        {/* Photo */}
+        <div style={{position:'relative'}}>
+          <ImgPlaceholder height={280} label={peca.label||peca.nome} style={{borderRadius:0}}/>
+          <button onClick={onClose} style={{position:'absolute',top:12,right:12,background:'rgba(255,255,255,0.9)',border:'none',borderRadius:'50%',width:32,height:32,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(4px)'}}>
+            <IconX size={15} color={C.text}/>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{padding:'20px 22px 28px',display:'flex',flexDirection:'column',gap:16}}>
+          {/* Name + price */}
+          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:F.serif,fontSize:22,fontWeight:600,color:C.text,lineHeight:1.2,marginBottom:4}}>{peca.nome}</div>
+              <div style={{fontFamily:F.sans,fontSize:13,color:C.text3}}>Disponível nos tamanhos: <strong style={{color:C.text2}}>{peca.tamanho}</strong></div>
+            </div>
+            {showPrice&&<div style={{fontFamily:F.serif,fontSize:22,fontWeight:600,color:C.text,flexShrink:0}}>{formatPrice(peca.preco)}</div>}
+          </div>
+
+          {/* Cabine CTA */}
+          <div style={{background:`linear-gradient(135deg,${C.accentLight},#f8f0e4)`,borderRadius:14,padding:'16px',display:'flex',alignItems:'center',gap:12,border:`1px solid ${C.accentDark}20`}}>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:F.serif,fontSize:15,fontWeight:600,color:C.accentDark,marginBottom:2}}>✦ Cabine Virtual</div>
+              <div style={{fontFamily:F.sans,fontSize:12,color:C.accentDark,opacity:0.8,lineHeight:1.5}}>Experimente esta peça em você antes de comprar</div>
+            </div>
+            <button onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+              onClick={()=>{onClose();onCabine(peca);}}
+              style={{background:hov?C.accentDark:C.accent,color:'#fff',border:'none',borderRadius:10,padding:'10px 16px',fontFamily:F.sans,fontSize:13,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap',transition:'background 0.15s'}}>
+              Experimentar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+</script>
+
+<!-- ⑤ Public vitrine -->
+<script type="text/babel">
+const VITRINE_PECAS=[
+  {id:'1',nome:'Blusa de Linho Branca',preco:8900,tamanho:'P · M · G',cat:'blusas',label:'blusa linho\nbranca',createdAt:'2026-01-12'},
+  {id:'2',nome:'Calça Wide Leg Bege',preco:14900,tamanho:'36 · 38 · 40',cat:'calcas',label:'calça wide leg\nbege',createdAt:'2026-01-20'},
+  {id:'3',nome:'Vestido Midi Floral',preco:18900,tamanho:'P · M',cat:'vestidos',label:'vestido midi\nestampa floral',createdAt:'2026-02-04'},
+  {id:'4',nome:'Saia Midi Plissada',preco:11900,tamanho:'36 · 38 · 40 · 42',cat:'saias',label:'saia plissada\nareia',createdAt:'2026-02-22'},
+  {id:'5',nome:'Shorts Jeans Vintage',preco:7900,tamanho:'36 · 38',cat:'calcas',label:'shorts jeans\ndelavê',createdAt:'2026-03-10'},
+  {id:'6',nome:'Blazer Oversized Bege',preco:21900,tamanho:'P · M',cat:'casacos',label:'blazer oversized\npalha',createdAt:'2026-03-18'},
+  {id:'7',nome:'Cardigan Tricô Caramelo',preco:12900,tamanho:'Único',cat:'tricos',label:'cardigan tricô\ncaramelo',createdAt:'2026-04-02'},
+  {id:'8',nome:'Vestido Ombro a Ombro Branco',preco:16900,tamanho:'P · M · G',cat:'vestidos',label:'vestido ombro\na ombro',createdAt:'2026-04-21'},
+];
+const LOJA={nome:'Atelier Laila',slug:'atelier-laila',instagram:'@atelierlaila',whatsapp:'5511998765432',tagline:'Moda feminina com alma',logoUrl:null};
+
+function SocialLink({type,handle,mobile=false}){
+  const size=mobile?16:17;
+  const icons={instagram:<IconInstagram size={size}/>,tiktok:<IconTikTok size={size}/>,whatsapp:<IconWhatsApp size={size} color="#fff"/>};
+  const isWa=type==='whatsapp';
+  return<a href="#" title={handle} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
+    width:mobile?30:34,height:mobile?30:34,borderRadius:'50%',
+    background:isWa?'#25d366':C.surface2,color:isWa?'#fff':C.text2,
+    textDecoration:'none',transition:'opacity 0.15s',flexShrink:0}}
+    onMouseEnter={e=>e.currentTarget.style.opacity='0.75'}
+    onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
+    {icons[type]}
+  </a>;
+}
+
+function CatFilter({selected,onChange,mobile=false}){
+  const cats=[{id:'todas',label:'Todas'},...CATEGORIAS.filter(c=>VITRINE_PECAS.some(p=>p.cat===c.id))];
+  return<div style={{display:'flex',gap:6,overflowX:'auto',padding:mobile?'0 12px':'0',paddingBottom:4,scrollbarWidth:'none'}}>
+    {cats.map(c=>{
+      const on=selected===c.id;
+      return<button key={c.id} onClick={()=>onChange(c.id)} style={{
+        padding:'6px 14px',borderRadius:20,border:`1px solid ${on?C.text:C.border}`,
+        background:on?C.text:'transparent',color:on?'#fff':C.text2,
+        fontFamily:F.sans,fontSize:mobile?11.5:12.5,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap',transition:'all 0.15s',flexShrink:0}}>{c.label}</button>;
+    })}
+  </div>;
+}
+
+// Mobile card — Feature 2: tap opens drawer, not cabine directly
+function MobileCard({peca,onOpen,showPrice}){
+  return<div onClick={()=>onOpen(peca)} style={{background:C.surface,borderRadius:11,overflow:'hidden',cursor:'pointer',
+    boxShadow:'0 1px 6px rgba(0,0,0,0.05)',transition:'transform 0.15s,box-shadow 0.15s'}}
+    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)';}}
+    onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='0 1px 6px rgba(0,0,0,0.05)';}}>
+    <div style={{position:'relative'}}>
+      <ImgPlaceholder height={155} label={peca.label}/>
+      <div style={{position:'absolute',bottom:8,right:8,background:'rgba(255,255,255,0.95)',borderRadius:16,padding:'4px 10px',fontFamily:F.sans,fontSize:10.5,fontWeight:600,color:C.text,backdropFilter:'blur(4px)'}}>
+        ✦ Cabine
+      </div>
+    </div>
+    <div style={{padding:'9px 11px 12px'}}>
+      <div style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text,marginBottom:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{peca.nome}</div>
+      <div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3,marginBottom:showPrice?3:0}}>{peca.tamanho}</div>
+      {showPrice&&<div style={{fontFamily:F.serif,fontSize:14,fontWeight:600,color:C.text,marginTop:4}}>{formatPrice(peca.preco)}</div>}
+    </div>
+  </div>;
+}
+
+// Desktop card — Feature 2: hover shows detail CTA
+function DesktopCard({peca,onOpen,showPrice}){
+  const[hov,setHov]=React.useState(false);
+  return<div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    style={{background:C.surface,borderRadius:14,overflow:'hidden',cursor:'pointer',
+      boxShadow:hov?'0 10px 32px rgba(0,0,0,0.11)':'0 2px 8px rgba(0,0,0,0.05)',
+      transform:hov?'translateY(-3px)':'none',transition:'all 0.22s'}} onClick={()=>onOpen(peca)}>
+    <div style={{position:'relative',overflow:'hidden'}}>
+      <ImgPlaceholder height={240} label={peca.label} style={{transition:'transform 0.35s',...(hov?{transform:'scale(1.03)'}:{})}}/>
+      <div style={{position:'absolute',inset:0,background:`rgba(18,14,12,${hov?0.22:0})`,transition:'background 0.22s',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        {hov&&<div style={{background:'rgba(255,255,255,0.96)',borderRadius:22,padding:'9px 20px',fontFamily:F.sans,fontSize:13,fontWeight:600,color:C.text,display:'flex',alignItems:'center',gap:6,animation:'vv-pop 0.18s ease-out'}}>
+          ✦ Ver peça
+        </div>}
+      </div>
+    </div>
+    <div style={{padding:'13px 16px 16px'}}>
+      <div style={{fontFamily:F.sans,fontSize:14,fontWeight:500,color:C.text,marginBottom:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{peca.nome}</div>
+      <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,marginBottom:8}}>{peca.tamanho}</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+        {showPrice
+          ?<span style={{fontFamily:F.serif,fontSize:19,fontWeight:600,color:C.text}}>{formatPrice(peca.preco)}</span>
+          :<span style={{fontFamily:F.sans,fontSize:12,color:C.text3}}>Consulte o preço</span>}
+        <span style={{fontFamily:F.sans,fontSize:12,color:C.accent,fontWeight:500}}>✦ Cabine</span>
+      </div>
+    </div>
+  </div>;
+}
+
+function PhoneFrame({children}){
+  return<div style={{position:'relative',width:315,flexShrink:0}}>
+    <div style={{background:'#181614',borderRadius:46,padding:'10px',boxShadow:'0 20px 60px rgba(0,0,0,0.28),inset 0 0 0 1px #2e2b28'}}>
+      <div style={{borderRadius:37,overflow:'hidden',background:C.bg,position:'relative'}}>
+        <div style={{height:44,background:C.surface,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 22px',flexShrink:0,position:'relative'}}>
+          <span style={{fontFamily:F.sans,fontSize:11.5,fontWeight:600,color:C.text}}>9:41</span>
+          <div style={{width:90,height:26,background:'#181614',borderRadius:18,position:'absolute',left:'50%',transform:'translateX(-50%)'}}/>
+          <div style={{display:'flex',gap:4,alignItems:'center',fontSize:11}}>●●● 📶</div>
+        </div>
+        <div style={{height:600,overflowY:'auto'}}>{children}</div>
+        <div style={{height:28,background:C.surface,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{width:90,height:4,background:C.border2,borderRadius:2}}/>
+        </div>
+      </div>
+    </div>
+    <div style={{textAlign:'center',marginTop:14,fontFamily:F.sans,fontSize:11,color:C.text3,letterSpacing:'0.05em',textTransform:'uppercase'}}>Mobile</div>
+  </div>;
+}
+
+function DesktopFrame({children}){
+  return<div style={{flex:1,minWidth:520}}>
+    <div style={{background:'#ddd6cc',borderRadius:12,overflow:'hidden',boxShadow:'0 18px 60px rgba(0,0,0,0.14)'}}>
+      <div style={{background:'#ece5dc',padding:'10px 16px',display:'flex',alignItems:'center',gap:10}}>
+        <div style={{display:'flex',gap:6}}>{['#ff5f57','#febc2e','#28c840'].map(c=><div key={c} style={{width:11,height:11,borderRadius:'50%',background:c}}/>)}</div>
+        <div style={{flex:1,background:'rgba(255,255,255,0.75)',borderRadius:6,padding:'5px 12px',fontFamily:F.sans,fontSize:11.5,color:C.text3}}>vitrine.app/v/atelier-laila</div>
+      </div>
+      <div style={{height:580,overflowY:'auto',background:C.bg}}>{children}</div>
+    </div>
+    <div style={{textAlign:'center',marginTop:14,fontFamily:F.sans,fontSize:11,color:C.text3,letterSpacing:'0.05em',textTransform:'uppercase'}}>Desktop</div>
+  </div>;
+}
+
+function StoreBanner({loja,mobile=false}){
+  return<div style={{background:C.text,padding:mobile?'24px 16px':'32px 48px',textAlign:'center'}}>
+    <div style={{marginBottom:12}}><VVLogo size={mobile?26:30} dark={false}/></div>
+    <div style={{fontFamily:F.serif,fontSize:mobile?19:24,fontWeight:500,color:C.surface,letterSpacing:'0.03em',marginBottom:6,lineHeight:1.3}}>{loja.nome}</div>
+    <div style={{fontFamily:F.sans,fontSize:mobile?11:12.5,color:'rgba(255,255,255,0.55)',marginBottom:16,letterSpacing:'0.04em',textTransform:'uppercase'}}>{loja.tagline}</div>
+    <div style={{display:'flex',justifyContent:'center',gap:10}}>
+      <SocialLink type="instagram" handle={loja.instagram} mobile={mobile}/>
+      <SocialLink type="tiktok" handle="@atelierlaila" mobile={mobile}/>
+      <SocialLink type="whatsapp" handle={loja.whatsapp} mobile={mobile}/>
+    </div>
+    <div style={{marginTop:20,fontFamily:F.sans,fontSize:mobile?10:11,color:'rgba(255,255,255,0.3)',letterSpacing:'0.06em'}}>VITRINE.APP</div>
+  </div>;
+}
+
+function PublicVitrine({lojaConfig}){
+  const[cabinePeca,setCabinePeca]=React.useState(null);
+  const[drawerPeca,setDrawerPeca]=React.useState(null);
+  const[showPrice,setShowPrice]=React.useState(lojaConfig?.exibirPreco||false);
+  const[catFilter,setCatFilter]=React.useState('todas');
+  const[viewMode,setViewMode]=React.useState('grade'); // 'grade' | 'foco'
+  const[focusIdx,setFocusIdx]=React.useState(0);
+  const filtered=(catFilter==='todas'?VITRINE_PECAS:VITRINE_PECAS.filter(p=>p.cat===catFilter)).slice().sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
+
+  // Reset focus index when filter changes
+  React.useEffect(()=>setFocusIdx(0),[catFilter]);
+
+  const focusPeca=filtered[focusIdx]||null;
+
+  // Icon SVGs for view toggle
+  function IconGrid({active}){return<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="0" y="0" width="6" height="6" rx="1" fill={active?'#fff':C.text3}/><rect x="9" y="0" width="6" height="6" rx="1" fill={active?'#fff':C.text3}/><rect x="0" y="9" width="6" height="6" rx="1" fill={active?'#fff':C.text3}/><rect x="9" y="9" width="6" height="6" rx="1" fill={active?'#fff':C.text3}/></svg>;}
+  function IconFocus({active}){return<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="3" width="13" height="9" rx="1.5" fill={active?'#fff':C.text3}/></svg>;}
+
+  return<div style={{display:'flex',flexDirection:'column',height:'100%',background:C.surface3,overflow:'hidden'}}>
+    {/* Controls */}
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'11px 28px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,gap:16,flexWrap:'wrap'}}>
+      <span style={{fontFamily:F.sans,fontSize:12.5,fontWeight:600,color:C.text2}}>Preview — Vitrine Pública</span>
+      <div style={{display:'flex',alignItems:'center',gap:14}}>
+        {/* View mode toggle */}
+        <div style={{display:'flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden'}}>
+          {[{id:'grade',Icon:IconGrid,tip:'Grade'},{id:'foco',Icon:IconFocus,tip:'Peça única'}].map(({id,Icon,tip})=>(
+            <button key={id} onClick={()=>setViewMode(id)} title={tip}
+              style={{padding:'6px 10px',background:viewMode===id?C.text:C.surface,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.15s'}}>
+              <Icon active={viewMode===id}/>
+            </button>
+          ))}
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <Toggle checked={showPrice} onChange={setShowPrice}/>
+          <span style={{fontFamily:F.sans,fontSize:12.5,color:C.text2}}>Mostrar preços</span>
+        </div>
+        <a href="#" style={{fontFamily:F.sans,fontSize:12,color:C.accent,textDecoration:'none',fontWeight:500}}>Abrir ↗</a>
+      </div>
+    </div>
+
+    {/* Side by side */}
+    <div style={{flex:1,overflowX:'auto',overflowY:'auto',padding:'36px 28px',display:'flex',gap:36,alignItems:'flex-start'}}>
+      {/* Mobile */}
+      <PhoneFrame>
+        <div style={{background:C.bg,minHeight:'100%',display:'flex',flexDirection:'column'}}>
+          <div style={{background:C.surface,padding:'14px 14px 12px',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,zIndex:10}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:9,flex:1,minWidth:0}}><LojaMark loja={LOJA} size={32} radius={9}/><span style={{fontFamily:F.serif,fontSize:21,fontWeight:400,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',letterSpacing:'-0.01em'}}>{LOJA.nome}</span></div>
+              <div style={{display:'flex',gap:6,flexShrink:0,marginLeft:8}}>
+                <SocialLink type="instagram" handle={LOJA.instagram} mobile/>
+                <SocialLink type="tiktok" handle="@atelierlaila" mobile/>
+                <SocialLink type="whatsapp" handle={LOJA.whatsapp} mobile/>
+              </div>
+            </div>
+            <CatFilter selected={catFilter} onChange={setCatFilter} mobile/>
+          </div>
+          {viewMode==='grade'
+            ?<div style={{padding:'12px 10px',flex:1}}>
+              <div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3,marginBottom:9,textAlign:'center'}}>{filtered.length} peças</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}} className="vv-stagger">
+                {filtered.map((p,i)=><div key={p.id} style={{'--i':i}}><MobileCard peca={p} onOpen={setDrawerPeca} showPrice={showPrice}/></div>)}
+              </div>
+            </div>
+            :(<React.Fragment>{/* Foco mobile — single piece with swipe-hint nav */}
+              {focusPeca&&<div style={{flex:1,display:'flex',flexDirection:'column'}}>
+              <div style={{position:'relative',flex:1,minHeight:0}}>
+                <ImgPlaceholder height={380} label={focusPeca.label} style={{borderRadius:0}}/>
+                {/* Nav arrows */}
+                {focusIdx>0&&<button onClick={()=>setFocusIdx(i=>i-1)} style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',background:'rgba(255,255,255,0.9)',border:'none',borderRadius:'50%',width:32,height:32,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(4px)'}}>
+                  <IconChevron dir="left" size={14} color={C.text}/>
+                </button>}
+                {focusIdx<filtered.length-1&&<button onClick={()=>setFocusIdx(i=>i+1)} style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'rgba(255,255,255,0.9)',border:'none',borderRadius:'50%',width:32,height:32,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(4px)'}}>
+                  <IconChevron dir="right" size={14} color={C.text}/>
+                </button>}
+                {/* Counter dots */}
+                <div style={{position:'absolute',bottom:12,left:0,right:0,display:'flex',justifyContent:'center',gap:5}}>
+                  {filtered.slice(0,Math.min(filtered.length,8)).map((_,i)=><div key={i} style={{width:i===focusIdx?16:5,height:5,borderRadius:3,background:i===focusIdx?C.accent:'rgba(255,255,255,0.6)',transition:'all 0.2s'}}/>)}
+                </div>
+              </div>
+              <div style={{padding:'14px 14px 20px',background:C.surface}}>
+                <div style={{fontFamily:F.serif,fontSize:18,fontWeight:600,color:C.text,marginBottom:3}}>{focusPeca.nome}</div>
+                <div style={{fontFamily:F.sans,fontSize:12,color:C.text3,marginBottom:showPrice?4:10}}>{focusPeca.tamanho}</div>
+                {showPrice&&<div style={{fontFamily:F.serif,fontSize:16,fontWeight:600,color:C.text,marginBottom:10}}>{formatPrice(focusPeca.preco)}</div>}
+                <button onClick={()=>setDrawerPeca(focusPeca)} style={{width:'100%',padding:'10px',background:C.text,color:'#fff',border:'none',borderRadius:9,fontFamily:F.sans,fontSize:13,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                  ✦ Experimentar
+                </button>
+              </div>
+            </div>}
+          </React.Fragment>)}
+          {viewMode==='grade'&&<StoreBanner loja={LOJA} mobile/>}
+        </div>
+      </PhoneFrame>
+
+      {/* Desktop */}
+      <DesktopFrame>
+        <div style={{background:C.bg,minHeight:'100%',display:'flex',flexDirection:'column'}}>
+          <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'0 40px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',height:60}}>
+              <div style={{display:'flex',alignItems:'center',gap:11,flex:1,minWidth:0}}><LojaMark loja={LOJA} size={38} radius={10}/><span style={{fontFamily:F.serif,fontSize:26,fontWeight:400,color:C.text,letterSpacing:'-0.015em',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{LOJA.nome}</span></div>
+              <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0,marginLeft:16}}>
+                <SocialLink type="instagram" handle={LOJA.instagram}/>
+                <SocialLink type="tiktok" handle="@atelierlaila"/>
+                <SocialLink type="whatsapp" handle={LOJA.whatsapp}/>
+              </div>
+            </div>
+          </div>
+          <div style={{background:C.accentLight,padding:'12px 40px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}}>
+            <span style={{fontFamily:F.serif,fontSize:14,fontWeight:500,color:C.accentDark}}>✦ Cabine Virtual — experimente antes de escolher</span>
+            <span style={{fontFamily:F.sans,fontSize:11.5,color:C.accentDark}}>Clique em qualquer peça</span>
+          </div>
+          <div style={{padding:'16px 40px 0',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+            <CatFilter selected={catFilter} onChange={setCatFilter}/>
+          </div>
+
+          {viewMode==='grade'
+            ?<div style={{padding:'20px 40px 40px',flex:1}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>
+                <span style={{fontFamily:F.serif,fontSize:21,fontWeight:500,color:C.text}}>Peças disponíveis</span>
+                <span style={{fontFamily:F.sans,fontSize:12,color:C.text3}}>{filtered.length} itens</span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:18}} className="vv-stagger">
+                {filtered.map((p,i)=><div key={p.id} style={{'--i':i}}><DesktopCard peca={p} onOpen={setDrawerPeca} showPrice={showPrice}/></div>)}
+              </div>
+            </div>
+:(<React.Fragment>{/* Foco desktop — large piece center with thumbnail rail */}
+              {focusPeca&&<div style={{flex:1,display:'flex',overflow:'hidden'}}>
+              {/* Thumbnail rail */}
+              <div style={{width:96,borderRight:`1px solid ${C.border}`,overflowY:'auto',padding:'12px 8px',display:'flex',flexDirection:'column',gap:8,flexShrink:0}}>
+                {filtered.map((p,i)=><div key={p.id} onClick={()=>setFocusIdx(i)}
+                  style={{borderRadius:8,overflow:'hidden',border:`2px solid ${i===focusIdx?C.accent:C.border}`,cursor:'pointer',transition:'border-color 0.15s',flexShrink:0}}>
+                  <ImgPlaceholder height={80} label={''} style={{borderRadius:0}}/>
+                </div>)}
+              </div>
+              {/* Main image */}
+              <div style={{flex:1,position:'relative',overflow:'hidden'}}>
+                <ImgPlaceholder height="100%" label={focusPeca.label} style={{borderRadius:0,minHeight:400}}/>
+                {/* Prev/Next */}
+                {focusIdx>0&&<button onClick={()=>setFocusIdx(i=>i-1)} style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',background:'rgba(255,255,255,0.92)',border:'none',borderRadius:'50%',width:36,height:36,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 10px rgba(0,0,0,0.1)'}}>
+                  <IconChevron dir="left" size={15} color={C.text}/>
+                </button>}
+                {focusIdx<filtered.length-1&&<button onClick={()=>setFocusIdx(i=>i+1)} style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',background:'rgba(255,255,255,0.92)',border:'none',borderRadius:'50%',width:36,height:36,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 2px 10px rgba(0,0,0,0.1)'}}>
+                  <IconChevron dir="right" size={15} color={C.text}/>
+                </button>}
+              </div>
+              {/* Info panel */}
+              <div style={{width:220,borderLeft:`1px solid ${C.border}`,padding:'28px 20px',display:'flex',flexDirection:'column',gap:14,flexShrink:0}}>
+                <div>
+                  <div style={{fontFamily:F.serif,fontSize:20,fontWeight:600,color:C.text,marginBottom:6,lineHeight:1.2}}>{focusPeca.nome}</div>
+                  <div style={{fontFamily:F.sans,fontSize:12,color:C.text3}}>{focusPeca.tamanho}</div>
+                </div>
+                {showPrice&&<div style={{fontFamily:F.serif,fontSize:20,fontWeight:600,color:C.text}}>{formatPrice(focusPeca.preco)}</div>}
+                <button onClick={()=>setDrawerPeca(focusPeca)}
+                  style={{width:'100%',padding:'11px',background:C.text,color:'#fff',border:'none',borderRadius:9,fontFamily:F.sans,fontSize:13,fontWeight:500,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'background 0.15s'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='#2d2825'}
+                  onMouseLeave={e=>e.currentTarget.style.background=C.text}>
+                  ✦ Experimentar
+                </button>
+                {/* Progress indicator */}
+                <div style={{marginTop:'auto',fontFamily:F.sans,fontSize:11,color:C.text3,textAlign:'center'}}>
+                  {focusIdx+1} de {filtered.length}
+                </div>
+              </div>
+            </div>}
+          </React.Fragment>)}
+          {viewMode==='grade'&&<StoreBanner loja={LOJA}/>}
+        </div>
+      </DesktopFrame>
+    </div>
+
+    {/* Feature 2: Piece drawer */}
+    <PecaDrawer open={!!drawerPeca} onClose={()=>setDrawerPeca(null)} peca={drawerPeca}
+      showPrice={showPrice}
+      onCabine={(p)=>{setCabinePeca(p);}}/>
+
+    {/* Feature 3/4/5: Cabine modal */}
+    <CabineModal open={!!cabinePeca} onClose={()=>setCabinePeca(null)} peca={cabinePeca} lojaConfig={lojaConfig}/>
+  </div>;
+}
+</script>
+
+<!-- ⑥ Admin panel -->
+<script type="text/babel">
+const MOCK_PECAS=[
+  {id:'1',nome:'Blusa de Linho Branca',preco:8900,tamanho:'P, M, G',cat:'blusas',status:'disponivel',fotos:3,createdAt:'2026-01-12'},
+  {id:'2',nome:'Calça Wide Leg Bege',preco:14900,tamanho:'36, 38, 40',cat:'calcas',status:'disponivel',fotos:4,createdAt:'2026-01-20'},
+  {id:'3',nome:'Vestido Midi Floral',preco:18900,tamanho:'P, M',cat:'vestidos',status:'disponivel',fotos:5,createdAt:'2026-02-04'},
+  {id:'4',nome:'Cardigan Tricô Caramelo',preco:12900,tamanho:'Único',cat:'tricos',status:'vendida',fotos:2,createdAt:'2026-02-15'},
+  {id:'5',nome:'Shorts Jeans Vintage',preco:7900,tamanho:'36, 38',cat:'calcas',status:'disponivel',fotos:3,createdAt:'2026-03-10'},
+  {id:'6',nome:'Blusa Cropped Listrada',preco:6900,tamanho:'P, M, G',cat:'blusas',status:'vendida',fotos:2,createdAt:'2026-03-18'},
+  {id:'7',nome:'Saia Midi Plissada',preco:11900,tamanho:'36, 38, 40, 42',cat:'saias',status:'disponivel',fotos:4,createdAt:'2026-04-02'},
+  {id:'8',nome:'Blazer Oversized Bege',preco:21900,tamanho:'P, M',cat:'casacos',status:'disponivel',fotos:3,createdAt:'2026-04-21'},
+];
+const PHLABELS=['blusa linho\nbranca','calça wide\nleg bege','vestido\nfloral','cardigan\ncaramelo','shorts jeans\nvintage','blusa cropped\nlistrada','saia midi\nplissada','blazer\noversized'];
+
+function AdminSidebar({section,setSection,loja}){
+  const nav=[
+    {id:'dashboard',label:'Dashboard',icon:'⊞'},
+    {id:'pecas',label:'Disponíveis',icon:'◈'},
+    {id:'todas',label:'Todas as peças',icon:'≡'},
+    {id:'config',label:'Configurações',icon:'⚙'},
+  ];
+  const[col,setCol]=React.useState(()=>{try{return localStorage.getItem('vv_sb')==='1'}catch(e){return false}});
+  function toggle(){setCol(v=>{const n=!v;try{localStorage.setItem('vv_sb',n?'1':'0')}catch(e){};return n});}
+  const W=col?64:216;
+  return<aside style={{width:W,background:C.surface,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',flexShrink:0,height:'100%',transition:'width 0.22s cubic-bezier(0.2,0.8,0.2,1)',overflow:'hidden'}}>
+    <div style={{padding:col?'18px 0 12px':'20px 16px 12px',display:'flex',flexDirection:col?'column':'row',alignItems:'center',justifyContent:col?'center':'space-between',gap:8}}>
+      {!col&&<VVLogo size={20}/>}
+      <button onClick={toggle} title={col?'Expandir':'Recolher'} style={{width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,cursor:'pointer',color:C.text2,transition:'all 0.15s',flexShrink:0}}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor=C.accent;e.currentTarget.style.color=C.accent;}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text2;}}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" style={{transform:col?'rotate(180deg)':'none',transition:'transform 0.22s'}}><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+    </div>
+    {!col&&<div style={{padding:'2px 16px 12px'}}>
+      <div style={{padding:'9px 11px',background:C.surface2,borderRadius:9,display:'flex',alignItems:'center',gap:9}}>
+        <LojaMark loja={loja} size={26} radius={7}/>
+        <div style={{fontFamily:F.sans,fontSize:12.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{trunc(loja.nome,18)}</div>
+      </div>
+    </div>}
+    {col&&<div style={{padding:'2px 0 12px',display:'flex',justifyContent:'center'}}><LojaMark loja={loja} size={32} radius={8}/></div>}
+    <nav style={{flex:1,padding:col?'2px 8px':'2px 10px'}}>
+      {nav.map(item=>{const a=section===item.id;return<div key={item.id} onClick={()=>setSection(item.id)} title={col?item.label:undefined}
+        style={{display:'flex',alignItems:'center',gap:9,padding:col?'10px':'9px 12px',justifyContent:col?'center':'flex-start',borderRadius:8,cursor:'pointer',marginBottom:1,
+          background:a?C.accentLight:'transparent',color:a?C.accentDark:C.text2,
+          fontFamily:F.sans,fontSize:13.5,fontWeight:a?600:400,transition:'all 0.18s'}}
+        onMouseEnter={e=>{if(!a)e.currentTarget.style.background=C.surface2}}
+        onMouseLeave={e=>{if(!a)e.currentTarget.style.background='transparent'}}>
+        <span style={{fontSize:14}}>{item.icon}</span>{!col&&item.label}
+      </div>;})}
+    </nav>
+    <div style={{padding:col?'12px 8px':'14px 16px',borderTop:`1px solid ${C.border}`}}>
+      {!col?<>
+        <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:10}}>
+          <Avatar name="Laila Moura" size={30}/>
+          <div style={{minWidth:0,flex:1}}>
+            <div style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>Laila Moura</div>
+            <div style={{fontFamily:F.sans,fontSize:11,color:C.text3}}>lojista</div>
+          </div>
+        </div>
+        <button style={{width:'100%',padding:'7px',border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text2,fontFamily:F.sans,fontSize:12.5,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'all 0.15s'}}
+          onMouseEnter={e=>{e.currentTarget.style.background=C.surface2}}
+          onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
+          <span style={{fontSize:13}}>↪</span> Sair
+        </button>
+      </>:<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
+        <Avatar name="Laila Moura" size={30}/>
+        <button title="Sair" style={{width:30,height:30,padding:0,border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',color:C.text2,fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>↪</button>
+      </div>}
+    </div>
+  </aside>;
+}
+
+function Dashboard({pecas,setSection}){
+  const disp=pecas.filter(p=>p.status==='disponivel').length;
+  const vend=pecas.filter(p=>p.status==='vendida').length;
+  return<div style={{padding:'28px 32px',maxWidth:880}}>
+    {/* Header row with vitrine link top-right */}
+    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:6,gap:12}}>
+      <h1 style={{fontFamily:F.serif,fontSize:26,fontWeight:600,color:C.text,margin:0}}>Bom dia, Laila 👋</h1>
+      <a href="#" style={{display:'flex',alignItems:'center',gap:6,padding:'7px 14px',borderRadius:20,border:`1px solid ${C.border}`,fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text2,textDecoration:'none',flexShrink:0,transition:'all 0.15s',background:C.surface}}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor=C.accent;e.currentTarget.style.color=C.accent;}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text2;}}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Visualizar vitrine
+      </a>
+    </div>
+    <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,margin:'0 0 24px'}}>Sua vitrine está ativa · Atualizado agora</p>
+    <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:24}}>
+      <KpiCard label="Disponíveis" value={disp} sub="peças na vitrine" icon="◈"/>
+      <KpiCard label="Vendidas" value={vend} sub="este mês" icon="✓"/>
+      <KpiCard label="Total" value={pecas.length} sub="cadastradas" icon="≡"/>
+    </div>
+    <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:28}}>
+      <Btn variant="dark" icon={<span>+</span>} onClick={()=>setSection('pecas')}>Nova peça</Btn>
+    </div>
+    <div style={{fontFamily:F.sans,fontSize:11.5,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:12}}>Peças recentes</div>
+    <VVCard>
+      {pecas.slice(0,6).map((p,i)=><React.Fragment key={p.id}>
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 18px'}}>
+          <ImgPlaceholder width={40} height={40} style={{borderRadius:7,flexShrink:0}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:F.sans,fontSize:13.5,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nome}</div>
+            <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,marginTop:1}}>{getCatLabel(p.cat)} · {p.tamanho}</div>
+          </div>
+          <span style={{fontFamily:F.serif,fontSize:15,fontWeight:600,color:C.text,flexShrink:0}}>{formatPrice(p.preco)}</span>
+          <Badge label={p.status==='disponivel'?'disponível':'vendida'} variant={p.status==='disponivel'?'disponivel':'vendida'}/>
+        </div>
+        {i<5&&<Divider/>}
+      </React.Fragment>)}
+    </VVCard>
+  </div>;
+}
+
+const TAMANHOS_PADRAO=['PP','P','M','G','GG','36','38','40','42','44','Único'];
+
+function PecaFormModal({open,onClose,peca,onSave}){
+  const[nome,setNome]=React.useState('');
+  const[preco,setPreco]=React.useState('');
+  const[tamanhosSel,setTamanhosSel]=React.useState([]);
+  const[cat,setCat]=React.useState('blusas');
+  const[catCustom,setCatCustom]=React.useState('');
+  const[fotos,setFotos]=React.useState([]); // [{url,name,destaque}]
+  const[saving,setSaving]=React.useState(false);
+  const fileRef=React.useRef(null);
+
+  React.useEffect(()=>{
+    if(open){
+      setNome(peca?.nome||'');
+      setPreco(peca?(peca.preco/100).toFixed(2):'');
+      // Parse tamanhos from string
+      const ts=peca?.tamanho?peca.tamanho.split(/[,·\s]+/).map(t=>t.trim()).filter(Boolean):[];
+      setTamanhosSel(ts);
+      setCat(peca?.cat||'blusas');setCatCustom('');setFotos([]);
+    }
+  },[open,peca]);
+
+  function toggleTamanho(t){
+    setTamanhosSel(prev=>prev.includes(t)?prev.filter(x=>x!==t):[...prev,t]);
+  }
+
+  function handleFotos(files){
+    const arr=Array.from(files).slice(0,8-fotos.length);
+    const novos=arr.map((f,i)=>({url:URL.createObjectURL(f),name:f.name,destaque:fotos.length===0&&i===0}));
+    setFotos(prev=>[...prev,...novos].map((f,i)=>({...f,destaque:i===0?prev.length===0:f.destaque})));
+  }
+
+  function setDestaque(idx){
+    setFotos(prev=>prev.map((f,i)=>({...f,destaque:i===idx})));
+  }
+
+  function removeFoto(idx){
+    setFotos(prev=>{
+      const next=prev.filter((_,i)=>i!==idx);
+      if(next.length>0&&!next.some(f=>f.destaque)) next[0].destaque=true;
+      return next;
+    });
+  }
+
+  function handleSave(){
+    setSaving(true);
+    const tamanhoStr=tamanhosSel.join(' · ')||'';
+    const finalCat=cat==='custom'?catCustom.toLowerCase().replace(/\s+/g,'-')||'outros':cat;
+    setTimeout(()=>{
+      onSave({nome,preco:preco?Math.round(parseFloat(preco)*100):0,tamanho:tamanhoStr,cat:finalCat,status:'disponivel',fotos:fotos.length});
+      setSaving(false);
+    },700);
+  }
+
+  const isCustomCat=cat==='custom';
+
+  return<VVModal open={open} onClose={onClose} title={peca?'Editar peça':'Nova peça'} width={520}
+    footer={<>
+      <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+      <Btn variant="dark" onClick={handleSave} disabled={!nome} loading={saving}>{saving?'Salvando…':'Salvar'}</Btn>
+    </>}>
+    <div style={{display:'flex',flexDirection:'column',gap:18}}>
+
+      {/* Nome — único obrigatório */}
+      <VVInput label="Nome" value={nome} onChange={e=>setNome(e.target.value)}
+        placeholder="Ex: Blusa de linho branca" required/>
+
+      {/* Preço — opcional */}
+      <VVInput label={<span>Preço <span style={{fontFamily:F.sans,fontSize:11,color:C.text3,fontWeight:400}}>opcional</span></span>}
+        value={preco} onChange={e=>setPreco(e.target.value)} prefix="R$" type="number"/>
+
+      {/* Tamanhos — chips múltiplos, opcional */}
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+          <label style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text2}}>Tamanhos</label>
+          <span style={{fontFamily:F.sans,fontSize:11,color:C.text3}}>opcional</span>
+        </div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {TAMANHOS_PADRAO.map(t=>{
+            const on=tamanhosSel.includes(t);
+            return<button key={t} onClick={()=>toggleTamanho(t)}
+              style={{padding:'6px 13px',borderRadius:20,border:`1.5px solid ${on?C.accent:C.border}`,
+                background:on?C.accentLight:'transparent',color:on?C.accentDark:C.text2,
+                fontFamily:F.sans,fontSize:12.5,fontWeight:on?600:400,cursor:'pointer',transition:'all 0.12s'}}>
+              {t}
+            </button>;
+          })}
+        </div>
+        {tamanhosSel.length>0&&<div style={{marginTop:8,fontFamily:F.sans,fontSize:11.5,color:C.text3}}>
+          Selecionados: {tamanhosSel.join(', ')}
+        </div>}
+      </div>
+
+      {/* Categoria */}
+      <div>
+        <VVSelect label="Categoria" value={cat} onChange={e=>setCat(e.target.value)}
+          options={[...CATEGORIAS.map(c=>({value:c.id,label:c.label})),{value:'custom',label:'+ Adicionar categoria personalizada'}]}/>
+        {isCustomCat&&<VVInput value={catCustom} onChange={e=>setCatCustom(e.target.value)}
+          placeholder="Nome da categoria…" style={{marginTop:8}}/>}
+      </div>
+
+      {/* Fotos */}
+      <div>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+          <label style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text2}}>Fotos</label>
+          <span style={{fontFamily:F.sans,fontSize:11,color:C.text3}}>até 8</span>
+        </div>
+        {/* Uploaded thumbnails */}
+        {fotos.length>0&&<div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+          {fotos.map((f,i)=><div key={i} style={{position:'relative',width:72,height:72,borderRadius:9,overflow:'hidden',
+            border:`2px solid ${f.destaque?C.accent:C.border}`,cursor:'pointer',flexShrink:0}}
+            onClick={()=>setDestaque(i)}>
+            <img src={f.url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+            {/* Destaque badge */}
+            {f.destaque&&<div style={{position:'absolute',bottom:0,left:0,right:0,background:C.accent,padding:'2px 0',textAlign:'center',fontFamily:F.sans,fontSize:9,color:'#fff',fontWeight:600}}>destaque</div>}
+            {/* Remove */}
+            <button onClick={e=>{e.stopPropagation();removeFoto(i);}}
+              style={{position:'absolute',top:3,right:3,width:18,height:18,borderRadius:'50%',background:'rgba(30,26,23,0.7)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <IconX size={9} color="#fff"/>
+            </button>
+          </div>)}
+          {/* Add more */}
+          {fotos.length<8&&<div onClick={()=>fileRef.current?.click()}
+            style={{width:72,height:72,borderRadius:9,border:`2px dashed ${C.border}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,cursor:'pointer',background:C.surface2,flexShrink:0,transition:'border-color 0.15s'}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+            <span style={{color:C.text3,fontSize:18,lineHeight:1}}>+</span>
+          </div>}
+        </div>}
+        {/* Empty drop zone */}
+        {fotos.length===0&&<div onClick={()=>fileRef.current?.click()}
+          onDragOver={e=>e.preventDefault()}
+          onDrop={e=>{e.preventDefault();handleFotos(e.dataTransfer.files);}}
+          style={{border:`2px dashed ${C.border}`,borderRadius:10,padding:'20px',textAlign:'center',background:C.surface2,cursor:'pointer',transition:'border-color 0.15s'}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+          <div style={{marginBottom:6}}><IconUpload size={20} color={C.text3}/></div>
+          <div style={{fontFamily:F.sans,fontSize:13,color:C.text2,marginBottom:2}}>Arraste ou <span style={{color:C.accent}}>selecione fotos</span></div>
+          <div style={{fontFamily:F.sans,fontSize:11,color:C.text3}}>JPEG · PNG · até 5 MB cada</div>
+        </div>}
+        {fotos.length>0&&<div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3}}>Clique numa foto para definir como destaque</div>}
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={e=>handleFotos(e.target.files)}/>
+      </div>
+
+      <div style={{display:'flex',alignItems:'center',gap:7,padding:'9px 12px',background:C.accentLight,borderRadius:8}}>
+        <span style={{color:C.accent,fontSize:13}}>◈</span>
+        <span style={{fontFamily:F.sans,fontSize:11.5,color:C.accentDark}}>Publicada automaticamente como <strong>disponível</strong>.</span>
+      </div>
+    </div>
+  </VVModal>;
+}
+
+function PecaDetalhe({open,onClose,peca,onEdit,onDelete}){
+  const[tab,setTab]=React.useState('info');
+  const[copyMsg,setCopyMsg]=React.useState('');
+  if(!open||!peca)return null;
+  const infoRows=[
+    {label:'Categoria',value:getCatLabel(peca.cat||'blusas')},
+    {label:'Tamanho',value:peca.tamanho},{label:'Cor',value:peca.cor||'Não informada'},
+    {label:'Estado',value:peca.estado||'Excelente'},{label:'Fotos',value:`${peca.fotos||1} foto${(peca.fotos||1)!==1?'s':''}`},
+    {label:'Cadastrada em',value:'12/04/2026'},
+  ];
+  return<div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(30,26,23,0.52)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:20,backdropFilter:'blur(4px)'}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:'100%',maxWidth:800,maxHeight:'90vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 80px rgba(0,0,0,0.18)',overflow:'hidden',animation:'vv-pop 0.2s ease-out'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'17px 24px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+          <span style={{fontFamily:F.serif,fontSize:20,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{peca.nome}</span>
+          <Badge label={peca.status==='disponivel'?'disponível':'vendida'} variant={peca.status==='disponivel'?'disponivel':'vendida'}/>
+        </div>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:C.text3,display:'flex',padding:4}}><IconX size={17} color={C.text3}/></button>
+      </div>
+      <div style={{display:'flex',flex:1,overflow:'hidden'}}>
+        <div style={{width:300,flexShrink:0,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <ImgPlaceholder height={300} label={`${trunc(peca.nome,20)}\nfoto principal`} style={{borderRadius:0,flexShrink:0}}/>
+          <div style={{display:'flex',gap:7,padding:'10px 14px',overflowX:'auto',flexShrink:0}}>
+            {Array.from({length:peca.fotos||1}).map((_,i)=>(
+              <ImgPlaceholder key={i} width={52} height={52} style={{borderRadius:6,flexShrink:0,border:i===0?`2px solid ${C.accent}`:`1px solid ${C.border}`}}/>
+            ))}
+            <div style={{width:52,height:52,borderRadius:6,border:`2px dashed ${C.border}`,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <span style={{color:C.text3,fontSize:18}}>+</span>
+            </div>
+          </div>
+        </div>
+        <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,padding:'0 22px',flexShrink:0}}>
+            {[{id:'info',label:'Informações'},{id:'desc',label:'Descrição'}].map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'12px 14px',border:'none',background:'transparent',cursor:'pointer',fontFamily:F.sans,fontSize:13.5,fontWeight:tab===t.id?600:400,color:tab===t.id?C.text:C.text3,borderBottom:`2px solid ${tab===t.id?C.accent:'transparent'}`,marginBottom:-1}}>{t.label}</button>
+            ))}
+          </div>
+          <div style={{flex:1,overflowY:'auto',padding:'18px 22px'}}>
+            {tab==='info'&&<>
+              <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:18}}>
+                <span style={{fontFamily:F.serif,fontSize:30,fontWeight:600,color:C.text}}>{formatPrice(peca.preco)}</span>
+                <Badge label="visível na vitrine" variant="neutral"/>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',marginBottom:18}}>
+                {infoRows.map((r,i)=>(
+                  <div key={r.label} style={{padding:'9px 0',borderBottom:`1px solid ${C.border}`,borderRight:i%2===0?`1px solid ${C.border}`:'none',paddingRight:i%2===0?14:0,paddingLeft:i%2!==0?14:0}}>
+                    <div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3,fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:2}}>{r.label}</div>
+                    <div style={{fontFamily:F.sans,fontSize:13.5,fontWeight:500,color:C.text}}>{r.value}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{background:C.surface2,borderRadius:9,padding:'11px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3,marginBottom:2}}>Link público</div>
+                  <div style={{fontFamily:'monospace',fontSize:11.5,color:C.text2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>vitrine.app/v/atelier-laila/p/{peca.id}</div>
+                </div>
+                <div style={{display:'flex',gap:7,flexShrink:0}}>
+                  <Btn variant="ghost" size="sm" onClick={()=>{setCopyMsg('Copiado!');setTimeout(()=>setCopyMsg(''),2000);}}>{copyMsg||'Copiar'}</Btn>
+                  <Btn variant="ghost" size="sm">↗</Btn>
+                </div>
+              </div>
+            </>}
+            {tab==='desc'&&<div>
+              <VVInput as="textarea" label="Descrição da peça" rows={6}
+                value={peca.desc||'Blusa de linho branca, leveza e sofisticação para o dia a dia.'}
+                onChange={()=>{}} helper="A descrição aparece na vitrine e auxilia na busca."/>
+              <div style={{marginTop:14}}><Btn variant="dark" size="sm">Salvar descrição</Btn></div>
+            </div>}
+          </div>
+          <div style={{padding:'12px 22px',borderTop:`1px solid ${C.border}`,display:'flex',gap:9,alignItems:'center',flexShrink:0}}>
+            <Btn variant="dark" onClick={onEdit} icon={<span>✎</span>}>Editar</Btn>
+            {peca.status==='disponivel'&&<Btn variant="ghost">Marcar como vendida</Btn>}
+            <div style={{flex:1}}/>
+            <Btn variant="text" size="sm" onClick={onDelete} style={{color:C.danger}}>Excluir peça</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+
+function VendidoModal({open,onClose,peca,onConfirm}){
+  const[sel,setSel]=React.useState([]);
+  const tamanhos=peca?.tamanho?peca.tamanho.split(/[,·\s]+/).map(t=>t.trim()).filter(Boolean):[];
+  const semTamanho=tamanhos.length===0;
+
+  React.useEffect(()=>{if(open)setSel([]);},[open,peca]);
+
+  function confirm(todos=false){
+    onConfirm(todos?'todos':sel);
+    onClose();
+  }
+
+  return<VVModal open={open} onClose={onClose} title="Confirma a venda?" width={380}
+    footer={<>
+      <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+      <Btn variant="dark" disabled={!semTamanho&&sel.length===0} onClick={()=>confirm(false)}>
+        {semTamanho?'Sim, confirmar':sel.length===tamanhos.length?'Marcar todos':'Confirmar venda'}
+      </Btn>
+    </>}>
+    {semTamanho
+      ?<p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,margin:0,lineHeight:1.65}}>
+          A peça <strong>{peca?.nome}</strong> será marcada como vendida e sairá da vitrine. Você poderá reverter depois.
+        </p>
+      :<div>
+        <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,margin:'0 0 16px',lineHeight:1.6}}>Qual tamanho foi vendido?</p>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
+          {tamanhos.map(t=>{const on=sel.includes(t);return<button key={t} onClick={()=>setSel(prev=>on?prev.filter(x=>x!==t):[...prev,t])}
+            style={{padding:'8px 16px',borderRadius:20,border:`1.5px solid ${on?C.accent:C.border}`,
+              background:on?C.accentLight:'transparent',color:on?C.accentDark:C.text2,
+              fontFamily:F.sans,fontSize:13,fontWeight:on?600:400,cursor:'pointer',transition:'all 0.12s'}}>
+            {t}
+          </button>;})}
+        </div>
+        <button onClick={()=>confirm(true)} style={{width:'100%',padding:'9px',border:`1px dashed ${C.border}`,borderRadius:8,background:'transparent',color:C.text2,fontFamily:F.sans,fontSize:13,cursor:'pointer',transition:'all 0.15s'}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=C.danger}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+          Marcar todos os tamanhos como vendido
+        </button>
+      </div>}
+  </VVModal>;
+}
+
+function PecasList({pecas,setPecas,showAll}){
+  const[modalOpen,setModalOpen]=React.useState(false);
+  const[editPeca,setEditPeca]=React.useState(null);
+  const[deleteId,setDeleteId]=React.useState(null);
+  const[detalhePeca,setDetalhePeca]=React.useState(null);
+  const[vendidoPeca,setVendidoPeca]=React.useState(null);
+  const[search,setSearch]=React.useState('');
+  const[catF,setCatF]=React.useState('todas');
+  const[view,setView]=React.useState('grid');
+
+  const filtered=pecas.filter(p=>{
+    const q=search.toLowerCase();
+    const matchS=p.nome.toLowerCase().includes(q)||getCatLabel(p.cat).toLowerCase().includes(q);
+    const matchSt=showAll||p.status==='disponivel';
+    const matchC=catF==='todas'||p.cat===catF;
+    return matchS&&matchSt&&matchC;
+  }).sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
+
+  function handleSave(data){
+    if(editPeca) setPecas(prev=>prev.map(p=>p.id===editPeca.id?{...p,...data}:p));
+    else setPecas(prev=>[...prev,{id:String(Date.now()),...data,fotos:0}]);
+    setModalOpen(false);setEditPeca(null);
+  }
+
+  function handleVendido(peca){
+    // Sempre abre o modal para confirmar a venda
+    setVendidoPeca(peca);
+  }
+
+  function handleRestaurar(peca){
+    setPecas(prev=>prev.map(x=>x.id===peca.id?{...x,status:'disponivel'}:x));
+  }
+
+  function handleVendidoConfirm(tamanhosSel){
+    if(!vendidoPeca)return;
+    if(tamanhosSel==='todos'){
+      setPecas(prev=>prev.map(x=>x.id===vendidoPeca.id?{...x,status:'vendida'}:x));
+    } else {
+      // Remove sold sizes from available
+      const tamanhos=vendidoPeca.tamanho.split(/[,·\s]+/).map(t=>t.trim()).filter(Boolean);
+      const restantes=tamanhos.filter(t=>!tamanhosSel.includes(t));
+      if(restantes.length===0){
+        setPecas(prev=>prev.map(x=>x.id===vendidoPeca.id?{...x,status:'vendida'}:x));
+      } else {
+        setPecas(prev=>prev.map(x=>x.id===vendidoPeca.id?{...x,tamanho:restantes.join(' · ')}:x));
+      }
+    }
+    setVendidoPeca(null);
+  }
+
+  return<div style={{padding:'26px 32px',overflowY:'auto',height:'100%',boxSizing:'border-box'}}>
+    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20,gap:12,flexWrap:'wrap'}}>
+      <div>
+        <h1 style={{fontFamily:F.serif,fontSize:24,fontWeight:600,color:C.text,margin:0,letterSpacing:'0.01em'}}>{showAll?'Todas as peças':'Peças disponíveis'}</h1>
+        <p style={{fontFamily:F.sans,fontSize:13,color:C.text3,margin:'3px 0 0'}}>{filtered.length} peças</p>
+      </div>
+      <Btn variant="dark" icon={<span style={{fontSize:15}}>+</span>} onClick={()=>{setEditPeca(null);setModalOpen(true);}}>Nova peça</Btn>
+    </div>
+    <div style={{display:'flex',gap:10,marginBottom:16,alignItems:'center',flexWrap:'wrap'}}>
+      <div style={{position:'relative',flex:1,maxWidth:320}}>
+        <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:C.text3,fontSize:13}}>🔍</span>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nome ou categoria"
+          style={{width:'100%',padding:'8px 12px 8px 32px',border:`1.5px solid ${C.border}`,borderRadius:8,fontFamily:F.sans,fontSize:13.5,color:C.text,background:C.surface,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+      <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+        {[{id:'todas',label:'Todas'},...CATEGORIAS].map(c=>{const on=catF===c.id;return<button key={c.id} onClick={()=>setCatF(c.id)}
+          style={{padding:'6px 12px',borderRadius:16,border:`1px solid ${on?C.text:C.border}`,background:on?C.text:'transparent',color:on?'#fff':C.text2,fontFamily:F.sans,fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap',transition:'all 0.15s'}}>{c.label}</button>;})}
+      </div>
+      <div style={{display:'flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',flexShrink:0}}>
+        {['grid','list'].map(v=><button key={v} onClick={()=>setView(v)} style={{padding:'7px 12px',background:view===v?C.text:C.surface,color:view===v?'#fff':C.text2,border:'none',cursor:'pointer',fontFamily:F.sans,fontSize:13}}>{v==='grid'?'⊞':'≡'}</button>)}
+      </div>
+    </div>
+    {view==='grid'
+      ?<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:14}}>
+        {filtered.map((p,i)=><VVCard key={p.id} hover style={{overflow:'hidden'}}>
+          <div onClick={()=>setDetalhePeca(p)} style={{cursor:'pointer'}}><ImgPlaceholder height={180} label={PHLABELS[i%PHLABELS.length]}/></div>
+          <div style={{padding:'12px 14px'}}>
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:5,marginBottom:3}}>
+              <span style={{fontFamily:F.sans,fontSize:13,fontWeight:500,color:C.text,lineHeight:1.35,overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{p.nome}</span>
+              <Badge label={p.status==='disponivel'?'disponível':'vendida'} variant={p.status==='disponivel'?'disponivel':'vendida'}/>
+            </div>
+            <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,marginBottom:8}}>{p.tamanho||'—'}</div>
+            <div style={{fontFamily:F.serif,fontSize:17,fontWeight:600,color:C.text,marginBottom:10}}>{p.preco?formatPrice(p.preco):'—'}</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              <Btn variant="ghost" size="sm" onClick={()=>{setEditPeca(p);setModalOpen(true);}}>Editar</Btn>
+              {p.status==='disponivel'
+                ?<button onClick={()=>handleVendido(p)} title="Marcar como vendida" style={{width:30,height:30,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:7,border:`1px solid ${C.border}`,background:C.surface,color:C.text2,cursor:'pointer',transition:'all 0.15s'}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.accent;e.currentTarget.style.color=C.accent}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text2}}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                </button>
+                :<Btn variant="text" size="sm" onClick={()=>handleRestaurar(p)} style={{color:C.accent,fontSize:12}}>↩ Restaurar</Btn>}
+            </div>
+          </div>
+        </VVCard>)}
+      </div>
+      :<VVCard>
+        {filtered.map((p,i)=><React.Fragment key={p.id}>
+          <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 18px'}}>
+            <div onClick={()=>setDetalhePeca(p)} style={{cursor:'pointer',flexShrink:0}}><ImgPlaceholder width={48} height={48} style={{borderRadius:7}}/></div>
+            <div style={{flex:1,minWidth:0}}>
+              <div onClick={()=>setDetalhePeca(p)} style={{fontFamily:F.sans,fontSize:13.5,fontWeight:500,color:C.text,cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nome}</div>
+              <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,marginTop:1}}>{getCatLabel(p.cat)}{p.tamanho?` · ${p.tamanho}`:''}</div>
+            </div>
+            <span style={{fontFamily:F.serif,fontSize:16,fontWeight:600,color:C.text,flexShrink:0}}>{p.preco?formatPrice(p.preco):'—'}</span>
+            <Badge label={p.status==='disponivel'?'disponível':'vendida'} variant={p.status==='disponivel'?'disponivel':'vendida'}/>
+            <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+              <Btn variant="ghost" size="sm" onClick={()=>{setEditPeca(p);setModalOpen(true);}}>Editar</Btn>
+              {p.status==='disponivel'
+                ?<button onClick={()=>handleVendido(p)} title="Marcar como vendida" style={{width:30,height:30,padding:0,display:'inline-flex',alignItems:'center',justifyContent:'center',borderRadius:7,border:`1px solid ${C.border}`,background:C.surface,color:C.text2,cursor:'pointer',transition:'all 0.15s'}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.accent;e.currentTarget.style.color=C.accent}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.text2}}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                </button>
+                :<Btn variant="text" size="sm" onClick={()=>handleRestaurar(p)} style={{color:C.accent,fontSize:12}}>↩ Restaurar</Btn>}
+            </div>
+          </div>
+          {i<filtered.length-1&&<Divider/>}
+        </React.Fragment>)}
+      </VVCard>}
+    <PecaFormModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditPeca(null);}} peca={editPeca} onSave={handleSave}/>
+    <VVModal open={!!deleteId} onClose={()=>setDeleteId(null)} title="Excluir peça" width={400}
+      footer={<><Btn variant="ghost" onClick={()=>setDeleteId(null)}>Cancelar</Btn><Btn variant="danger" onClick={()=>{setPecas(prev=>prev.filter(p=>p.id!==deleteId));setDeleteId(null);}}>Excluir</Btn></>}>
+      <p style={{fontFamily:F.sans,fontSize:14,color:C.text2,margin:0,lineHeight:1.6}}>Esta ação é irreversível. A peça será removida da vitrine.</p>
+    </VVModal>
+    <VendidoModal open={!!vendidoPeca} onClose={()=>setVendidoPeca(null)} peca={vendidoPeca} onConfirm={handleVendidoConfirm}/>
+    <PecaDetalhe open={!!detalhePeca} onClose={()=>setDetalhePeca(null)} peca={detalhePeca}
+      onEdit={()=>{setEditPeca(detalhePeca);setDetalhePeca(null);setModalOpen(true);}}
+      onDelete={()=>{setDeleteId(detalhePeca?.id);setDetalhePeca(null);}}/>
+  </div>;
+}
+
+// Feature 1 — Provador: compact visual picker (minimalista)
+function ProvadorConfigCompact({config,onChange}){
+  const[uploading,setUploading]=React.useState(false);
+  const fileRef=React.useRef(null);
+
+  function handleFile(file){
+    if(!file||!file.type.startsWith('image/'))return;
+    setUploading(true);
+    setTimeout(()=>{
+      const url=URL.createObjectURL(file);
+      setUploading(false);
+      onChange({...config,fundoTipo:'personalizado',fundoImg:{name:file.name,url}});
+    },900);
+  }
+
+  function handleRemove(e){
+    e.stopPropagation();
+    onChange({...config,fundoTipo:'branco',fundoImg:null});
+  }
+
+  const isBranco=config.fundoTipo==='branco';
+  const hasImg=config.fundoImg?.url;
+
+  // Tile dimensions
+  const tw=112,th=88;
+
+  return<div>
+    <div style={{fontFamily:F.sans,fontSize:11,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:12}}>Fundo do provador</div>
+    <div style={{display:'flex',gap:10}}>
+
+      {/* Tile 1 — Fundo branco */}
+      <div onClick={()=>onChange({...config,fundoTipo:'branco'})}
+        style={{width:tw,cursor:'pointer',flexShrink:0,transition:'all 0.15s'}}>
+        <div style={{width:tw,height:th,borderRadius:10,border:`2px solid ${isBranco?C.accent:C.border}`,overflow:'hidden',
+          background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',transition:'border-color 0.15s',position:'relative'}}>
+          {/* Minimal provador illustration */}
+          <svg width="52" height="64" viewBox="0 0 52 64" fill="none">
+            {/* Body silhouette — clean and abstract */}
+            <ellipse cx="26" cy="14" rx="9" ry="9" fill="#e8e2db"/>
+            <path d="M10 64 C10 44 16 36 26 34 C36 36 42 44 42 64Z" fill="#ede8e0"/>
+          </svg>
+          {isBranco&&<div style={{position:'absolute',top:6,right:6,width:16,height:16,borderRadius:'50%',background:C.accent,display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <IconCheck size={9} color="#fff"/>
+          </div>}
+        </div>
+        <div style={{marginTop:8,textAlign:'center'}}>
+          <div style={{fontFamily:F.sans,fontSize:12,fontWeight:isBranco?600:400,color:isBranco?C.text:C.text2}}>Padrão branco</div>
+        </div>
+      </div>
+
+      {/* Tile 2 — Experiência da loja */}
+      <div onClick={()=>{if(!hasImg)fileRef.current?.click();else onChange({...config,fundoTipo:'personalizado'});}}
+        style={{width:tw,cursor:'pointer',flexShrink:0,transition:'all 0.15s'}}>
+        <div style={{width:tw,height:th,borderRadius:10,border:`2px solid ${!isBranco?C.accent:C.border}`,overflow:'hidden',
+          background:C.surface2,display:'flex',alignItems:'center',justifyContent:'center',transition:'border-color 0.15s',position:'relative'}}>
+          {uploading&&<Spinner size={20} color={C.accent}/>}
+          {!uploading&&hasImg&&<>
+            <img src={config.fundoImg.url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+            {!isBranco&&<div style={{position:'absolute',top:6,right:6,width:16,height:16,borderRadius:'50%',background:C.accent,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <IconCheck size={9} color="#fff"/>
+            </div>}
+          </>}
+          {!uploading&&!hasImg&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+            <IconUpload size={18} color={C.text3}/>
+            <span style={{fontFamily:F.sans,fontSize:10,color:C.text3}}>Enviar foto</span>
+          </div>}
+        </div>
+        <div style={{marginTop:8,textAlign:'center'}}>
+          <div style={{fontFamily:F.sans,fontSize:12,fontWeight:!isBranco?600:400,color:!isBranco?C.text:C.text2}}>Experiência da loja</div>
+        </div>
+      </div>
+
+      {/* Actions when image is uploaded */}
+      {hasImg&&!uploading&&<div style={{display:'flex',flexDirection:'column',justifyContent:'center',gap:6,paddingTop:4}}>
+        <button onClick={()=>fileRef.current?.click()} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:7,padding:'5px 11px',fontFamily:F.sans,fontSize:11.5,color:C.text2,cursor:'pointer',display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap'}}>
+          <IconRefresh size={11} color={C.text2}/>Trocar
+        </button>
+        <button onClick={handleRemove} style={{background:'none',border:'none',borderRadius:7,padding:'5px 11px',fontFamily:F.sans,fontSize:11.5,color:C.text3,cursor:'pointer',display:'flex',alignItems:'center',gap:4,whiteSpace:'nowrap'}}>
+          <IconTrash size={11} color={C.text3}/>Remover
+        </button>
+      </div>}
+    </div>
+
+    <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>handleFile(e.target.files[0])}/>
+  </div>;
+}
+
+function SectionLabel({children}){
+  return<div style={{fontFamily:F.sans,fontSize:11,fontWeight:600,color:C.text3,textTransform:'uppercase',
+    letterSpacing:'0.07em',marginBottom:14}}>{children}</div>;
+}
+
+function ConfigSection({loja,setLoja,lojaConfig,setLojaConfig}){
+  const[saved,setSaved]=React.useState(false);
+  const[logoImg,setLogoImg]=React.useState(null);
+  const logoRef=React.useRef(null);
+
+  function handleLogoFile(file){
+    if(!file||!file.type.startsWith('image/'))return;
+    setLogoImg(URL.createObjectURL(file));
+  }
+
+  return<div style={{overflowY:'auto',height:'100%',padding:'32px 36px',boxSizing:'border-box'}}>
+    <div style={{maxWidth:480}}>
+
+      {/* Page title */}
+      <h1 style={{fontFamily:F.serif,fontSize:24,fontWeight:600,color:C.text,margin:'0 0 28px',letterSpacing:'0.01em'}}>Configurações</h1>
+
+      {/* ── Identidade ── */}
+      <div style={{marginBottom:32}}>
+        <SectionLabel>Identidade</SectionLabel>
+        {/* Logo + name row */}
+        <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:20}}>
+          {/* Logo tile */}
+          <div onClick={()=>logoRef.current?.click()} style={{width:64,height:64,borderRadius:12,overflow:'hidden',cursor:'pointer',
+            border:`1.5px solid ${C.border}`,flexShrink:0,position:'relative',background:C.surface2,transition:'border-color 0.15s'}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+            {logoImg
+              ?<img src={logoImg} alt="Logo" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+              :<div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3}}>
+                <IconImage size={18} color={C.text3}/>
+                <span style={{fontFamily:F.sans,fontSize:9,color:C.text3}}>Logo</span>
+              </div>}
+            {/* Hover overlay */}
+            <div style={{position:'absolute',inset:0,background:'rgba(30,26,23,0)',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.15s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(30,26,23,0.35)';e.currentTarget.querySelector('span')&&(e.currentTarget.querySelector('span').style.opacity='1');}}
+              onMouseLeave={e=>{e.currentTarget.style.background='rgba(30,26,23,0)';e.currentTarget.querySelector('span')&&(e.currentTarget.querySelector('span').style.opacity='0');}}>
+            </div>
+          </div>
+          <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:8}}>
+            <VVInput label="Nome da loja" value={loja.nome} onChange={e=>setLoja(p=>({...p,nome:e.target.value}))}/>
+          </div>
+          <input ref={logoRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>handleLogoFile(e.target.files[0])}/>
+        </div>
+        <VVInput label="Tagline" value={loja.tagline||''} onChange={e=>setLoja(p=>({...p,tagline:e.target.value}))} placeholder="Uma frase curta que representa sua loja"/>
+      </div>
+
+      <Divider style={{marginBottom:28}}/>
+
+      {/* ── Contato & redes ── */}
+      <div style={{marginBottom:32}}>
+        <SectionLabel>Contato & redes</SectionLabel>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <VVInput label="WhatsApp" value={loja.whatsapp} onChange={e=>setLoja(p=>({...p,whatsapp:e.target.value}))} prefix="+55" placeholder="11 99999-9999"/>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <VVInput label="Instagram" value={loja.instagram} onChange={e=>setLoja(p=>({...p,instagram:e.target.value}))} prefix="@" placeholder="atelierlaila"/>
+            <VVInput label="TikTok" value={loja.tiktok||''} onChange={e=>setLoja(p=>({...p,tiktok:e.target.value}))} prefix="@" placeholder="atelierlaila"/>
+          </div>
+        </div>
+      </div>
+
+      <Divider style={{marginBottom:28}}/>
+
+      {/* ── Vitrine ── */}
+      <div style={{marginBottom:32}}>
+        <SectionLabel>Vitrine</SectionLabel>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}}>
+          <span style={{fontFamily:F.sans,fontSize:13.5,color:C.text}}>Vitrine visível para clientes</span>
+          <Toggle checked={lojaConfig.exibirPreco!==undefined?true:true} onChange={()=>{}}/>
+        </div>
+        <div style={{marginTop:14,display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}}>
+          <span style={{fontFamily:F.sans,fontSize:13.5,color:C.text}}>Mostrar preços</span>
+          <Toggle checked={lojaConfig.exibirPreco} onChange={v=>setLojaConfig(p=>({...p,exibirPreco:v}))}/>
+        </div>
+      </div>
+
+      <Divider style={{marginBottom:28}}/>
+
+      {/* ── Provador virtual ── */}
+      <div style={{marginBottom:36}}>
+        <SectionLabel>Provador virtual</SectionLabel>
+        <ProvadorConfigCompact config={lojaConfig} onChange={setLojaConfig}/>
+      </div>
+
+      {/* ── Save ── */}
+      <div style={{display:'flex',alignItems:'center',gap:12,paddingTop:4}}>
+        <Btn variant="dark" onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),2400);}}>Salvar</Btn>
+        {saved&&<span style={{fontFamily:F.sans,fontSize:13,color:C.success,display:'flex',alignItems:'center',gap:5,animation:'vv-fade 0.2s ease-out'}}>
+          <IconCheck size={13} color={C.success}/>Salvo
+        </span>}
+      </div>
+
+    </div>
+  </div>;
+}
+
+function AdminPanel(){
+  const[section,setSection]=React.useState('dashboard');
+  const[pecas,setPecas]=React.useState(MOCK_PECAS);
+  const[loja,setLoja]=React.useState({nome:'Atelier Laila',slug:'atelier-laila',whatsapp:'11 99876-5432',instagram:'atelierlaila',tiktok:'atelierlaila',tagline:'Moda feminina com alma'});
+  const[lojaConfig,setLojaConfig]=React.useState({exibirPreco:false,fundoTipo:'branco',fundoImg:null});
+  return<div style={{display:'flex',height:'100%',background:C.bg,overflow:'hidden'}}>
+    <AdminSidebar section={section} setSection={setSection} loja={loja}/>
+    <main style={{flex:1,overflowY:'auto'}}>
+      {section==='dashboard'&&<Dashboard pecas={pecas} setSection={setSection}/>}
+      {section==='pecas'&&<PecasList pecas={pecas} setPecas={setPecas} showAll={false}/>}
+      {section==='todas'&&<PecasList pecas={pecas} setPecas={setPecas} showAll={true}/>}
+      {section==='config'&&<ConfigSection loja={loja} setLoja={setLoja} lojaConfig={lojaConfig} setLojaConfig={setLojaConfig}/>}
+    </main>
+  </div>;
+}
+</script>
+
+<!-- ⑦ Super-admin -->
+<script type="text/babel">
+const MOCK_LOJAS=[
+  {id:'1',nome:'Atelier Laila',slug:'atelier-laila',email:'laila@atelierlaila.com',pecas:8,vendidas:2,ativa:true,criada:'10/03/2026',logoUrl:null},
+  {id:'2',nome:'Closet da Bê',slug:'closet-da-be',email:'beatriz@closetdabe.com.br',pecas:14,vendidas:5,ativa:true,criada:'18/03/2026',logoUrl:null},
+  {id:'3',nome:'Studio Manu',slug:'studio-manu',email:'manu@studiomanu.com',pecas:22,vendidas:11,ativa:true,criada:'01/04/2026',logoUrl:null},
+  {id:'4',nome:'Arara da Carol',slug:'arara-da-carol',email:'carol@araradacarol.com',pecas:6,vendidas:0,ativa:false,criada:'20/04/2026',logoUrl:null},
+  {id:'5',nome:'Armário da Lu',slug:'armario-da-lu',email:'lu@armariodalú.com.br',pecas:18,vendidas:7,ativa:true,criada:'22/04/2026',logoUrl:null},
+];
+const COTA_DATA={'1':{used:147,limit:200},'2':{used:88,limit:200},'3':{used:193,limit:200},'4':{used:12,limit:100},'5':{used:41,limit:200}};
+
+function CreateLojaModal({open,onClose,onCreate}){
+  const[nome,setNome]=React.useState('');
+  const[email,setEmail]=React.useState('');
+  const[slug,setSlug]=React.useState('');
+  const[cota,setCota]=React.useState('200');
+  const[saving,setSaving]=React.useState(false);
+  const[doneState,setDoneState]=React.useState(false);
+  React.useEffect(()=>{if(open){setNome('');setEmail('');setSlug('');setCota('200');setDoneState(false);}},[open]);
+  React.useEffect(()=>{setSlug(nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''));},[nome]);
+  function handleCreate(){setSaving(true);setTimeout(()=>{setSaving(false);setDoneState(true);onCreate({id:String(Date.now()),nome,slug,email,pecas:0,vendidas:0,ativa:true,criada:new Date().toLocaleDateString('pt-BR')});setTimeout(onClose,1500);},800);}
+  return<VVModal open={open} onClose={onClose} title="Nova loja" width={500}
+    footer={!doneState&&<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn><Btn variant="dark" onClick={handleCreate} disabled={!nome||!email} loading={saving}>{saving?'Criando…':'Criar + enviar convite'}</Btn></>}>
+    {doneState?<div style={{textAlign:'center',padding:'16px 0'}}>
+      <div style={{fontSize:38,marginBottom:14}}>✉️</div>
+      <div style={{fontFamily:F.serif,fontSize:22,fontWeight:600,color:C.text,marginBottom:8}}>Loja criada!</div>
+      <div style={{fontFamily:F.sans,fontSize:13.5,color:C.text2}}>Convite enviado para <strong>{email}</strong></div>
+    </div>:<div style={{display:'flex',flexDirection:'column',gap:16}}>
+      <VVInput label="Nome da loja" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Ex: Studio Manu" required/>
+      <VVInput label="E-mail da lojista" value={email} onChange={e=>setEmail(e.target.value)} placeholder="lojista@email.com" type="email" required helper="Magic link de acesso será enviado automaticamente"/>
+      <VVInput label="Slug da vitrine" value={slug} onChange={e=>setSlug(e.target.value)} prefix="vitrine.app/v/"/>
+      <VVInput label="Cota mensal" value={cota} onChange={e=>setCota(e.target.value)} type="number" suffix="simulações/mês"/>
+    </div>}
+  </VVModal>;
+}
+
+function LojaRow({loja,onToggle}){
+  const cota=COTA_DATA[loja.id]||{used:0,limit:200};
+  const pct=Math.round((cota.used/cota.limit)*100);
+  return<div style={{display:'flex',alignItems:'center',gap:14,padding:'14px 22px'}}>
+    <Avatar name={loja.nome} size={38}/>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+        <span style={{fontFamily:F.sans,fontSize:13.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:160}}>{loja.nome}</span>
+        <Badge label={loja.ativa?'ativa':'inativa'} variant={loja.ativa?'success':'neutral'}/>
+      </div>
+      <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{loja.email}</div>
+    </div>
+    <div style={{textAlign:'center',minWidth:52}}><div style={{fontFamily:F.serif,fontSize:19,fontWeight:600,color:C.text}}>{loja.pecas}</div><div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3}}>peças</div></div>
+    <div style={{textAlign:'center',minWidth:52}}><div style={{fontFamily:F.serif,fontSize:19,fontWeight:600,color:C.accent}}>{loja.vendidas}</div><div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3}}>vendidas</div></div>
+    <div style={{minWidth:110}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+        <span style={{fontFamily:F.sans,fontSize:10.5,color:C.text3}}>Cabine</span>
+        <span style={{fontFamily:F.sans,fontSize:10.5,color:pct>85?C.danger:C.text3}}>{cota.used}/{cota.limit}</span>
+      </div>
+      <div style={{height:4,background:C.border,borderRadius:2,overflow:'hidden'}}>
+        <div style={{height:'100%',width:`${Math.min(pct,100)}%`,background:pct>85?C.danger:C.accent,borderRadius:2}}/>
+      </div>
+    </div>
+    <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
+      <Btn variant="ghost" size="sm">Editar</Btn>
+      <Toggle checked={loja.ativa} onChange={v=>onToggle(loja.id,v)}/>
+    </div>
+  </div>;
+}
+
+function SuperAdmin(){
+  const[lojas,setLojas]=React.useState(MOCK_LOJAS);
+  const[createOpen,setCreateOpen]=React.useState(false);
+  const[cabineOn,setCabineOn]=React.useState(true);
+  const[budget,setBudget]=React.useState('120');
+  const[savedSys,setSavedSys]=React.useState(false);
+  const total={pecas:lojas.reduce((a,l)=>a+l.pecas,0),vendidas:lojas.reduce((a,l)=>a+l.vendidas,0)};
+  const totalTryOns=Object.values(COTA_DATA).reduce((a,c)=>a+c.used,0);
+  return<div style={{display:'flex',flexDirection:'column',height:'100%',background:C.bg,overflow:'hidden'}}>
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'0 28px',display:'flex',alignItems:'center',justifyContent:'space-between',height:56,flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:14}}>
+        <VVLogo size={20}/>
+        <div style={{width:1,height:18,background:C.border}}/>
+        <span style={{fontFamily:F.sans,fontSize:13,fontWeight:600,color:C.text}}>Super-Admin</span>
+        <Badge label="Francisco" variant="admin"/>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <Avatar name="Francisco" size={30}/>
+        <span style={{fontFamily:F.sans,fontSize:13,color:C.text2}}>francisco@vitrine.app</span>
+      </div>
+    </div>
+    <div style={{flex:1,overflowY:'auto',padding:'28px 32px'}}>
+      <h1 style={{fontFamily:F.serif,fontSize:24,fontWeight:600,color:C.text,margin:'0 0 18px',letterSpacing:'0.01em'}}>Visão geral da plataforma</h1>
+      <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:26}}>
+        <KpiCard label="Lojas ativas" value={lojas.filter(l=>l.ativa).length} sub={`de ${lojas.length} total`} icon="🏪"/>
+        <KpiCard label="Peças" value={total.pecas} sub="em todas as vitrines" icon="◈"/>
+        <KpiCard label="Vendidas" value={total.vendidas} sub="este mês" icon="✓"/>
+        <KpiCard label="Simulações (Cabine)" value={totalTryOns} sub={`≈ US$ ${(totalTryOns*0.06).toFixed(2)} estimado`} icon="✦"/>
+      </div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+        <div style={{fontFamily:F.sans,fontSize:11,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em'}}>Lojas</div>
+        <Btn variant="dark" icon={<span>+</span>} onClick={()=>setCreateOpen(true)}>Nova loja + convite</Btn>
+      </div>
+      <VVCard style={{marginBottom:22}}>
+        {lojas.map((l,i)=><React.Fragment key={l.id}>
+          <LojaRow loja={l} onToggle={(id,v)=>setLojas(prev=>prev.map(x=>x.id===id?{...x,ativa:v}:x))}/>
+          {i<lojas.length-1&&<Divider/>}
+        </React.Fragment>)}
+      </VVCard>
+      <VVCard style={{padding:'22px'}}>
+        <div style={{fontFamily:F.sans,fontSize:11,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:18}}>Controles do sistema</div>
+        <div style={{display:'flex',flexDirection:'column',gap:18}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px',background:cabineOn?C.accentLight:'#f7ebeb',borderRadius:10}}>
+            <div>
+              <div style={{fontFamily:F.sans,fontSize:14,fontWeight:600,color:C.text}}>Kill switch — Cabine</div>
+              <div style={{fontFamily:F.sans,fontSize:12,color:C.text2,marginTop:3}}>Desligar suspende as simulações em <strong>todas</strong> as vitrines</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <Badge label={cabineOn?'ON':'OFF'} variant={cabineOn?'success':'neutral'}/>
+              <Toggle checked={cabineOn} onChange={setCabineOn}/>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:12,alignItems:'flex-end'}}>
+            <VVInput label="Orçamento mensal de API (US$)" value={budget} onChange={e=>setBudget(e.target.value)} type="number" prefix="US$" helper="Kill switch ativa automaticamente ao atingir o limite" style={{flex:1}}/>
+            <Btn variant="dark" onClick={()=>{setSavedSys(true);setTimeout(()=>setSavedSys(false),2000);}} style={{marginBottom:2}}>{savedSys?'✓ Salvo':'Salvar'}</Btn>
+          </div>
+        </div>
+      </VVCard>
+    </div>
+    <CreateLojaModal open={createOpen} onClose={()=>setCreateOpen(false)} onCreate={l=>setLojas(prev=>[...prev,l])}/>
+  </div>;
+}
+</script>
+
+<!-- ⑧ Auth screens -->
+<script type="text/babel">
+function AuthShell({children,width=400}){
+  return<div style={{minHeight:'100%',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+    <div style={{width:'100%',maxWidth:width}}>
+      <div style={{textAlign:'center',marginBottom:32}}><VVLogo size={30}/></div>
+      <VVCard style={{padding:'34px 38px'}}>{children}</VVCard>
+      <div style={{textAlign:'center',marginTop:18,fontFamily:F.sans,fontSize:11,color:C.text3,letterSpacing:'0.03em'}}>vitrine.app</div>
+    </div>
+  </div>;
+}
+
+function RecuperarSenha({onBack}){
+  const[email,setEmail]=React.useState('');
+  const[sent,setSent]=React.useState(false);
+  const[loading,setLoading]=React.useState(false);
+  function handleSubmit(){if(!email)return;setLoading(true);setTimeout(()=>{setLoading(false);setSent(true);},900);}
+  return<AuthShell>
+    {!sent?<>
+      <h1 style={{fontFamily:F.serif,fontSize:26,fontWeight:600,color:C.text,margin:'0 0 8px',textAlign:'center',letterSpacing:'0.01em'}}>Recuperar senha</h1>
+      <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,margin:'0 0 26px',textAlign:'center',lineHeight:1.65}}>Informe o e-mail da sua conta e enviaremos um link para redefinição.</p>
+      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <VVInput label="E-mail" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seunome@email.com" type="email" required/>
+        <Btn variant="dark" size="lg" onClick={handleSubmit} disabled={!email} loading={loading} style={{width:'100%',justifyContent:'center'}}>
+          {!loading&&'Enviar link de recuperação'}
+        </Btn>
+      </div>
+      <div style={{marginTop:20,textAlign:'center'}}>
+        <span onClick={onBack} style={{fontFamily:F.sans,fontSize:13,color:C.text3,cursor:'pointer',textDecoration:'underline'}}>← Voltar ao login</span>
+      </div>
+    </>:<div style={{textAlign:'center',padding:'6px 0'}}>
+      <div style={{width:52,height:52,borderRadius:'50%',background:C.accentLight,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 18px',fontSize:22}}>✉️</div>
+      <h2 style={{fontFamily:F.serif,fontSize:23,fontWeight:600,color:C.text,margin:'0 0 10px'}}>Verifique seu e-mail</h2>
+      <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,lineHeight:1.7,margin:'0 0 22px'}}>Se existe uma conta com <strong>{email}</strong>, você receberá o link em breve.</p>
+      <Btn variant="ghost" onClick={()=>{setSent(false);setEmail('');}} style={{width:'100%',justifyContent:'center'}}>Usar outro e-mail</Btn>
+      <div style={{marginTop:14}}><span onClick={onBack} style={{fontFamily:F.sans,fontSize:13,color:C.text3,cursor:'pointer',textDecoration:'underline'}}>← Voltar ao login</span></div>
+    </div>}
+  </AuthShell>;
+}
+
+function DefinirSenha({mode='invite'}){
+  const[senha,setSenha]=React.useState('');
+  const[confirmar,setConfirmar]=React.useState('');
+  const[loading,setLoading]=React.useState(false);
+  const[doneState,setDoneState]=React.useState(false);
+  const isInvite=mode==='invite';
+  const minLen=8,hasMin=senha.length>=minLen,hasUpper=/[A-Z]/.test(senha),hasNum=/[0-9]/.test(senha);
+  const matches=senha===confirmar&&confirmar.length>0;
+  const valid=hasMin&&matches;
+  const checks=[{ok:hasMin,label:`${minLen}+ caracteres`},{ok:hasUpper,label:'Maiúscula'},{ok:hasNum,label:'Número'},{ok:matches,label:'Senhas iguais'}];
+  if(doneState)return<AuthShell>
+    <div style={{textAlign:'center',padding:'6px 0'}}>
+      <div style={{width:52,height:52,borderRadius:'50%',background:C.accentLight,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 18px',color:C.accentDark}}><IconCheck size={22} color={C.accentDark}/></div>
+      <h2 style={{fontFamily:F.serif,fontSize:23,fontWeight:600,color:C.text,margin:'0 0 10px'}}>{isInvite?'Tudo pronto!':'Senha redefinida!'}</h2>
+      <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,lineHeight:1.7,margin:'0 0 22px'}}>{isInvite?'Sua conta foi criada.':'Senha atualizada com sucesso.'}</p>
+      <Btn variant="dark" size="lg" style={{width:'100%',justifyContent:'center'}}>{isInvite?'Acessar minha vitrine →':'Ir para o login →'}</Btn>
+    </div>
+  </AuthShell>;
+  return<AuthShell>
+    {isInvite&&<div style={{background:C.accentLight,borderRadius:9,padding:'11px 14px',marginBottom:22,display:'flex',alignItems:'flex-start',gap:9}}>
+      <span style={{fontSize:15,flexShrink:0}}>✉️</span>
+      <div><div style={{fontFamily:F.sans,fontSize:12.5,fontWeight:600,color:C.accentDark,marginBottom:1}}>Convite recebido</div>
+        <div style={{fontFamily:F.sans,fontSize:12,color:C.accentDark,lineHeight:1.5}}>Você foi convidada para <strong>Atelier Laila</strong>.</div></div>
+    </div>}
+    <h1 style={{fontFamily:F.serif,fontSize:25,fontWeight:600,color:C.text,margin:'0 0 8px',textAlign:'center'}}>{isInvite?'Defina sua senha':'Nova senha'}</h1>
+    <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,margin:'0 0 22px',textAlign:'center',lineHeight:1.65}}>{isInvite?'Crie uma senha segura para sua conta.':'Escolha uma nova senha.'}</p>
+    <div style={{display:'flex',flexDirection:'column',gap:13}}>
+      <VVInput label="Nova senha" value={senha} onChange={e=>setSenha(e.target.value)} type="password" placeholder="••••••••" required/>
+      <VVInput label="Confirmar senha" value={confirmar} onChange={e=>setConfirmar(e.target.value)} type="password" placeholder="••••••••"
+        error={confirmar.length>2&&!matches?'As senhas não coincidem':undefined}/>
+      {senha.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'5px 10px',padding:'10px 12px',background:C.surface2,borderRadius:8}}>
+        {checks.map(c=><div key={c.label} style={{display:'flex',alignItems:'center',gap:5}}>
+          <span style={{fontSize:11,color:c.ok?C.success:C.text3,fontWeight:700}}>{c.ok?'✓':'·'}</span>
+          <span style={{fontFamily:F.sans,fontSize:11.5,color:c.ok?C.success:C.text3}}>{c.label}</span>
+        </div>)}
+      </div>}
+      <Btn variant="dark" size="lg" onClick={()=>{if(!valid)return;setLoading(true);setTimeout(()=>{setLoading(false);setDoneState(true);},900);}}
+        disabled={!valid} loading={loading} style={{width:'100%',justifyContent:'center',marginTop:2}}>
+        {!loading&&(isInvite?'Salvar senha e acessar':'Redefinir senha')}
+      </Btn>
+    </div>
+  </AuthShell>;
+}
+
+function AuthScreens(){
+  const[view,setView]=React.useState('recuperar');
+  const views=[{id:'recuperar',label:'Recuperar senha'},{id:'convite',label:'Pós-convite'},{id:'redefinir',label:'Redefinir senha'}];
+  return<div style={{display:'flex',flexDirection:'column',height:'100%',background:C.surface3,overflow:'hidden'}}>
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'11px 28px',display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+      <span style={{fontFamily:F.sans,fontSize:12,color:C.text3,marginRight:6}}>Tela:</span>
+      {views.map(v=><button key={v.id} onClick={()=>setView(v.id)} style={{padding:'6px 14px',borderRadius:20,border:`1px solid ${view===v.id?C.text:C.border}`,background:view===v.id?C.text:'transparent',color:view===v.id?'#fff':C.text2,fontFamily:F.sans,fontSize:13,fontWeight:500,cursor:'pointer',transition:'all 0.15s'}}>{v.label}</button>)}
+    </div>
+    <div style={{flex:1,overflowY:'auto'}}>
+      {view==='recuperar'&&<RecuperarSenha onBack={()=>{}}/>}
+      {view==='convite'&&<DefinirSenha mode="invite"/>}
+      {view==='redefinir'&&<DefinirSenha mode="reset"/>}
+    </div>
+  </div>;
+}
+</script>
+
+<!-- ⑨ Tweaks -->
+<script type="text/babel">
+const __TWK_CSS=`.twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:260px;max-height:calc(100vh - 32px);display:flex;flex-direction:column;background:rgba(250,249,247,.9);color:#29261b;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.6);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);font:11.5px/1.4 ui-sans-serif,system-ui,sans-serif;overflow:hidden}.twk-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 8px 10px 14px;cursor:move;user-select:none}.twk-hd b{font-size:12px;font-weight:600}.twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:13px}.twk-x:hover{background:rgba(0,0,0,.06)}.twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:0}.twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:rgba(41,38,27,.45);padding:8px 0 0}.twk-row{display:flex;flex-direction:column;gap:4px}.twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}.twk-lbl{font-weight:500;color:rgba(41,38,27,.72)}.twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;background:rgba(0,0,0,.15);transition:background .15s;cursor:pointer;padding:0}.twk-toggle[data-on="1"]{background:#b8956a}.twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}.twk-toggle[data-on="1"] i{transform:translateX(14px)}.twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;background:rgba(0,0,0,.06);user-select:none}.twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);transition:left .15s,width .15s}.twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;background:transparent;cursor:pointer;padding:4px 6px;font-size:11px;border-radius:6px}`;
+
+function useTweaks(defaults){
+  const[values,setValues]=React.useState(defaults);
+  const setTweak=React.useCallback((k,v)=>{const edits=typeof k==='object'?k:{[k]:v};setValues(p=>({...p,...edits}));window.parent.postMessage({type:'__edit_mode_set_keys',edits},'*');},[]);
+  return[values,setTweak];
+}
+function TweaksPanel({title='Tweaks',children}){
+  const[open,setOpen]=React.useState(false);
+  React.useEffect(()=>{
+    const onMsg=e=>{if(e?.data?.type==='__activate_edit_mode')setOpen(true);if(e?.data?.type==='__deactivate_edit_mode')setOpen(false);};
+    window.addEventListener('message',onMsg);
+    window.parent.postMessage({type:'__edit_mode_available'},'*');
+    return()=>window.removeEventListener('message',onMsg);
+  },[]);
+  const dismiss=()=>{setOpen(false);window.parent.postMessage({type:'__edit_mode_dismissed'},'*');};
+  if(!open)return null;
+  return<><style>{__TWK_CSS}</style>
+    <div className="twk-panel">
+      <div className="twk-hd"><b>{title}</b><button className="twk-x" onClick={dismiss}>✕</button></div>
+      <div className="twk-body">{children}</div>
+    </div></>;
+}
+function TweakSection({title,children}){return<><div className="twk-sect">{title}</div>{children}</>;}
+function TweakToggle({label,value,onChange}){return<div className="twk-row twk-row-h"><span className="twk-lbl">{label}</span><button className="twk-toggle" data-on={value?'1':'0'} onClick={()=>onChange(!value)}><i/></button></div>;}
+function TweakRadio({label,value,options,onChange}){
+  const opts=options.map(o=>typeof o==='object'?o:{value:o,label:o});
+  const idx=Math.max(0,opts.findIndex(o=>o.value===value));
+  const n=opts.length;
+  return<div className="twk-row"><span className="twk-lbl">{label}</span>
+    <div className="twk-seg">
+      <div className="twk-seg-thumb" style={{left:`calc(2px + ${idx}*(100% - 4px)/${n})`,width:`calc((100% - 4px)/${n})`}}/>
+      {opts.map(o=><button key={o.value} onClick={()=>onChange(o.value)}>{o.label}</button>)}
+    </div>
+  </div>;
+}
+</script>
+
+<!-- ⑩ App shell -->
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentColor": "#b8956a",
+  "showWatermark": true,
+  "cabineEntryMode": "drawer",
+  "motionLevel": "default",
+  "motionDemo": false
+}/*EDITMODE-END*/;
+
+const TABS=[
+  {id:'vitrine',label:'Vitrine Pública',icon:'🛍'},
+  {id:'admin',label:'Painel da Loja',icon:'🏪'},
+  {id:'superadmin',label:'Super-Admin',icon:'⚙'},
+  {id:'auth',label:'Auth & Onboarding',icon:'🔑'},
+];
+
+function App(){
+  const[tab,setTab]=React.useState('vitrine');
+  const[tweaks,setTweak]=useTweaks(TWEAK_DEFAULTS);
+  const[lojaConfig,setLojaConfig]=React.useState({exibirPreco:false,fundoTipo:'branco',fundoImg:null});
+
+  // Apply motion intensity to <html> so all CSS vars cascade
+  React.useEffect(()=>{
+    const lvl=tweaks.motionLevel||'default';
+    document.documentElement.setAttribute('data-motion',lvl==='default'?'':lvl);
+  },[tweaks.motionLevel]);
+
+  return<div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
+    <header style={{background:C.surface,borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 20px',height:52,flexShrink:0,zIndex:100}}>
+      <div style={{display:'flex',alignItems:'center',gap:2}}>
+        {TABS.map(t=><button key={t.id} className={`vv-tab${tab===t.id?' on':''}`} onClick={()=>setTab(t.id)}>
+          <span style={{fontSize:14}}>{t.icon}</span>{t.label}
+        </button>)}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:5,padding:'5px 11px',background:'#f0f9f3',borderRadius:16,border:'1px solid #c8e8d4'}}>
+          <div style={{width:6,height:6,borderRadius:'50%',background:'#28c840'}}/>
+          <span style={{fontFamily:F.sans,fontSize:11.5,fontWeight:500,color:'#3a7a4a'}}>v2 · Fluidez</span>
+        </div>
+      </div>
+    </header>
+
+    <div style={{flex:1,overflow:'hidden',position:'relative'}}>
+      <div key={tab} className="vv-tab-pane" style={{height:'100%'}}>
+        {tab==='vitrine'&&<PublicVitrine lojaConfig={lojaConfig}/>}
+        {tab==='admin'&&<AdminPanel/>}
+        {tab==='superadmin'&&<SuperAdmin/>}
+        {tab==='auth'&&<AuthScreens/>}
+      </div>
+    </div>
+
+    <TweaksPanel title="Tweaks">
+      <TweakSection title="Vitrine">
+        <TweakToggle label="Mostrar preços" value={lojaConfig.exibirPreco} onChange={v=>setLojaConfig(p=>({...p,exibirPreco:v}))}/>
+        <TweakRadio label="Fundo do provador" value={lojaConfig.fundoTipo} options={[{value:'branco',label:'Branco'},{value:'personalizado',label:'Loja'}]} onChange={v=>setLojaConfig(p=>({...p,fundoTipo:v}))}/>
+      </TweakSection>
+      <TweakSection title="Motion">
+        <TweakRadio label="Intensidade" value={tweaks.motionLevel||'default'} options={[{value:'calm',label:'Calmo'},{value:'default',label:'Padrão'},{value:'playful',label:'Vivo'}]} onChange={v=>setTweak('motionLevel',v)}/>
+        <TweakToggle label="Reduzir motion" value={tweaks.motionLevel==='off'} onChange={v=>setTweak('motionLevel',v?'off':'default')}/>
+      </TweakSection>
+      <TweakSection title="Protótipo">
+        <TweakToggle label="Watermark" value={tweaks.showWatermark} onChange={v=>setTweak('showWatermark',v)}/>
+      </TweakSection>
+    </TweaksPanel>
+  </div>;
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+</script>
+</body>
+</html>
