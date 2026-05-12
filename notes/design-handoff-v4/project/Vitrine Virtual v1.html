@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Vitrine Virtual — Protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%}
+body{background:#faf7f3;font-family:'DM Sans',system-ui,sans-serif}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#d4cbc0;border-radius:3px}
+@keyframes vv-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes vv-bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+@keyframes vv-fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+input,select,textarea,button{font-family:inherit}
+.vv-tab{display:flex;align-items:center;gap:7px;padding:8px 16px;border:none;background:transparent;cursor:pointer;border-radius:8px;transition:all 0.15s;font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:500;white-space:nowrap}
+.vv-tab:hover{background:#f5f0ea}
+.vv-tab.on{background:#1e1a17;color:#fff}
+.vv-tab:not(.on){color:#6d6460}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ① Tokens + shared primitives -->
+<script type="text/babel">
+const C={
+  bg:'#faf7f3',surface:'#ffffff',surface2:'#f5f0ea',surface3:'#ede6dc',
+  text:'#1e1a17',text2:'#6d6460',text3:'#b0a59d',
+  accent:'#b8956a',accentDark:'#8b6840',accentLight:'#f2e8d8',
+  border:'#e6dfd6',border2:'#d4cbc0',
+  success:'#6b9b78',successLight:'#e8f3eb',
+  danger:'#c47a7a',dangerLight:'#f7ebeb',
+  warning:'#c49a5a',warningLight:'#faf0e0',
+};
+const F={serif:"'Cormorant Garamond',Georgia,serif",sans:"'DM Sans',system-ui,sans-serif"};
+
+// Categories — feminine fashion
+const CATEGORIAS=[
+  {id:'blusas',label:'Blusas & Tops'},
+  {id:'calcas',label:'Calças & Shorts'},
+  {id:'vestidos',label:'Vestidos'},
+  {id:'saias',label:'Saias'},
+  {id:'casacos',label:'Casacos & Jaquetas'},
+  {id:'tricos',label:'Tricôs & Moletons'},
+  {id:'acessorios',label:'Acessórios'},
+  {id:'outros',label:'Outros'},
+];
+function getCatLabel(id){const c=CATEGORIAS.find(x=>x.id===id);return c?c.label:id;}
+
+// Truncate helper
+function trunc(str,max=32){if(!str)return'';return str.length>max?str.slice(0,max-1)+'…':str;}
+function formatPrice(c){return'R$ '+(c/100).toFixed(2).replace('.',',');}
+
+// Logo
+function VVLogo({size=28,dark=true}){
+  const fill=dark?C.text:C.surface,textFill=dark?C.surface:C.text;
+  return <div style={{display:'flex',alignItems:'center',gap:8}}>
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="8" fill={fill}/>
+      <text x="16" y="22" fontFamily="Georgia,serif" fontSize="14" fontWeight="600"
+        fill={textFill} textAnchor="middle" letterSpacing="0.5">vv</text>
+    </svg>
+    <span style={{fontFamily:F.serif,fontSize:size*0.75,fontWeight:600,color:dark?C.text:C.surface,letterSpacing:'0.04em',lineHeight:1}}>vitrine</span>
+  </div>;
+}
+
+// Social icon SVGs
+function IconInstagram({size=18,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill={color} stroke="none"/></svg>;}
+function IconTikTok({size=18,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.27 8.27 0 0 0 4.84 1.55V6.78a4.85 4.85 0 0 1-1.07-.09z"/></svg>;}
+function IconWhatsApp({size=18,color='currentColor'}){return<svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>;}
+function IconEye({size=18,open=true,color='currentColor'}){return open
+  ?<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+  :<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;}
+
+// Button
+function Btn({children,variant='primary',size='md',onClick,disabled,style={},icon}){
+  const[hov,setHov]=React.useState(false);
+  const base={display:'inline-flex',alignItems:'center',gap:6,border:'none',cursor:disabled?'not-allowed':'pointer',
+    fontFamily:F.sans,fontWeight:500,transition:'all 0.18s',borderRadius:8,opacity:disabled?0.5:1,whiteSpace:'nowrap',
+    fontSize:size==='sm'?13:size==='lg'?15:14,padding:size==='sm'?'6px 12px':size==='lg'?'12px 24px':'8px 18px'};
+  const vs={
+    primary:{background:hov?C.accentDark:C.accent,color:'#fff'},
+    dark:{background:hov?'#2d2825':C.text,color:'#fff'},
+    ghost:{background:hov?C.surface2:'transparent',color:C.text,border:`1px solid ${C.border}`},
+    danger:{background:hov?'#b56b6b':C.danger,color:'#fff'},
+    success:{background:hov?'#5a8a67':C.success,color:'#fff'},
+    text:{background:'transparent',color:hov?C.accent:C.text2,padding:size==='sm'?'4px 6px':'6px 8px'},
+  };
+  return<button onClick={disabled?undefined:onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    style={{...base,...vs[variant],...style}}>
+    {icon&&<span style={{display:'flex'}}>{icon}</span>}{children}
+  </button>;
+}
+
+// Badge — boutique style (no aggressive green/red)
+function Badge({label,variant='neutral'}){
+  const vs={
+    disponivel:{bg:C.accentLight,color:C.accentDark,dot:C.accent},
+    vendida:{bg:'#f0edea',color:'#a09890',dot:'#c8c0b8'},
+    admin:{bg:C.accentLight,color:C.accentDark,dot:C.accent},
+    neutral:{bg:C.surface2,color:C.text2,dot:C.text3},
+    warning:{bg:C.warningLight,color:C.warning,dot:C.warning},
+    success:{bg:C.successLight,color:C.success,dot:C.success},
+  };
+  const v=vs[variant]||vs.neutral;
+  return<span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px',borderRadius:20,
+    background:v.bg,color:v.color,fontSize:11.5,fontFamily:F.sans,fontWeight:500,letterSpacing:'0.01em'}}>
+    <span style={{width:5,height:5,borderRadius:'50%',background:v.dot,flexShrink:0}}/>
+    <span style={variant==='vendida'?{textDecoration:'line-through',textDecorationColor:'#c8c0b8'}:{}}>{label}</span>
+  </span>;
+}
+
+// Input with optional password eye icon
+function VVInput({label,value,onChange,placeholder,type='text',prefix,suffix,error,helper,rows=3,as:As='input',style={},required=false}){
+  const[focus,setFocus]=React.useState(false);
+  const[showPw,setShowPw]=React.useState(false);
+  const isPw=type==='password';
+  const actualType=isPw?(showPw?'text':'password'):type;
+  const hasSuffix=suffix||isPw;
+  const paddingR=hasSuffix?'38px':'12px';
+  const ist={width:'100%',padding:prefix?`9px ${paddingR} 9px 38px`:`9px ${paddingR} 9px 12px`,
+    border:`1.5px solid ${error?C.danger:focus?C.accent:C.border}`,
+    borderRadius:8,fontFamily:F.sans,fontSize:14,color:C.text,background:C.surface,outline:'none',
+    boxSizing:'border-box',transition:'border-color 0.15s',resize:As==='textarea'?'vertical':undefined};
+  return<div style={{display:'flex',flexDirection:'column',gap:5,...style}}>
+    {label&&<label style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text2,display:'flex',gap:4}}>
+      {label}{required&&<span style={{color:C.accent}}>*</span>}
+    </label>}
+    <div style={{position:'relative'}}>
+      {prefix&&<span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',color:C.text3,fontSize:14}}>{prefix}</span>}
+      <As value={value} onChange={onChange} placeholder={placeholder} type={actualType} rows={rows}
+        style={ist} onFocus={()=>setFocus(true)} onBlur={()=>setFocus(false)}/>
+      {isPw&&<button type="button" onClick={()=>setShowPw(p=>!p)}
+        style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:C.text3,display:'flex',padding:2}}>
+        <IconEye size={16} open={showPw} color={C.text3}/>
+      </button>}
+      {!isPw&&suffix&&<span style={{position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',color:C.text3,fontSize:12}}>{suffix}</span>}
+    </div>
+    {(error||helper)&&<span style={{fontSize:12,color:error?C.danger:C.text3,fontFamily:F.sans,lineHeight:1.4}}>{error||helper}</span>}
+  </div>;
+}
+
+// Select
+function VVSelect({label,value,onChange,options=[],style={}}){
+  return<div style={{display:'flex',flexDirection:'column',gap:5,...style}}>
+    {label&&<label style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text2}}>{label}</label>}
+    <select value={value} onChange={onChange} style={{padding:'9px 12px',border:`1.5px solid ${C.border}`,borderRadius:8,
+      fontFamily:F.sans,fontSize:14,color:C.text,background:C.surface,outline:'none',cursor:'pointer',appearance:'none',
+      backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23b0a59d' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E")`,
+      backgroundRepeat:'no-repeat',backgroundPosition:'right 12px center'}}>
+      {options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  </div>;
+}
+
+// Modal
+function VVModal({open,onClose,title,children,width=520,footer}){
+  if(!open)return null;
+  return<div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(30,26,23,0.52)',
+    display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:20,backdropFilter:'blur(4px)'}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:'100%',
+      maxWidth:width,maxHeight:'92vh',display:'flex',flexDirection:'column',
+      boxShadow:'0 24px 80px rgba(0,0,0,0.18)'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+        padding:'20px 26px 16px',borderBottom:`1px solid ${C.border}`}}>
+        <span style={{fontFamily:F.serif,fontSize:22,fontWeight:600,color:C.text,letterSpacing:'0.01em'}}>{title}</span>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',
+          color:C.text3,fontSize:18,lineHeight:1,padding:4,borderRadius:6}}>✕</button>
+      </div>
+      <div style={{padding:'24px 26px',overflowY:'auto',flex:1}}>{children}</div>
+      {footer&&<div style={{padding:'16px 26px',borderTop:`1px solid ${C.border}`,
+        display:'flex',justifyContent:'flex-end',gap:10}}>{footer}</div>}
+    </div>
+  </div>;
+}
+
+// Card
+function VVCard({children,style={},onClick,hover=false}){
+  const[hov,setHov]=React.useState(false);
+  return<div onClick={onClick} onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    style={{background:C.surface,borderRadius:12,border:`1px solid ${C.border}`,
+      boxShadow:hov&&hover?'0 6px 24px rgba(0,0,0,0.08)':'0 1px 4px rgba(0,0,0,0.04)',
+      transition:'all 0.2s',cursor:onClick?'pointer':'default',
+      transform:hov&&hover?'translateY(-2px)':'none',...style}}>
+    {children}
+  </div>;
+}
+
+// KPI Card
+function KpiCard({label,value,sub,icon}){
+  return<VVCard style={{padding:'20px 22px',flex:1,minWidth:130}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+      <div>
+        <div style={{fontFamily:F.sans,fontSize:11,color:C.text3,fontWeight:500,
+          textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:8}}>{label}</div>
+        <div style={{fontFamily:F.serif,fontSize:30,fontWeight:600,color:C.text,lineHeight:1}}>{value}</div>
+        {sub&&<div style={{fontFamily:F.sans,fontSize:12,color:C.text3,marginTop:6,lineHeight:1.4}}>{sub}</div>}
+      </div>
+      <div style={{width:38,height:38,borderRadius:10,background:C.accentLight,
+        display:'flex',alignItems:'center',justifyContent:'center',color:C.accent,fontSize:17,flexShrink:0}}>
+        {icon}
+      </div>
+    </div>
+  </VVCard>;
+}
+
+function Divider({style={}}){return<div style={{height:1,background:C.border,...style}}/>;}
+
+function Spinner({size=20,color=C.accent}){
+  return<svg width={size} height={size} viewBox="0 0 24 24" style={{animation:'vv-spin 0.8s linear infinite'}}>
+    <circle cx="12" cy="12" r="10" fill="none" stroke={color} strokeWidth="2.5" strokeDasharray="31 31" strokeLinecap="round"/>
+  </svg>;
+}
+
+function ImgPlaceholder({width='100%',height=200,label='',style={}}){
+  const uid=React.useId();
+  return<div style={{width,height,overflow:'hidden',position:'relative',background:'#ede8e0',
+    display:'flex',alignItems:'center',justifyContent:'center',...style}}>
+    <svg width="100%" height="100%" style={{position:'absolute',inset:0}}>
+      <defs><pattern id={`s${uid}`} width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="14" height="14" fill="#ede8e0"/><rect width="7" height="14" fill="#e4ddd5"/>
+      </pattern></defs>
+      <rect width="100%" height="100%" fill={`url(#s${uid})`}/>
+    </svg>
+    {label&&<span style={{position:'relative',fontFamily:'monospace',fontSize:10,color:'#b8afa5',
+      textAlign:'center',padding:'0 12px',lineHeight:1.6,whiteSpace:'pre-line'}}>{label}</span>}
+  </div>;
+}
+
+function Toggle({checked,onChange}){
+  return<div onClick={()=>onChange(!checked)} style={{width:38,height:21,borderRadius:11,
+    background:checked?C.accent:C.border,cursor:'pointer',position:'relative',transition:'background 0.2s',flexShrink:0}}>
+    <div style={{position:'absolute',top:3,left:checked?20:3,width:15,height:15,borderRadius:'50%',
+      background:'#fff',transition:'left 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.2)'}}/>
+  </div>;
+}
+
+function Avatar({name='',size=34}){
+  const initials=name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  return<div style={{width:size,height:size,borderRadius:'50%',background:C.accentLight,
+    display:'flex',alignItems:'center',justifyContent:'center',
+    fontFamily:F.sans,fontSize:size*0.34,fontWeight:600,color:C.accentDark,flexShrink:0}}>
+    {initials||'?'}
+  </div>;
+}
+</script>
+
+<!-- ② Cabine (try-on modal) -->
+<script type="text/babel">
+function CabineModal({open,onClose,peca}){
+  const[step,setStep]=React.useState(0);
+  const[progress,setProgress]=React.useState(0);
+  const[agreed,setAgreed]=React.useState(false);
+
+  React.useEffect(()=>{if(!open){setTimeout(()=>{setStep(0);setProgress(0);setAgreed(false);},300);}},[open]);
+  React.useEffect(()=>{
+    if(step===2){
+      setProgress(0);let p=0;
+      const iv=setInterval(()=>{p+=Math.random()*16+5;if(p>=100){p=100;clearInterval(iv);setTimeout(()=>setStep(3),500);}setProgress(Math.min(p,100));},280);
+      return()=>clearInterval(iv);
+    }
+  },[step]);
+
+  if(!open)return null;
+  const steps=['Sua foto','Confirmar','Processando','Resultado'];
+
+  return<div onClick={onClose} style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(18,14,12,0.72)',
+    display:'flex',alignItems:'center',justifyContent:'center',padding:20,backdropFilter:'blur(6px)'}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:22,width:'100%',maxWidth:460,
+      boxShadow:'0 32px 80px rgba(0,0,0,0.22)',overflow:'hidden',display:'flex',flexDirection:'column'}}>
+      {/* Header */}
+      <div style={{padding:'20px 24px 14px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontFamily:F.serif,fontSize:21,fontWeight:600,color:C.text,letterSpacing:'0.01em'}}>Cabine</div>
+          {peca&&<div style={{fontFamily:F.sans,fontSize:12,color:C.text3,marginTop:2,
+            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:320}}>{peca.nome}</div>}
+        </div>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:C.text3,fontSize:17,padding:4}}>✕</button>
+      </div>
+      {/* Step indicators */}
+      <div style={{display:'flex',padding:'12px 24px',gap:4,alignItems:'center'}}>
+        {steps.map((s,i)=><React.Fragment key={i}>
+          <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+            <div style={{width:20,height:20,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',
+              background:i<step?C.success:i===step?C.text:C.border,transition:'background 0.3s',flexShrink:0}}>
+              {i<step?<span style={{fontSize:10,color:'#fff'}}>✓</span>
+                :<span style={{fontSize:10,color:i===step?'#fff':C.text3,fontFamily:F.sans,fontWeight:600}}>{i+1}</span>}
+            </div>
+            <span style={{fontFamily:F.sans,fontSize:11.5,color:i===step?C.text:C.text3,fontWeight:i===step?600:400}}>{s}</span>
+          </div>
+          {i<steps.length-1&&<div style={{flex:1,height:1,background:i<step?C.success:C.border,transition:'background 0.3s',minWidth:8}}/>}
+        </React.Fragment>)}
+      </div>
+      {/* Content */}
+      <div style={{padding:'4px 24px 24px',minHeight:330}}>
+        {step===0&&<div>
+          <div style={{marginBottom:16}}>
+            <div style={{fontFamily:F.sans,fontSize:14,fontWeight:500,color:C.text,marginBottom:4}}>Como você quer enviar sua foto?</div>
+            <div style={{fontFamily:F.sans,fontSize:13,color:C.text3,lineHeight:1.6}}>Sua foto é usada apenas para gerar a simulação e não é armazenada.</div>
+          </div>
+          <div style={{display:'flex',gap:10,marginBottom:18}}>
+            {[{icon:'📷',label:'Tirar foto',sub:'Câmera agora'},{icon:'🖼',label:'Galeria',sub:'Do seu celular'}].map(opt=>(
+              <div key={opt.label} onClick={()=>agreed&&setStep(1)} style={{flex:1,border:`1.5px solid ${agreed?C.border:C.border}`,
+                borderRadius:12,padding:'18px 12px',textAlign:'center',cursor:agreed?'pointer':'not-allowed',
+                opacity:agreed?1:0.45,transition:'all 0.15s',background:C.surface2}}>
+                <div style={{fontSize:26,marginBottom:8}}>{opt.icon}</div>
+                <div style={{fontFamily:F.sans,fontSize:13,fontWeight:600,color:C.text}}>{opt.label}</div>
+                <div style={{fontFamily:F.sans,fontSize:11,color:C.text3,marginTop:3}}>{opt.sub}</div>
+              </div>
+            ))}
+          </div>
+          <div onClick={()=>setAgreed(!agreed)} style={{display:'flex',alignItems:'flex-start',gap:10,cursor:'pointer',
+            padding:'12px 14px',background:C.accentLight,borderRadius:10,marginBottom:14}}>
+            <div style={{width:17,height:17,border:`1.5px solid ${agreed?C.accent:C.border2}`,borderRadius:4,
+              background:agreed?C.accent:'#fff',display:'flex',alignItems:'center',justifyContent:'center',
+              flexShrink:0,marginTop:1,transition:'all 0.15s'}}>
+              {agreed&&<span style={{color:'#fff',fontSize:10,lineHeight:1}}>✓</span>}
+            </div>
+            <span style={{fontFamily:F.sans,fontSize:12,color:C.text2,lineHeight:1.55}}>
+              Concordo com o uso temporário da minha foto para gerar a simulação visual.
+            </span>
+          </div>
+          <div style={{fontFamily:F.sans,fontSize:11,color:C.text3,textAlign:'center'}}>
+            Dúvidas? Leia nossa <span style={{color:C.accent,cursor:'pointer'}}>política de privacidade</span>
+          </div>
+        </div>}
+        {step===1&&<div>
+          <div style={{fontFamily:F.sans,fontSize:13,color:C.text2,marginBottom:14}}>Foto selecionada:</div>
+          <div style={{display:'flex',gap:12,marginBottom:18}}>
+            <div style={{flex:1}}><div style={{fontFamily:F.sans,fontSize:11,color:C.text3,marginBottom:6}}>Sua foto</div><ImgPlaceholder height={190} label={"sua foto\n(simulação)"} style={{borderRadius:10}}/></div>
+            <div style={{flex:1}}><div style={{fontFamily:F.sans,fontSize:11,color:C.text3,marginBottom:6}}>Peça</div><ImgPlaceholder height={190} label={peca?trunc(peca.nome,20):'peça'} style={{borderRadius:10}}/></div>
+          </div>
+          <div style={{background:C.surface2,borderRadius:9,padding:'10px 14px',marginBottom:16}}>
+            <div style={{fontFamily:F.sans,fontSize:12,color:C.text2}}>✓ Foto válida · ✓ Formato aceito · ✓ Pronta para simulação</div>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <Btn variant="ghost" onClick={()=>setStep(0)}>Trocar foto</Btn>
+            <Btn variant="dark" onClick={()=>setStep(2)} style={{flex:1}}>Gerar simulação</Btn>
+          </div>
+        </div>}
+        {step===2&&<div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'28px 0'}}>
+          <div style={{position:'relative',width:76,height:76,marginBottom:22}}>
+            <svg width="76" height="76" viewBox="0 0 76 76" style={{animation:'vv-spin 2s linear infinite'}}>
+              <circle cx="38" cy="38" r="32" fill="none" stroke={C.border} strokeWidth="3.5"/>
+              <circle cx="38" cy="38" r="32" fill="none" stroke={C.text} strokeWidth="3.5"
+                strokeDasharray={`${progress*2.01} 201`} strokeLinecap="round" style={{transition:'stroke-dasharray 0.3s'}}/>
+            </svg>
+            <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
+              fontFamily:F.serif,fontSize:17,fontWeight:600,color:C.text}}>{Math.round(progress)}%</div>
+          </div>
+          <div style={{fontFamily:F.serif,fontSize:19,fontWeight:600,color:C.text,marginBottom:8,letterSpacing:'0.01em'}}>Gerando sua simulação</div>
+          <div style={{fontFamily:F.sans,fontSize:13,color:C.text3,textAlign:'center',lineHeight:1.6}}>Combinando sua foto com a peça selecionada</div>
+          <div style={{marginTop:22,display:'flex',gap:6}}>
+            {[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:'50%',background:C.accent,animation:`vv-bounce 1.2s ease-in-out ${i*0.2}s infinite`}}/>)}
+          </div>
+        </div>}
+        {step===3&&<div>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+            <div style={{width:22,height:22,borderRadius:'50%',background:C.accentLight,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <span style={{color:C.accentDark,fontSize:12}}>✓</span>
+            </div>
+            <span style={{fontFamily:F.sans,fontSize:13,fontWeight:500,color:C.accentDark}}>Simulação gerada!</span>
+          </div>
+          <div style={{display:'flex',gap:10,marginBottom:16}}>
+            <div style={{flex:1}}><div style={{fontFamily:F.sans,fontSize:10,color:C.text3,marginBottom:5,textAlign:'center'}}>Antes</div><ImgPlaceholder height={220} label={"foto\noriginal"} style={{borderRadius:10}}/></div>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:F.sans,fontSize:10,color:C.text3,marginBottom:5,textAlign:'center'}}>Com a peça</div>
+              <div style={{position:'relative',height:220,borderRadius:10,overflow:'hidden',border:`1.5px solid ${C.accent}`}}>
+                <ImgPlaceholder height={220} label={"simulação\nda Cabine"} style={{borderRadius:0}}/>
+              </div>
+            </div>
+          </div>
+          {peca&&<div style={{background:C.surface2,borderRadius:10,padding:'12px 14px',marginBottom:14,display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontFamily:F.sans,fontSize:13,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{peca.nome}</div>
+              <div style={{fontFamily:F.sans,fontSize:11,color:C.text3,marginTop:1}}>{peca.tamanho}</div>
+            </div>
+            <div style={{fontFamily:F.serif,fontSize:17,fontWeight:600,color:C.text,flexShrink:0}}>{formatPrice(peca.preco)}</div>
+          </div>}
+          <Btn variant="dark" size="lg" style={{width:'100%',justifyContent:'center'}}
+            icon={<IconWhatsApp size={16} color="#fff"/>}
+            onClick={()=>window.open(`https://wa.me/5511998765432?text=${encodeURIComponent(`Olá! Vi a peça "${peca?.nome}" na vitrine e quero saber mais.`)}`)}>
+            Falar com a loja
+          </Btn>
+          <Btn variant="text" size="sm" onClick={()=>setStep(0)} style={{width:'100%',justifyContent:'center',marginTop:8}}>Experimentar outra peça</Btn>
+          <div style={{fontFamily:F.sans,fontSize:10,color:C.text3,textAlign:'center',marginTop:10}}>A simulação expira em 24h e não é armazenada.</div>
+        </div>}
+      </div>
+    </div>
+  </div>;
+}
+</script>
+
+<!-- ③ Public vitrine -->
+<script type="text/babel">
+const VITRINE_PECAS=[
+  {id:'1',nome:'Blusa de Linho Branca',preco:8900,tamanho:'P · M · G',cat:'blusas',label:'blusa linho\nbranca'},
+  {id:'2',nome:'Calça Wide Leg Bege',preco:14900,tamanho:'36 · 38 · 40',cat:'calcas',label:'calça wide leg\nbege'},
+  {id:'3',nome:'Vestido Midi Floral',preco:18900,tamanho:'P · M',cat:'vestidos',label:'vestido midi\nestampa floral'},
+  {id:'4',nome:'Saia Midi Plissada',preco:11900,tamanho:'36 · 38 · 40 · 42',cat:'saias',label:'saia plissada\nareia'},
+  {id:'5',nome:'Shorts Jeans Vintage',preco:7900,tamanho:'36 · 38',cat:'calcas',label:'shorts jeans\ndelavê'},
+  {id:'6',nome:'Blazer Oversized Bege',preco:21900,tamanho:'P · M',cat:'casacos',label:'blazer oversized\npalha'},
+  {id:'7',nome:'Cardigan Tricô Caramelo',preco:12900,tamanho:'Único',cat:'tricos',label:'cardigan tricô\ncaramelo'},
+  {id:'8',nome:'Vestido Ombro a Ombro Branco',preco:16900,tamanho:'P · M · G',cat:'vestidos',label:'vestido ombro\na ombro'},
+];
+const LOJA={nome:'Atelier Laila',slug:'atelier-laila',instagram:'@atelierlaila',whatsapp:'5511998765432',
+  tagline:'Moda feminina com alma',banner:'Peças exclusivas para cada momento da sua vida'};
+
+function PhoneFrame({children}){
+  return<div style={{position:'relative',width:315,flexShrink:0}}>
+    <div style={{background:'#181614',borderRadius:46,padding:'10px',boxShadow:'0 20px 60px rgba(0,0,0,0.28),inset 0 0 0 1px #2e2b28'}}>
+      <div style={{borderRadius:37,overflow:'hidden',background:C.bg,position:'relative'}}>
+        <div style={{height:44,background:C.surface,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 22px',flexShrink:0,position:'relative'}}>
+          <span style={{fontFamily:F.sans,fontSize:11.5,fontWeight:600,color:C.text}}>9:41</span>
+          <div style={{width:90,height:26,background:'#181614',borderRadius:18,position:'absolute',left:'50%',transform:'translateX(-50%)'}}/>
+          <div style={{display:'flex',gap:4,alignItems:'center',fontSize:11}}>●●● 📶</div>
+        </div>
+        <div style={{height:600,overflowY:'auto'}}>{children}</div>
+        <div style={{height:28,background:C.surface,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{width:90,height:4,background:C.border2,borderRadius:2}}/>
+        </div>
+      </div>
+    </div>
+    <div style={{textAlign:'center',marginTop:14,fontFamily:F.sans,fontSize:11,color:C.text3,letterSpacing:'0.05em',textTransform:'uppercase'}}>Mobile</div>
+  </div>;
+}
+
+function DesktopFrame({children}){
+  return<div style={{flex:1,minWidth:520}}>
+    <div style={{background:'#ddd6cc',borderRadius:12,overflow:'hidden',boxShadow:'0 18px 60px rgba(0,0,0,0.14)'}}>
+      <div style={{background:'#ece5dc',padding:'10px 16px',display:'flex',alignItems:'center',gap:10}}>
+        <div style={{display:'flex',gap:6}}>{['#ff5f57','#febc2e','#28c840'].map(c=><div key={c} style={{width:11,height:11,borderRadius:'50%',background:c}}/>)}</div>
+        <div style={{flex:1,background:'rgba(255,255,255,0.75)',borderRadius:6,padding:'5px 12px',fontFamily:F.sans,fontSize:11.5,color:C.text3}}>vitrine.app/v/atelier-laila</div>
+      </div>
+      <div style={{height:580,overflowY:'auto',background:C.bg}}>{children}</div>
+    </div>
+    <div style={{textAlign:'center',marginTop:14,fontFamily:F.sans,fontSize:11,color:C.text3,letterSpacing:'0.05em',textTransform:'uppercase'}}>Desktop</div>
+  </div>;
+}
+
+// Social icon link
+function SocialLink({type,handle,mobile=false}){
+  const size=mobile?16:17;
+  const icons={instagram:<IconInstagram size={size} color="currentColor"/>,tiktok:<IconTikTok size={size} color="currentColor"/>,whatsapp:<IconWhatsApp size={size} color="#fff"/>};
+  const isWa=type==='whatsapp';
+  return<a href="#" title={handle} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
+    width:mobile?30:34,height:mobile?30:34,borderRadius:'50%',
+    background:isWa?'#25d366':C.surface2,color:isWa?'#fff':C.text2,
+    textDecoration:'none',transition:'opacity 0.15s',flexShrink:0}}
+    onMouseEnter={e=>e.currentTarget.style.opacity='0.75'}
+    onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
+    {icons[type]}
+  </a>;
+}
+
+// Piece card — mobile
+function MobileCard({peca,onCabine,showPrice,viewMode}){
+  const isLook=viewMode==='look';
+  return<div style={{background:C.surface,borderRadius:11,overflow:'hidden',boxShadow:'0 1px 6px rgba(0,0,0,0.05)'}}>
+    {isLook
+      ?<div style={{display:'flex',height:140}}>
+          <ImgPlaceholder width="55%" height={140} label={peca.label}/>
+          <ImgPlaceholder width="45%" height={140} label={"look\ncompleto"} style={{borderLeft:`1px solid ${C.border}`}}/>
+        </div>
+      :<ImgPlaceholder height={155} label={peca.label}/>}
+    <div style={{padding:'9px 11px 12px'}}>
+      <div style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text,marginBottom:2,
+        overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{peca.nome}</div>
+      <div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3,marginBottom:showPrice?5:8}}>{peca.tamanho}</div>
+      {showPrice&&<div style={{fontFamily:F.serif,fontSize:14,fontWeight:600,color:C.text,marginBottom:8}}>{formatPrice(peca.preco)}</div>}
+      <button onClick={()=>onCabine(peca)} style={{width:'100%',padding:'7px',background:C.text,color:'#fff',
+        border:'none',borderRadius:7,fontFamily:F.sans,fontSize:11,fontWeight:500,cursor:'pointer',
+        display:'flex',alignItems:'center',justifyContent:'center',gap:5,letterSpacing:'0.02em'}}>
+        ✦ Cabine
+      </button>
+    </div>
+  </div>;
+}
+
+// Piece card — desktop
+function DesktopCard({peca,onCabine,showPrice,viewMode}){
+  const[hov,setHov]=React.useState(false);
+  const isLook=viewMode==='look';
+  return<div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    style={{background:C.surface,borderRadius:14,overflow:'hidden',cursor:'pointer',
+      boxShadow:hov?'0 8px 28px rgba(0,0,0,0.1)':'0 2px 8px rgba(0,0,0,0.05)',
+      transform:hov?'translateY(-2px)':'none',transition:'all 0.22s'}}>
+    <div style={{position:'relative'}}>
+      {isLook
+        ?<div style={{display:'flex',height:220}}>
+            <ImgPlaceholder width="60%" height={220} label={peca.label}/>
+            <ImgPlaceholder width="40%" height={220} label={"look\ncompleto"} style={{borderLeft:`1px solid ${C.border}`}}/>
+          </div>
+        :<ImgPlaceholder height={240} label={peca.label}/>}
+      {hov&&<div style={{position:'absolute',inset:0,background:'rgba(18,14,12,0.3)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+        <button onClick={()=>onCabine(peca)} style={{background:C.surface,color:C.text,border:'none',borderRadius:22,
+          padding:'9px 20px',fontFamily:F.sans,fontSize:13,fontWeight:600,cursor:'pointer',
+          display:'flex',alignItems:'center',gap:6}}>✦ Cabine</button>
+      </div>}
+    </div>
+    <div style={{padding:'13px 15px 16px'}}>
+      <div style={{fontFamily:F.sans,fontSize:14,fontWeight:500,color:C.text,marginBottom:3,
+        overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{peca.nome}</div>
+      <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,marginBottom:8}}>{peca.tamanho}</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+        {showPrice
+          ?<span style={{fontFamily:F.serif,fontSize:19,fontWeight:600,color:C.text}}>{formatPrice(peca.preco)}</span>
+          :<span style={{fontFamily:F.sans,fontSize:12,color:C.text3}}>Consulte o preço</span>}
+        <button onClick={()=>onCabine(peca)} style={{background:C.accentLight,color:C.accentDark,border:'none',
+          borderRadius:7,padding:'5px 12px',fontFamily:F.sans,fontSize:12,fontWeight:600,cursor:'pointer',
+          display:'flex',alignItems:'center',gap:5}}>✦ Cabine</button>
+      </div>
+    </div>
+  </div>;
+}
+
+// Store banner
+function StoreBanner({loja,mobile=false}){
+  return<div style={{background:C.text,padding:mobile?'24px 16px':'32px 48px',textAlign:'center'}}>
+    <div style={{marginBottom:12}}>
+      <VVLogo size={mobile?26:30} dark={false}/>
+    </div>
+    <div style={{fontFamily:F.serif,fontSize:mobile?19:24,fontWeight:500,color:C.surface,
+      letterSpacing:'0.03em',marginBottom:6,lineHeight:1.3}}>{loja.nome}</div>
+    <div style={{fontFamily:F.sans,fontSize:mobile?11:12.5,color:'rgba(255,255,255,0.55)',
+      marginBottom:16,letterSpacing:'0.04em',textTransform:'uppercase'}}>{loja.tagline}</div>
+    <div style={{display:'flex',justifyContent:'center',gap:10}}>
+      <SocialLink type="instagram" handle={loja.instagram} mobile={mobile}/>
+      <SocialLink type="tiktok" handle="@atelierlaila" mobile={mobile}/>
+      <SocialLink type="whatsapp" handle={loja.whatsapp} mobile={mobile}/>
+    </div>
+    <div style={{marginTop:20,fontFamily:F.sans,fontSize:mobile?10:11,color:'rgba(255,255,255,0.3)',letterSpacing:'0.06em'}}>
+      VITRINE.APP
+    </div>
+  </div>;
+}
+
+// Category pill filter
+function CatFilter({selected,onChange,mobile=false}){
+  const cats=[{id:'todas',label:'Todas'},...CATEGORIAS.filter(c=>VITRINE_PECAS.some(p=>p.cat===c.id))];
+  return<div style={{display:'flex',gap:6,overflowX:'auto',padding:mobile?'0 12px':'0',
+    paddingBottom:4,scrollbarWidth:'none'}}>
+    {cats.map(c=>{
+      const on=selected===c.id;
+      return<button key={c.id} onClick={()=>onChange(c.id)} style={{
+        padding:'6px 14px',borderRadius:20,border:`1px solid ${on?C.text:C.border}`,
+        background:on?C.text:'transparent',color:on?'#fff':C.text2,
+        fontFamily:F.sans,fontSize:mobile?11.5:12.5,fontWeight:500,cursor:'pointer',
+        whiteSpace:'nowrap',transition:'all 0.15s',flexShrink:0}}>{c.label}</button>;
+    })}
+  </div>;
+}
+
+function PublicVitrine(){
+  const[cabinePeca,setCabinePeca]=React.useState(null);
+  const[showPrice,setShowPrice]=React.useState(false);
+  const[viewMode,setViewMode]=React.useState('solteira'); // 'solteira' | 'look'
+  const[catFilter,setCatFilter]=React.useState('todas');
+
+  const filtered=catFilter==='todas'?VITRINE_PECAS:VITRINE_PECAS.filter(p=>p.cat===catFilter);
+
+  return<div style={{display:'flex',flexDirection:'column',height:'100%',background:C.surface3,overflow:'hidden'}}>
+    {/* Preview controls bar */}
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'11px 28px',
+      display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,gap:16,flexWrap:'wrap'}}>
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{fontFamily:F.sans,fontSize:12,color:C.text3}}>Vista:</span>
+        {[{id:'solteira',label:'Solteira'},{id:'look',label:'Look'}].map(v=>(
+          <button key={v.id} onClick={()=>setViewMode(v.id)} style={{padding:'5px 12px',borderRadius:16,
+            border:`1px solid ${viewMode===v.id?C.text:C.border}`,background:viewMode===v.id?C.text:'transparent',
+            color:viewMode===v.id?'#fff':C.text2,fontFamily:F.sans,fontSize:12,fontWeight:500,cursor:'pointer',transition:'all 0.15s'}}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <Toggle checked={showPrice} onChange={setShowPrice}/>
+          <span style={{fontFamily:F.sans,fontSize:12.5,color:C.text2}}>Mostrar preços</span>
+        </div>
+        <a href="#" style={{fontFamily:F.sans,fontSize:12,color:C.accent,textDecoration:'none',fontWeight:500}}>Abrir ↗</a>
+      </div>
+    </div>
+    {/* Side-by-side preview */}
+    <div style={{flex:1,overflowX:'auto',overflowY:'auto',padding:'36px 28px',display:'flex',gap:36,alignItems:'flex-start'}}>
+      {/* Mobile */}
+      <PhoneFrame>
+        <div style={{background:C.bg,minHeight:'100%',display:'flex',flexDirection:'column'}}>
+          <div style={{background:C.surface,padding:'14px 14px 12px',borderBottom:`1px solid ${C.border}`,position:'sticky',top:0,zIndex:10}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+              <span style={{fontFamily:F.serif,fontSize:20,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{LOJA.nome}</span>
+              <div style={{display:'flex',gap:6,flexShrink:0,marginLeft:8}}>
+                <SocialLink type="instagram" handle={LOJA.instagram} mobile/>
+                <SocialLink type="tiktok" handle="@atelierlaila" mobile/>
+                <SocialLink type="whatsapp" handle={LOJA.whatsapp} mobile/>
+              </div>
+            </div>
+            <CatFilter selected={catFilter} onChange={setCatFilter} mobile/>
+          </div>
+          <div style={{padding:'12px 10px',flex:1}}>
+            <div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3,marginBottom:9,textAlign:'center'}}>{filtered.length} peças</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}}>
+              {filtered.map(p=><MobileCard key={p.id} peca={p} onCabine={setCabinePeca} showPrice={showPrice} viewMode={viewMode}/>)}
+            </div>
+          </div>
+          <StoreBanner loja={LOJA} mobile/>
+        </div>
+      </PhoneFrame>
+      {/* Desktop */}
+      <DesktopFrame>
+        <div style={{background:C.bg,minHeight:'100%',display:'flex',flexDirection:'column'}}>
+          {/* Store header */}
+          <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'0 40px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',height:60}}>
+              <span style={{fontFamily:F.serif,fontSize:24,fontWeight:600,color:C.text,letterSpacing:'0.02em',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{LOJA.nome}</span>
+              <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0,marginLeft:16}}>
+                <SocialLink type="instagram" handle={LOJA.instagram}/>
+                <SocialLink type="tiktok" handle="@atelierlaila"/>
+                <SocialLink type="whatsapp" handle={LOJA.whatsapp}/>
+              </div>
+            </div>
+          </div>
+          {/* Cabine strip */}
+          <div style={{background:C.accentLight,padding:'14px 40px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}}>
+            <span style={{fontFamily:F.serif,fontSize:15,fontWeight:500,color:C.accentDark}}>✦ Cabine — experimente antes de escolher</span>
+            <span style={{fontFamily:F.sans,fontSize:11.5,color:C.accentDark}}>Passe o mouse sobre qualquer peça</span>
+          </div>
+          {/* Category filter */}
+          <div style={{padding:'16px 40px 0'}}>
+            <CatFilter selected={catFilter} onChange={setCatFilter}/>
+          </div>
+          {/* Grid */}
+          <div style={{padding:'20px 40px 40px',flex:1}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:18}}>
+              <span style={{fontFamily:F.serif,fontSize:21,fontWeight:500,color:C.text}}>Peças disponíveis</span>
+              <span style={{fontFamily:F.sans,fontSize:12,color:C.text3}}>{filtered.length} itens</span>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:18}}>
+              {filtered.map(p=><DesktopCard key={p.id} peca={p} onCabine={setCabinePeca} showPrice={showPrice} viewMode={viewMode}/>)}
+            </div>
+          </div>
+          <StoreBanner loja={LOJA}/>
+        </div>
+      </DesktopFrame>
+    </div>
+    <CabineModal open={!!cabinePeca} onClose={()=>setCabinePeca(null)} peca={cabinePeca}/>
+  </div>;
+}
+</script>
+
+<!-- ④ Admin panel -->
+<script type="text/babel">
+const MOCK_PECAS=[
+  {id:'1',nome:'Blusa de Linho Branca',preco:8900,tamanho:'P, M, G',cat:'blusas',status:'disponivel',fotos:3},
+  {id:'2',nome:'Calça Wide Leg Bege',preco:14900,tamanho:'36, 38, 40',cat:'calcas',status:'disponivel',fotos:4},
+  {id:'3',nome:'Vestido Midi Floral',preco:18900,tamanho:'P, M',cat:'vestidos',status:'disponivel',fotos:5},
+  {id:'4',nome:'Cardigan Tricô Caramelo',preco:12900,tamanho:'Único',cat:'tricos',status:'vendida',fotos:2},
+  {id:'5',nome:'Shorts Jeans Vintage',preco:7900,tamanho:'36, 38',cat:'calcas',status:'disponivel',fotos:3},
+  {id:'6',nome:'Blusa Cropped Listrada',preco:6900,tamanho:'P, M, G',cat:'blusas',status:'vendida',fotos:2},
+  {id:'7',nome:'Saia Midi Plissada',preco:11900,tamanho:'36, 38, 40, 42',cat:'saias',status:'disponivel',fotos:4},
+  {id:'8',nome:'Blazer Oversized Bege',preco:21900,tamanho:'P, M',cat:'casacos',status:'disponivel',fotos:3},
+];
+const PHLABELS=['blusa linho\nbranca','calça wide\nleg bege','vestido\nfloral','cardigan\ncaramelo','shorts jeans\nvintage','blusa cropped\nlistrada','saia midi\nplissada','blazer\noversized'];
+
+function AdminSidebar({section,setSection,loja}){
+  const nav=[
+    {id:'dashboard',label:'Dashboard',icon:'⊞'},
+    {id:'pecas',label:'Disponíveis',icon:'◈'},
+    {id:'todas',label:'Todas as peças',icon:'≡'},
+    {id:'config',label:'Configurações',icon:'⚙'},
+  ];
+  return<aside style={{width:216,background:C.surface,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',flexShrink:0,height:'100%'}}>
+    <div style={{padding:'22px 18px 14px'}}>
+      <VVLogo size={22}/>
+      <div style={{marginTop:18,padding:'10px 12px',background:C.surface2,borderRadius:9}}>
+        <div style={{fontFamily:F.sans,fontSize:12.5,fontWeight:600,color:C.text,
+          overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{trunc(loja.nome,22)}</div>
+        <div style={{fontFamily:F.sans,fontSize:11,color:C.text3,marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>vitrine.app/v/{loja.slug}</div>
+      </div>
+    </div>
+    <nav style={{flex:1,padding:'2px 10px'}}>
+      {nav.map(item=>{const a=section===item.id;return<div key={item.id} onClick={()=>setSection(item.id)}
+        style={{display:'flex',alignItems:'center',gap:9,padding:'9px 12px',borderRadius:8,cursor:'pointer',marginBottom:1,
+          background:a?C.accentLight:'transparent',color:a?C.accentDark:C.text2,
+          fontFamily:F.sans,fontSize:13.5,fontWeight:a?600:400,transition:'all 0.15s'}}>
+        <span style={{fontSize:14}}>{item.icon}</span>
+        {item.label}
+      </div>;})}
+    </nav>
+    <div style={{padding:'14px 18px',borderTop:`1px solid ${C.border}`}}>
+      <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:10}}>
+        <Avatar name="Laila Moura" size={30}/>
+        <div style={{minWidth:0}}>
+          <div style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>Laila Moura</div>
+          <div style={{fontFamily:F.sans,fontSize:11,color:C.text3}}>lojista</div>
+        </div>
+      </div>
+      <button style={{width:'100%',padding:'7px',border:`1px solid ${C.border}`,borderRadius:8,background:'transparent',
+        color:C.text2,fontFamily:F.sans,fontSize:12.5,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,
+        transition:'all 0.15s'}}
+        onMouseEnter={e=>{e.currentTarget.style.background=C.surface2}}
+        onMouseLeave={e=>{e.currentTarget.style.background='transparent'}}>
+        <span style={{fontSize:13}}>↪</span> Sair
+      </button>
+    </div>
+  </aside>;
+}
+
+function Dashboard({pecas,setSection}){
+  const disp=pecas.filter(p=>p.status==='disponivel').length;
+  const vend=pecas.filter(p=>p.status==='vendida').length;
+  return<div style={{padding:'28px 32px',maxWidth:880}}>
+    <h1 style={{fontFamily:F.serif,fontSize:26,fontWeight:600,color:C.text,margin:'0 0 5px'}}>Bom dia, Laila 👋</h1>
+    <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,margin:'0 0 24px'}}>Sua vitrine está ativa · Atualizado agora</p>
+    <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:24}}>
+      <KpiCard label="Disponíveis" value={disp} sub="peças na vitrine" icon="◈"/>
+      <KpiCard label="Vendidas" value={vend} sub="este mês" icon="✓"/>
+      <KpiCard label="Total" value={pecas.length} sub="cadastradas" icon="≡"/>
+    </div>
+    <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:28}}>
+      <Btn variant="dark" icon={<span>+</span>} onClick={()=>setSection('pecas')}>Nova peça</Btn>
+      <Btn variant="ghost">Ver vitrine ↗</Btn>
+    </div>
+    <div style={{fontFamily:F.sans,fontSize:11.5,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:12}}>Peças recentes</div>
+    <VVCard>
+      {pecas.slice(0,6).map((p,i)=><React.Fragment key={p.id}>
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 18px'}}>
+          <ImgPlaceholder width={40} height={40} style={{borderRadius:7,flexShrink:0}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontFamily:F.sans,fontSize:13.5,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{peca.nome}</div>
+            <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,marginTop:1}}>{getCatLabel(p.cat)} · {p.tamanho}</div>
+          </div>
+          <span style={{fontFamily:F.serif,fontSize:15,fontWeight:600,color:C.text,flexShrink:0}}>{formatPrice(p.preco)}</span>
+          <Badge label={p.status==='disponivel'?'disponível':'vendida'} variant={p.status==='disponivel'?'disponivel':'vendida'}/>
+        </div>
+        {i<5&&<Divider/>}
+      </React.Fragment>)}
+    </VVCard>
+  </div>;
+}
+
+// Piece form modal — vv identity, category, no status
+function PecaFormModal({open,onClose,peca,onSave}){
+  const[nome,setNome]=React.useState('');
+  const[preco,setPreco]=React.useState('');
+  const[tamanho,setTamanho]=React.useState('');
+  const[cat,setCat]=React.useState('blusas');
+  const[outrosLabel,setOutrosLabel]=React.useState('');
+  const[cor,setCor]=React.useState('');
+  const[estado,setEstado]=React.useState('Excelente');
+  const[desc,setDesc]=React.useState('');
+  const[saving,setSaving]=React.useState(false);
+
+  React.useEffect(()=>{
+    if(open){
+      setNome(peca?.nome||'');setPreco(peca?(peca.preco/100).toFixed(2):'');
+      setTamanho(peca?.tamanho||'');setCat(peca?.cat||'blusas');
+      setCor(peca?.cor||'');setEstado(peca?.estado||'Excelente');setDesc(peca?.desc||'');setOutrosLabel('');
+    }
+  },[open,peca]);
+
+  const catOptions=CATEGORIAS.map(c=>({value:c.id,label:c.label}));
+  const isOutros=cat==='outros';
+
+  function handleSave(){
+    setSaving(true);
+    const catId=isOutros&&outrosLabel
+      ?outrosLabel.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-')
+      :cat;
+    setTimeout(()=>{
+      onSave({nome,preco:Math.round(parseFloat(preco)*100),tamanho,cat:catId,cor,estado,desc,status:'disponivel'});
+      setSaving(false);
+    },700);
+  }
+
+  return<VVModal open={open} onClose={onClose} title={peca?'Editar peça':'Nova peça'} width={560}
+    footer={<>
+      <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+      <Btn variant="dark" onClick={handleSave} disabled={!nome||!preco||!tamanho}>
+        {saving?<><Spinner size={14} color="#fff"/> Salvando...</>:'Salvar peça'}
+      </Btn>
+    </>}>
+    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+      {/* Name */}
+      <VVInput label="Nome da peça" value={nome} onChange={e=>setNome(e.target.value)}
+        placeholder="Ex: Blusa de linho branca" required
+        helper={nome.length>0?`${nome.length}/80 · ${trunc(nome,80)===nome?'ok':'nome será abreviado na vitrine'}`:undefined}/>
+      {/* Price + size */}
+      <div style={{display:'flex',gap:12}}>
+        <VVInput label="Preço" value={preco} onChange={e=>setPreco(e.target.value)}
+          prefix="R$" type="number" style={{flex:1}} required/>
+        <VVInput label="Tamanho(s)" value={tamanho} onChange={e=>setTamanho(e.target.value)}
+          placeholder="P, M, G" style={{flex:1}} required helper="Separe por vírgula"/>
+      </div>
+      {/* Category */}
+      <VVSelect label="Categoria" value={cat} onChange={e=>setCat(e.target.value)} options={catOptions}/>
+      {isOutros&&<VVInput label="Nome da categoria" value={outrosLabel} onChange={e=>setOutrosLabel(e.target.value)}
+        placeholder="Ex: Macacão, Body, Kimono..." helper="Um ID será gerado automaticamente"/>}
+      {/* Color + condition */}
+      <div style={{display:'flex',gap:12}}>
+        <VVInput label="Cor principal" value={cor} onChange={e=>setCor(e.target.value)} placeholder="Ex: Branco, Caramelo" style={{flex:1}}/>
+        <VVSelect label="Estado" value={estado} onChange={e=>setEstado(e.target.value)} style={{flex:1}}
+          options={['Novo com etiqueta','Novo sem etiqueta','Excelente','Muito bom','Bom'].map(v=>({value:v,label:v}))}/>
+      </div>
+      {/* Description */}
+      <VVInput as="textarea" label="Descrição (opcional)" value={desc} onChange={e=>setDesc(e.target.value)}
+        rows={3} placeholder="Detalhe o tecido, caimento, ocasião de uso..."/>
+      {/* Photos */}
+      <div>
+        <label style={{fontFamily:F.sans,fontSize:12.5,fontWeight:500,color:C.text2,display:'block',marginBottom:7}}>Fotos</label>
+        <div style={{border:`2px dashed ${C.border}`,borderRadius:10,padding:'24px 18px',textAlign:'center',background:C.surface2,cursor:'pointer',transition:'border-color 0.15s'}}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=C.accent}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+          <div style={{fontSize:26,marginBottom:7}}>📷</div>
+          <div style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,marginBottom:3}}>Arraste fotos ou <span style={{color:C.accent,textDecoration:'underline'}}>clique para selecionar</span></div>
+          <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3}}>JPEG · PNG · WebP · Máx 5 MB · Até 8 fotos</div>
+        </div>
+      </div>
+      {/* Auto-status note */}
+      <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:C.accentLight,borderRadius:9}}>
+        <span style={{color:C.accent,fontSize:14}}>◈</span>
+        <span style={{fontFamily:F.sans,fontSize:12,color:C.accentDark,lineHeight:1.5}}>A peça será publicada automaticamente como <strong>disponível</strong> na sua vitrine.</span>
+      </div>
+    </div>
+  </VVModal>;
+}
+
+// Pieces list
+function PecasList({pecas,setPecas,showAll}){
+  const[modalOpen,setModalOpen]=React.useState(false);
+  const[editPeca,setEditPeca]=React.useState(null);
+  const[deleteId,setDeleteId]=React.useState(null);
+  const[detalhePeca,setDetalhePeca]=React.useState(null);
+  const[search,setSearch]=React.useState('');
+  const[catF,setCatF]=React.useState('todas');
+  const[view,setView]=React.useState('grid');
+
+  const filtered=pecas.filter(p=>{
+    const matchS=p.nome.toLowerCase().includes(search.toLowerCase());
+    const matchSt=showAll||p.status==='disponivel';
+    const matchC=catF==='todas'||p.cat===catF;
+    return matchS&&matchSt&&matchC;
+  });
+
+  function handleSave(data){
+    if(editPeca) setPecas(prev=>prev.map(p=>p.id===editPeca.id?{...p,...data}:p));
+    else setPecas(prev=>[...prev,{id:String(Date.now()),...data,fotos:0}]);
+    setModalOpen(false);setEditPeca(null);
+  }
+
+  return<div style={{padding:'26px 32px',overflowY:'auto',height:'100%',boxSizing:'border-box'}}>
+    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20,gap:12,flexWrap:'wrap'}}>
+      <div>
+        <h1 style={{fontFamily:F.serif,fontSize:24,fontWeight:600,color:C.text,margin:0,letterSpacing:'0.01em'}}>
+          {showAll?'Todas as peças':'Peças disponíveis'}
+        </h1>
+        <p style={{fontFamily:F.sans,fontSize:13,color:C.text3,margin:'3px 0 0'}}>{filtered.length} peças</p>
+      </div>
+      <Btn variant="dark" icon={<span style={{fontSize:15}}>+</span>} onClick={()=>{setEditPeca(null);setModalOpen(true);}}>Nova peça</Btn>
+    </div>
+    {/* Filter bar */}
+    <div style={{display:'flex',gap:10,marginBottom:16,alignItems:'center',flexWrap:'wrap'}}>
+      <div style={{position:'relative',flex:1,maxWidth:320}}>
+        <span style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:C.text3,fontSize:14}}>🔍</span>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar peça..."
+          style={{width:'100%',padding:'8px 12px 8px 32px',border:`1.5px solid ${C.border}`,borderRadius:8,
+            fontFamily:F.sans,fontSize:13.5,color:C.text,background:C.surface,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+      <div style={{display:'flex',gap:6,overflowX:'auto',flexWrap:'wrap'}}>
+        {[{id:'todas',label:'Todas'},...CATEGORIAS].map(c=>{
+          const on=catF===c.id;
+          return<button key={c.id} onClick={()=>setCatF(c.id)}
+            style={{padding:'6px 12px',borderRadius:16,border:`1px solid ${on?C.text:C.border}`,
+              background:on?C.text:'transparent',color:on?'#fff':C.text2,
+              fontFamily:F.sans,fontSize:12,fontWeight:500,cursor:'pointer',whiteSpace:'nowrap',transition:'all 0.15s'}}>
+            {c.label}
+          </button>;
+        })}
+      </div>
+      <div style={{display:'flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',flexShrink:0}}>
+        {['grid','list'].map(v=><button key={v} onClick={()=>setView(v)} style={{padding:'7px 12px',
+          background:view===v?C.text:C.surface,color:view===v?'#fff':C.text2,
+          border:'none',cursor:'pointer',fontFamily:F.sans,fontSize:13}}>
+          {v==='grid'?'⊞':'≡'}
+        </button>)}
+      </div>
+    </div>
+    {/* Grid / List */}
+    {view==='grid'
+      ?<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:14}}>
+        {filtered.map((p,i)=><VVCard key={p.id} hover style={{overflow:'hidden'}}>
+          <div onClick={()=>setDetalhePeca(p)} style={{cursor:'pointer'}}><ImgPlaceholder height={180} label={PHLABELS[i%PHLABELS.length]}/></div>
+          <div style={{padding:'12px 14px'}}>
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:5,marginBottom:3}}>
+              <span style={{fontFamily:F.sans,fontSize:13,fontWeight:500,color:C.text,lineHeight:1.35,
+                overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                {p.nome}
+              </span>
+              <Badge label={p.status==='disponivel'?'disponível':'vendida'} variant={p.status==='disponivel'?'disponivel':'vendida'}/>
+            </div>
+            <div style={{fontFamily:F.sans,fontSize:11,color:C.text3,marginBottom:3}}>{getCatLabel(p.cat)}</div>
+            <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,marginBottom:8}}>{p.tamanho}</div>
+            <div style={{fontFamily:F.serif,fontSize:17,fontWeight:600,color:C.text,marginBottom:10}}>{formatPrice(p.preco)}</div>
+            <div style={{display:'flex',gap:6}}>
+              <Btn variant="ghost" size="sm" onClick={()=>{setEditPeca(p);setModalOpen(true);}}>Editar</Btn>
+              {p.status==='disponivel'&&<Btn variant="text" size="sm"
+                onClick={()=>setPecas(prev=>prev.map(x=>x.id===p.id?{...x,status:'vendida'}:x))}
+                style={{color:C.text3,fontSize:12}}>Marcar vendida</Btn>}
+            </div>
+          </div>
+        </VVCard>)}
+      </div>
+      :<VVCard>
+        {filtered.map((p,i)=><React.Fragment key={p.id}>
+          <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 18px'}}>
+            <div onClick={()=>setDetalhePeca(p)} style={{cursor:'pointer',flexShrink:0}}>
+              <ImgPlaceholder width={48} height={48} style={{borderRadius:7}}/>
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div onClick={()=>setDetalhePeca(p)} style={{fontFamily:F.sans,fontSize:13.5,fontWeight:500,color:C.text,
+                cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nome}</div>
+              <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,marginTop:1}}>{getCatLabel(p.cat)} · {p.tamanho}</div>
+            </div>
+            <span style={{fontFamily:F.serif,fontSize:16,fontWeight:600,color:C.text,flexShrink:0}}>{formatPrice(p.preco)}</span>
+            <Badge label={p.status==='disponivel'?'disponível':'vendida'} variant={p.status==='disponivel'?'disponivel':'vendida'}/>
+            <div style={{display:'flex',gap:7}}>
+              <Btn variant="ghost" size="sm" onClick={()=>{setEditPeca(p);setModalOpen(true);}}>Editar</Btn>
+              {p.status==='disponivel'&&<Btn variant="text" size="sm"
+                onClick={()=>setPecas(prev=>prev.map(x=>x.id===p.id?{...x,status:'vendida'}:x))}
+                style={{color:C.text3,fontSize:12}}>Vendida</Btn>}
+            </div>
+          </div>
+          {i<filtered.length-1&&<Divider/>}
+        </React.Fragment>)}
+      </VVCard>}
+    <PecaFormModal open={modalOpen} onClose={()=>{setModalOpen(false);setEditPeca(null);}}
+      peca={editPeca} onSave={handleSave}/>
+    <VVModal open={!!deleteId} onClose={()=>setDeleteId(null)} title="Excluir peça" width={400}
+      footer={<><Btn variant="ghost" onClick={()=>setDeleteId(null)}>Cancelar</Btn>
+        <Btn variant="danger" onClick={()=>{setPecas(prev=>prev.filter(p=>p.id!==deleteId));setDeleteId(null);}}>Excluir</Btn></>}>
+      <p style={{fontFamily:F.sans,fontSize:14,color:C.text2,margin:0,lineHeight:1.6}}>Esta ação é irreversível. A peça e todas as suas fotos serão removidas da vitrine.</p>
+    </VVModal>
+    <PecaDetalhe open={!!detalhePeca} onClose={()=>setDetalhePeca(null)} peca={detalhePeca}
+      onEdit={()=>{setEditPeca(detalhePeca);setDetalhePeca(null);setModalOpen(true);}}
+      onDelete={()=>{setDeleteId(detalhePeca?.id);setDetalhePeca(null);}}/>
+  </div>;
+}
+
+function ConfigSection({loja,setLoja}){
+  const[saved,setSaved]=React.useState(false);
+  return<div style={{padding:'26px 32px',maxWidth:580,overflowY:'auto',height:'100%',boxSizing:'border-box'}}>
+    <h1 style={{fontFamily:F.serif,fontSize:24,fontWeight:600,color:C.text,margin:'0 0 6px',letterSpacing:'0.01em'}}>Configurações da loja</h1>
+    <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,margin:'0 0 24px',lineHeight:1.6}}>Personalize como sua vitrine aparece para os clientes.</p>
+    <VVCard style={{padding:'22px',marginBottom:16}}>
+      <div style={{fontFamily:F.sans,fontSize:11,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:14}}>Identidade</div>
+      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{display:'flex',gap:14,alignItems:'center'}}>
+          <ImgPlaceholder width={64} height={64} style={{borderRadius:10,flexShrink:0}} label="logo"/>
+          <div><Btn variant="ghost" size="sm">Enviar logo</Btn><div style={{fontFamily:F.sans,fontSize:11,color:C.text3,marginTop:5}}>PNG ou JPG · Mín 200×200 px</div></div>
+        </div>
+        <VVInput label="Nome da loja" value={loja.nome} onChange={e=>setLoja(p=>({...p,nome:e.target.value}))} helper={loja.nome.length>25?'Nome longo será abreviado na vitrine':''}/>
+        <VVInput label="Slug da vitrine" value={loja.slug} onChange={e=>setLoja(p=>({...p,slug:e.target.value}))} prefix="vitrine.app/v/" helper="Letras minúsculas, números e hífens"/>
+        <VVInput label="Tagline" value={loja.tagline||''} onChange={e=>setLoja(p=>({...p,tagline:e.target.value}))} placeholder="Uma frase que representa sua loja" helper="Aparece no banner da vitrine"/>
+      </div>
+    </VVCard>
+    <VVCard style={{padding:'22px',marginBottom:16}}>
+      <div style={{fontFamily:F.sans,fontSize:11,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:14}}>Contato & redes</div>
+      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <VVInput label="WhatsApp" value={loja.whatsapp} onChange={e=>setLoja(p=>({...p,whatsapp:e.target.value}))} prefix="+55" placeholder="11 99999-9999"/>
+        <VVInput label="Instagram" value={loja.instagram} onChange={e=>setLoja(p=>({...p,instagram:e.target.value}))} prefix="@" placeholder="atelierlaila"/>
+        <VVInput label="TikTok" value={loja.tiktok} onChange={e=>setLoja(p=>({...p,tiktok:e.target.value}))} prefix="@" placeholder="atelierlaila"/>
+      </div>
+    </VVCard>
+    <VVCard style={{padding:'22px',marginBottom:22}}>
+      <div style={{fontFamily:F.sans,fontSize:11,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:14}}>Exibição</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 0'}}>
+        <div>
+          <div style={{fontFamily:F.sans,fontSize:13.5,fontWeight:500,color:C.text}}>Mostrar preço na vitrine</div>
+          <div style={{fontFamily:F.sans,fontSize:12,color:C.text3,marginTop:2}}>Clientes verão os preços publicamente</div>
+        </div>
+        <Toggle checked={loja.exibirPreco} onChange={v=>setLoja(p=>({...p,exibirPreco:v}))}/>
+      </div>
+    </VVCard>
+    <div style={{display:'flex',alignItems:'center',gap:12}}>
+      <Btn variant="dark" onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),2000);}}>Salvar configurações</Btn>
+      {saved&&<span style={{fontFamily:F.sans,fontSize:13,color:C.success,display:'flex',alignItems:'center',gap:5}}>✓ Salvo</span>}
+    </div>
+  </div>;
+}
+
+function AdminPanel(){
+  const[section,setSection]=React.useState('dashboard');
+  const[pecas,setPecas]=React.useState(MOCK_PECAS);
+  const[loja,setLoja]=React.useState({nome:'Atelier Laila',slug:'atelier-laila',whatsapp:'11 99876-5432',instagram:'atelierlaila',tiktok:'atelierlaila',exibirPreco:false,tagline:'Moda feminina com alma'});
+  return<div style={{display:'flex',height:'100%',background:C.bg,overflow:'hidden'}}>
+    <AdminSidebar section={section} setSection={setSection} loja={loja}/>
+    <main style={{flex:1,overflowY:'auto'}}>
+      {section==='dashboard'&&<Dashboard pecas={pecas} setSection={setSection}/>}
+      {section==='pecas'&&<PecasList pecas={pecas} setPecas={setPecas} showAll={false}/>}
+      {section==='todas'&&<PecasList pecas={pecas} setPecas={setPecas} showAll={true}/>}
+      {section==='config'&&<ConfigSection loja={loja} setLoja={setLoja}/>}
+    </main>
+  </div>;
+}
+</script>
+
+<!-- ⑤ Super-admin -->
+<script type="text/babel">
+const MOCK_LOJAS=[
+  {id:'1',nome:'Atelier Laila',slug:'atelier-laila',email:'laila@atelierlaila.com',pecas:8,vendidas:2,ativa:true,criada:'10/03/2026'},
+  {id:'2',nome:'Closet da Bê',slug:'closet-da-be',email:'beatriz@closetdabe.com.br',pecas:14,vendidas:5,ativa:true,criada:'18/03/2026'},
+  {id:'3',nome:'Studio Manu',slug:'studio-manu',email:'manu@studiomanu.com',pecas:22,vendidas:11,ativa:true,criada:'01/04/2026'},
+  {id:'4',nome:'Arara da Carol',slug:'arara-da-carol',email:'carol@araradacarol.com',pecas:6,vendidas:0,ativa:false,criada:'20/04/2026'},
+  {id:'5',nome:'Armário da Lu',slug:'armario-da-lu',email:'lu@armariodalú.com.br',pecas:18,vendidas:7,ativa:true,criada:'22/04/2026'},
+];
+
+// Cota usage is internal only — not shown to lojistas
+const COTA_DATA={
+  '1':{used:147,limit:200},'2':{used:88,limit:200},'3':{used:193,limit:200},
+  '4':{used:12,limit:100},'5':{used:41,limit:200},
+};
+
+function CreateLojaModal({open,onClose,onCreate}){
+  const[nome,setNome]=React.useState('');
+  const[email,setEmail]=React.useState('');
+  const[slug,setSlug]=React.useState('');
+  const[cota,setCota]=React.useState('200');
+  const[saving,setSaving]=React.useState(false);
+  const[done,setDone]=React.useState(false);
+
+  React.useEffect(()=>{if(open){setNome('');setEmail('');setSlug('');setCota('200');setDone(false);}},[open]);
+  React.useEffect(()=>{setSlug(nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''));},[nome]);
+
+  function handleCreate(){
+    setSaving(true);
+    setTimeout(()=>{
+      setSaving(false);setDone(true);
+      onCreate({id:String(Date.now()),nome,slug,email,pecas:0,vendidas:0,ativa:true,criada:new Date().toLocaleDateString('pt-BR')});
+      setTimeout(onClose,1500);
+    },800);
+  }
+  return<VVModal open={open} onClose={onClose} title="Nova loja" width={500}
+    footer={!done&&<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+      <Btn variant="dark" onClick={handleCreate} disabled={!nome||!email}>
+        {saving?<><Spinner size={14} color="#fff"/> Criando...</>:'Criar + enviar convite'}
+      </Btn></>}>
+    {done?<div style={{textAlign:'center',padding:'16px 0'}}>
+      <div style={{fontSize:38,marginBottom:14}}>✉️</div>
+      <div style={{fontFamily:F.serif,fontSize:22,fontWeight:600,color:C.text,marginBottom:8}}>Loja criada!</div>
+      <div style={{fontFamily:F.sans,fontSize:13.5,color:C.text2}}>Convite enviado para <strong>{email}</strong></div>
+    </div>:<div style={{display:'flex',flexDirection:'column',gap:16}}>
+      <VVInput label="Nome da loja" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Ex: Studio Manu" required/>
+      <VVInput label="E-mail da lojista" value={email} onChange={e=>setEmail(e.target.value)}
+        placeholder="lojista@email.com" type="email" required helper="Magic link de acesso será enviado automaticamente"/>
+      <VVInput label="Slug da vitrine" value={slug} onChange={e=>setSlug(e.target.value)} prefix="vitrine.app/v/"/>
+      <VVInput label="Cota mensal" value={cota} onChange={e=>setCota(e.target.value)} type="number" suffix="simulações/mês"/>
+    </div>}
+  </VVModal>;
+}
+
+function LojaRow({loja,onToggle}){
+  const cota=COTA_DATA[loja.id]||{used:0,limit:200};
+  const pct=Math.round((cota.used/cota.limit)*100);
+  return<div style={{display:'flex',alignItems:'center',gap:14,padding:'14px 22px'}}>
+    <Avatar name={loja.nome} size={38}/>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+        <span style={{fontFamily:F.sans,fontSize:13.5,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:160}}>{loja.nome}</span>
+        <Badge label={loja.ativa?'ativa':'inativa'} variant={loja.ativa?'success':'neutral'}/>
+      </div>
+      <div style={{fontFamily:F.sans,fontSize:11.5,color:C.text3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{loja.email}</div>
+    </div>
+    <div style={{textAlign:'center',minWidth:52}}><div style={{fontFamily:F.serif,fontSize:19,fontWeight:600,color:C.text}}>{loja.pecas}</div><div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3}}>peças</div></div>
+    <div style={{textAlign:'center',minWidth:52}}><div style={{fontFamily:F.serif,fontSize:19,fontWeight:600,color:C.accent}}>{loja.vendidas}</div><div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3}}>vendidas</div></div>
+    {/* Cota — visible only to super-admin */}
+    <div style={{minWidth:110}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+        <span style={{fontFamily:F.sans,fontSize:10.5,color:C.text3}}>Cabine</span>
+        <span style={{fontFamily:F.sans,fontSize:10.5,color:pct>85?C.danger:C.text3}}>{cota.used}/{cota.limit}</span>
+      </div>
+      <div style={{height:4,background:C.border,borderRadius:2,overflow:'hidden'}}>
+        <div style={{height:'100%',width:`${Math.min(pct,100)}%`,background:pct>85?C.danger:C.accent,borderRadius:2}}/>
+      </div>
+    </div>
+    <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
+      <Btn variant="ghost" size="sm">Editar</Btn>
+      <Toggle checked={loja.ativa} onChange={v=>onToggle(loja.id,v)}/>
+    </div>
+  </div>;
+}
+
+function SuperAdmin(){
+  const[lojas,setLojas]=React.useState(MOCK_LOJAS);
+  const[createOpen,setCreateOpen]=React.useState(false);
+  const[cabineOn,setCabineOn]=React.useState(true);
+  const[budget,setBudget]=React.useState('120');
+  const[saved,setSaved]=React.useState(false);
+  const total={pecas:lojas.reduce((a,l)=>a+l.pecas,0),vendidas:lojas.reduce((a,l)=>a+l.vendidas,0)};
+  const totalTryOns=Object.values(COTA_DATA).reduce((a,c)=>a+c.used,0);
+
+  return<div style={{display:'flex',flexDirection:'column',height:'100%',background:C.bg,overflow:'hidden'}}>
+    {/* Header */}
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'0 28px',
+      display:'flex',alignItems:'center',justifyContent:'space-between',height:56,flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:14}}>
+        <VVLogo size={20}/>
+        <div style={{width:1,height:18,background:C.border}}/>
+        <span style={{fontFamily:F.sans,fontSize:13,fontWeight:600,color:C.text}}>Super-Admin</span>
+        <Badge label="Francisco" variant="admin"/>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <Avatar name="Francisco" size={30}/>
+        <span style={{fontFamily:F.sans,fontSize:13,color:C.text2}}>francisco.efjr@gmail.com</span>
+      </div>
+    </div>
+    <div style={{flex:1,overflowY:'auto',padding:'28px 32px'}}>
+      <h1 style={{fontFamily:F.serif,fontSize:24,fontWeight:600,color:C.text,margin:'0 0 18px',letterSpacing:'0.01em'}}>Visão geral da plataforma</h1>
+      <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:26}}>
+        <KpiCard label="Lojas ativas" value={lojas.filter(l=>l.ativa).length} sub={`de ${lojas.length} total`} icon="🏪"/>
+        <KpiCard label="Peças" value={total.pecas} sub="em todas as vitrines" icon="◈"/>
+        <KpiCard label="Vendidas" value={total.vendidas} sub="este mês" icon="✓"/>
+        <KpiCard label="Simulações (Cabine)" value={totalTryOns} sub={`≈ US$ ${(totalTryOns*0.06).toFixed(2)} estimado`} icon="✦"/>
+      </div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:10}}>
+        <div style={{fontFamily:F.sans,fontSize:11,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em'}}>Lojas</div>
+        <Btn variant="dark" icon={<span>+</span>} onClick={()=>setCreateOpen(true)}>Nova loja + convite</Btn>
+      </div>
+      <VVCard style={{marginBottom:22}}>
+        {lojas.map((l,i)=><React.Fragment key={l.id}>
+          <LojaRow loja={l} onToggle={(id,v)=>setLojas(prev=>prev.map(x=>x.id===id?{...x,ativa:v}:x))}/>
+          {i<lojas.length-1&&<Divider/>}
+        </React.Fragment>)}
+      </VVCard>
+      {/* System settings */}
+      <VVCard style={{padding:'22px'}}>
+        <div style={{fontFamily:F.sans,fontSize:11,fontWeight:600,color:C.text3,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:18}}>Controles do sistema</div>
+        <div style={{display:'flex',flexDirection:'column',gap:18}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+            padding:'14px',background:cabineOn?C.accentLight:'#f7ebeb',borderRadius:10}}>
+            <div>
+              <div style={{fontFamily:F.sans,fontSize:14,fontWeight:600,color:C.text}}>Kill switch — Cabine</div>
+              <div style={{fontFamily:F.sans,fontSize:12,color:C.text2,marginTop:3}}>Desligar suspende as simulações em <strong>todas</strong> as vitrines</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <Badge label={cabineOn?'ON':'OFF'} variant={cabineOn?'success':'neutral'}/>
+              <Toggle checked={cabineOn} onChange={setCabineOn}/>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:12,alignItems:'flex-end'}}>
+            <VVInput label="Orçamento mensal de API (US$)" value={budget} onChange={e=>setBudget(e.target.value)}
+              type="number" prefix="US$" helper="Kill switch ativa automaticamente ao atingir o limite" style={{flex:1}}/>
+            <Btn variant="dark" onClick={()=>{setSaved(true);setTimeout(()=>setSaved(false),2000);}} style={{marginBottom:2}}>
+              {saved?'✓ Salvo':'Salvar'}
+            </Btn>
+          </div>
+        </div>
+      </VVCard>
+    </div>
+    <CreateLojaModal open={createOpen} onClose={()=>setCreateOpen(false)} onCreate={l=>setLojas(prev=>[...prev,l])}/>
+  </div>;
+}
+</script>
+
+<!-- ⑥ Auth screens + Piece detail -->
+<script type="text/babel">
+function AuthShell({children,width=400}){
+  return<div style={{minHeight:'100%',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+    <div style={{width:'100%',maxWidth:width}}>
+      <div style={{textAlign:'center',marginBottom:32}}><VVLogo size={30}/></div>
+      <VVCard style={{padding:'34px 38px'}}>{children}</VVCard>
+      <div style={{textAlign:'center',marginTop:18,fontFamily:F.sans,fontSize:11,color:C.text3,letterSpacing:'0.03em'}}>vitrine.app</div>
+    </div>
+  </div>;
+}
+
+function RecuperarSenha({onBack}){
+  const[email,setEmail]=React.useState('');
+  const[sent,setSent]=React.useState(false);
+  const[loading,setLoading]=React.useState(false);
+  function handleSubmit(){if(!email)return;setLoading(true);setTimeout(()=>{setLoading(false);setSent(true);},900);}
+  return<AuthShell>
+    {!sent?<>
+      <h1 style={{fontFamily:F.serif,fontSize:26,fontWeight:600,color:C.text,margin:'0 0 8px',textAlign:'center',letterSpacing:'0.01em'}}>Recuperar senha</h1>
+      <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,margin:'0 0 26px',textAlign:'center',lineHeight:1.65}}>Informe o e-mail da sua conta e enviaremos um link para redefinição.</p>
+      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <VVInput label="E-mail" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seunome@email.com" type="email" required/>
+        <Btn variant="dark" size="lg" onClick={handleSubmit} disabled={!email||loading} style={{width:'100%',justifyContent:'center'}}>
+          {loading?<><Spinner size={15} color="#fff"/> Enviando...</>:'Enviar link de recuperação'}
+        </Btn>
+      </div>
+      <div style={{marginTop:20,textAlign:'center'}}>
+        <span onClick={onBack} style={{fontFamily:F.sans,fontSize:13,color:C.text3,cursor:'pointer',textDecoration:'underline',textDecorationColor:C.border}}>← Voltar ao login</span>
+      </div>
+    </>:<div style={{textAlign:'center',padding:'6px 0'}}>
+      <div style={{width:52,height:52,borderRadius:'50%',background:C.accentLight,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 18px',fontSize:22}}>✉️</div>
+      <h2 style={{fontFamily:F.serif,fontSize:23,fontWeight:600,color:C.text,margin:'0 0 10px',letterSpacing:'0.01em'}}>Verifique seu e-mail</h2>
+      <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,lineHeight:1.7,margin:'0 0 22px'}}>
+        Se existe uma conta com <strong>{email}</strong>, você receberá o link em breve.<br/>
+        Verifique também a caixa de spam.
+      </p>
+      <Btn variant="ghost" onClick={()=>{setSent(false);setEmail('');}} style={{width:'100%',justifyContent:'center'}}>Usar outro e-mail</Btn>
+      <div style={{marginTop:14}}><span onClick={onBack} style={{fontFamily:F.sans,fontSize:13,color:C.text3,cursor:'pointer',textDecoration:'underline',textDecorationColor:C.border}}>← Voltar ao login</span></div>
+    </div>}
+  </AuthShell>;
+}
+
+function DefinirSenha({mode='invite'}){
+  const[senha,setSenha]=React.useState('');
+  const[confirmar,setConfirmar]=React.useState('');
+  const[loading,setLoading]=React.useState(false);
+  const[done,setDone]=React.useState(false);
+  const isInvite=mode==='invite';
+  const minLen=8,hasMin=senha.length>=minLen,hasUpper=/[A-Z]/.test(senha),hasNum=/[0-9]/.test(senha);
+  const matches=senha===confirmar&&confirmar.length>0;
+  const valid=hasMin&&matches;
+  const checks=[{ok:hasMin,label:`${minLen}+ caracteres`},{ok:hasUpper,label:'Maiúscula'},{ok:hasNum,label:'Número'},{ok:matches,label:'Senhas iguais'}];
+
+  if(done)return<AuthShell>
+    <div style={{textAlign:'center',padding:'6px 0'}}>
+      <div style={{width:52,height:52,borderRadius:'50%',background:C.accentLight,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 18px',fontSize:22,color:C.accentDark}}>✓</div>
+      <h2 style={{fontFamily:F.serif,fontSize:23,fontWeight:600,color:C.text,margin:'0 0 10px',letterSpacing:'0.01em'}}>{isInvite?'Tudo pronto!':'Senha redefinida!'}</h2>
+      <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,lineHeight:1.7,margin:'0 0 22px'}}>
+        {isInvite?'Sua conta foi criada. Você já pode acessar sua vitrine.':'Senha atualizada com sucesso.'}
+      </p>
+      <Btn variant="dark" size="lg" style={{width:'100%',justifyContent:'center'}}>{isInvite?'Acessar minha vitrine →':'Ir para o login →'}</Btn>
+    </div>
+  </AuthShell>;
+
+  return<AuthShell>
+    {isInvite&&<div style={{background:C.accentLight,borderRadius:9,padding:'11px 14px',marginBottom:22,display:'flex',alignItems:'flex-start',gap:9}}>
+      <span style={{fontSize:15,flexShrink:0}}>✉️</span>
+      <div><div style={{fontFamily:F.sans,fontSize:12.5,fontWeight:600,color:C.accentDark,marginBottom:1}}>Convite recebido</div>
+        <div style={{fontFamily:F.sans,fontSize:12,color:C.accentDark,lineHeight:1.5}}>Você foi convidada para <strong>Atelier Laila</strong> na vitrine.app.</div></div>
+    </div>}
+    <h1 style={{fontFamily:F.serif,fontSize:25,fontWeight:600,color:C.text,margin:'0 0 8px',textAlign:'center',letterSpacing:'0.01em'}}>{isInvite?'Defina sua senha':'Nova senha'}</h1>
+    <p style={{fontFamily:F.sans,fontSize:13.5,color:C.text2,margin:'0 0 22px',textAlign:'center',lineHeight:1.65}}>
+      {isInvite?'Crie uma senha segura para sua conta.':'Escolha uma nova senha.'}
+    </p>
+    <div style={{display:'flex',flexDirection:'column',gap:13}}>
+      <VVInput label="Nova senha" value={senha} onChange={e=>setSenha(e.target.value)} type="password" placeholder="••••••••" required/>
+      <VVInput label="Confirmar senha" value={confirmar} onChange={e=>setConfirmar(e.target.value)} type="password" placeholder="••••••••"
+        error={confirmar.length>2&&!matches?'As senhas não coincidem':undefined}/>
+      {senha.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'5px 10px',padding:'10px 12px',background:C.surface2,borderRadius:8}}>
+        {checks.map(c=><div key={c.label} style={{display:'flex',alignItems:'center',gap:5}}>
+          <span style={{fontSize:11,color:c.ok?C.success:C.text3,fontWeight:700}}>{c.ok?'✓':'·'}</span>
+          <span style={{fontFamily:F.sans,fontSize:11.5,color:c.ok?C.success:C.text3}}>{c.label}</span>
+        </div>)}
+      </div>}
+      <Btn variant="dark" size="lg" onClick={()=>{if(!valid)return;setLoading(true);setTimeout(()=>{setLoading(false);setDone(true);},900);}}
+        disabled={!valid||loading} style={{width:'100%',justifyContent:'center',marginTop:2}}>
+        {loading?<><Spinner size={15} color="#fff"/> Salvando...</>:(isInvite?'Salvar senha e acessar':'Redefinir senha')}
+      </Btn>
+    </div>
+  </AuthShell>;
+}
+
+function AuthScreens(){
+  const[view,setView]=React.useState('recuperar');
+  const views=[{id:'recuperar',label:'Recuperar senha'},{id:'convite',label:'Pós-convite'},{id:'redefinir',label:'Redefinir senha'}];
+  return<div style={{display:'flex',flexDirection:'column',height:'100%',background:C.surface3,overflow:'hidden'}}>
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'11px 28px',display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+      <span style={{fontFamily:F.sans,fontSize:12,color:C.text3,marginRight:6}}>Tela:</span>
+      {views.map(v=><button key={v.id} onClick={()=>setView(v.id)} style={{padding:'6px 14px',borderRadius:20,
+        border:`1px solid ${view===v.id?C.text:C.border}`,background:view===v.id?C.text:'transparent',
+        color:view===v.id?'#fff':C.text2,fontFamily:F.sans,fontSize:13,fontWeight:500,cursor:'pointer',transition:'all 0.15s'}}>
+        {v.label}
+      </button>)}
+    </div>
+    <div style={{flex:1,overflowY:'auto'}}>
+      {view==='recuperar'&&<RecuperarSenha onBack={()=>{}}/>}
+      {view==='convite'&&<DefinirSenha mode="invite"/>}
+      {view==='redefinir'&&<DefinirSenha mode="reset"/>}
+    </div>
+  </div>;
+}
+
+// Piece detail modal
+function PecaDetalhe({open,onClose,peca,onEdit,onDelete}){
+  const[tab,setTab]=React.useState('info');
+  const[copyMsg,setCopyMsg]=React.useState('');
+  if(!open||!peca)return null;
+  const infoRows=[
+    {label:'Categoria',value:getCatLabel(peca.cat||'blusas')},
+    {label:'Tamanho',value:peca.tamanho},
+    {label:'Cor',value:peca.cor||'Não informada'},
+    {label:'Estado',value:peca.estado||'Excelente'},
+    {label:'Fotos',value:`${peca.fotos||1} foto${(peca.fotos||1)!==1?'s':''}`},
+    {label:'Cadastrada em',value:'12/04/2026'},
+  ];
+  return<div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(30,26,23,0.52)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,padding:20,backdropFilter:'blur(4px)'}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:20,width:'100%',maxWidth:800,maxHeight:'90vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 80px rgba(0,0,0,0.18)',overflow:'hidden'}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'17px 24px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,minWidth:0}}>
+          <span style={{fontFamily:F.serif,fontSize:20,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{peca.nome}</span>
+          <Badge label={peca.status==='disponivel'?'disponível':'vendida'} variant={peca.status==='disponivel'?'disponivel':'vendida'}/>
+        </div>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:C.text3,fontSize:17,padding:4,flexShrink:0}}>✕</button>
+      </div>
+      <div style={{display:'flex',flex:1,overflow:'hidden'}}>
+        {/* Photos */}
+        <div style={{width:300,flexShrink:0,borderRight:`1px solid ${C.border}`,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <ImgPlaceholder height={300} label={`${trunc(peca.nome,20)}\nfoto principal`} style={{borderRadius:0,flexShrink:0}}/>
+          <div style={{display:'flex',gap:7,padding:'10px 14px',overflowX:'auto',flexShrink:0}}>
+            {Array.from({length:peca.fotos||1}).map((_,i)=>(
+              <ImgPlaceholder key={i} width={52} height={52} style={{borderRadius:6,flexShrink:0,border:i===0?`2px solid ${C.accent}`:`1px solid ${C.border}`}}/>
+            ))}
+            <div style={{width:52,height:52,borderRadius:6,border:`2px dashed ${C.border}`,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+              <span style={{color:C.text3,fontSize:18}}>+</span>
+            </div>
+          </div>
+        </div>
+        {/* Info */}
+        <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div style={{display:'flex',borderBottom:`1px solid ${C.border}`,padding:'0 22px',flexShrink:0}}>
+            {[{id:'info',label:'Informações'},{id:'desc',label:'Descrição'}].map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'12px 14px',border:'none',background:'transparent',cursor:'pointer',
+                fontFamily:F.sans,fontSize:13.5,fontWeight:tab===t.id?600:400,color:tab===t.id?C.text:C.text3,
+                borderBottom:`2px solid ${tab===t.id?C.accent:'transparent'}`,marginBottom:-1}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div style={{flex:1,overflowY:'auto',padding:'18px 22px'}}>
+            {tab==='info'&&<>
+              <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:18}}>
+                <span style={{fontFamily:F.serif,fontSize:30,fontWeight:600,color:C.text}}>{formatPrice(peca.preco)}</span>
+                <Badge label="visível na vitrine" variant="neutral"/>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',marginBottom:18}}>
+                {infoRows.map((r,i)=>(
+                  <div key={r.label} style={{padding:'9px 0',borderBottom:`1px solid ${C.border}`,
+                    borderRight:i%2===0?`1px solid ${C.border}`:'none',
+                    paddingRight:i%2===0?14:0,paddingLeft:i%2!==0?14:0}}>
+                    <div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3,fontWeight:500,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:2}}>{r.label}</div>
+                    <div style={{fontFamily:F.sans,fontSize:13.5,fontWeight:500,color:C.text}}>{r.value}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{background:C.surface2,borderRadius:9,padding:'11px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                <div style={{minWidth:0}}>
+                  <div style={{fontFamily:F.sans,fontSize:10.5,color:C.text3,marginBottom:2}}>Link público</div>
+                  <div style={{fontFamily:'monospace',fontSize:11.5,color:C.text2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>vitrine.app/v/atelier-laila/p/{peca.id}</div>
+                </div>
+                <div style={{display:'flex',gap:7,flexShrink:0}}>
+                  <Btn variant="ghost" size="sm" onClick={()=>{setCopyMsg('Copiado!');setTimeout(()=>setCopyMsg(''),2000);}}>{copyMsg||'Copiar'}</Btn>
+                  <Btn variant="ghost" size="sm">↗</Btn>
+                </div>
+              </div>
+            </>}
+            {tab==='desc'&&<div>
+              <VVInput as="textarea" label="Descrição da peça" rows={6}
+                value={peca.desc||'Blusa de linho branca, leveza e sofisticação para o dia a dia. Tecido de alta qualidade, caimento perfeito.'}
+                onChange={()=>{}} helper="A descrição aparece na vitrine e auxilia na busca."/>
+              <div style={{marginTop:14}}><Btn variant="dark" size="sm">Salvar descrição</Btn></div>
+            </div>}
+          </div>
+          {/* Actions */}
+          <div style={{padding:'12px 22px',borderTop:`1px solid ${C.border}`,display:'flex',gap:9,alignItems:'center',flexShrink:0}}>
+            <Btn variant="dark" onClick={onEdit} icon={<span>✎</span>}>Editar</Btn>
+            {peca.status==='disponivel'&&<Btn variant="ghost">Marcar como vendida</Btn>}
+            <div style={{flex:1}}/>
+            <Btn variant="text" size="sm" onClick={onDelete} style={{color:C.danger}}>Excluir peça</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+</script>
+
+<!-- ⑦ Tweaks panel -->
+<script type="text/babel">
+const __TWK_CSS=`.twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:260px;max-height:calc(100vh - 32px);display:flex;flex-direction:column;background:rgba(250,249,247,.88);color:#29261b;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:.5px solid rgba(255,255,255,.6);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.18);font:11.5px/1.4 ui-sans-serif,system-ui,sans-serif;overflow:hidden}.twk-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 8px 10px 14px;cursor:move;user-select:none}.twk-hd b{font-size:12px;font-weight:600}.twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:13px}.twk-x:hover{background:rgba(0,0,0,.06)}.twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:0}.twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:rgba(41,38,27,.45);padding:8px 0 0}.twk-row{display:flex;flex-direction:column;gap:4px}.twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}.twk-lbl{font-weight:500;color:rgba(41,38,27,.72)}.twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;background:rgba(0,0,0,.15);transition:background .15s;cursor:pointer;padding:0}.twk-toggle[data-on="1"]{background:#b8956a}.twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}.twk-toggle[data-on="1"] i{transform:translateX(14px)}.twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;background:rgba(0,0,0,.06);user-select:none}.twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);transition:left .15s,width .15s}.twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;border-radius:6px;cursor:pointer;padding:4px 6px}.twk-swatch{appearance:none;width:48px;height:22px;border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:pointer;background:transparent}.twk-swatch::-webkit-color-swatch-wrapper{padding:0}.twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}`;
+
+function useTweaks(defaults){
+  const[values,setValues]=React.useState(defaults);
+  const setTweak=React.useCallback((k,v)=>{const edits=typeof k==='object'?k:{[k]:v};setValues(p=>({...p,...edits}));window.parent.postMessage({type:'__edit_mode_set_keys',edits},'*');},[]);
+  return[values,setTweak];
+}
+function TweaksPanel({title='Tweaks',children}){
+  const[open,setOpen]=React.useState(false);
+  const ref=React.useRef(null);
+  React.useEffect(()=>{
+    const onMsg=e=>{if(e?.data?.type==='__activate_edit_mode')setOpen(true);if(e?.data?.type==='__deactivate_edit_mode')setOpen(false);};
+    window.addEventListener('message',onMsg);
+    window.parent.postMessage({type:'__edit_mode_available'},'*');
+    return()=>window.removeEventListener('message',onMsg);
+  },[]);
+  const dismiss=()=>{setOpen(false);window.parent.postMessage({type:'__edit_mode_dismissed'},'*');};
+  if(!open)return null;
+  return<><style>{__TWK_CSS}</style>
+    <div ref={ref} className="twk-panel">
+      <div className="twk-hd"><b>{title}</b><button className="twk-x" onClick={dismiss}>✕</button></div>
+      <div className="twk-body">{children}</div>
+    </div></>;
+}
+function TweakSection({title,children}){return<><div className="twk-sect">{title}</div>{children}</>;}
+function TweakToggle({label,value,onChange}){return<div className="twk-row twk-row-h"><span className="twk-lbl">{label}</span><button className="twk-toggle" data-on={value?'1':'0'} onClick={()=>onChange(!value)}><i/></button></div>;}
+function TweakColor({label,value,onChange}){return<div className="twk-row twk-row-h"><span className="twk-lbl">{label}</span><input type="color" className="twk-swatch" value={value} onChange={e=>onChange(e.target.value)}/></div>;}
+function TweakRadio({label,value,options,onChange}){
+  const opts=options.map(o=>typeof o==='object'?o:{value:o,label:o});
+  const idx=Math.max(0,opts.findIndex(o=>o.value===value));
+  const n=opts.length;
+  return<div className="twk-row"><span className="twk-lbl">{label}</span>
+    <div className="twk-seg">
+      <div className="twk-seg-thumb" style={{left:`calc(2px + ${idx}*(100% - 4px)/${n})`,width:`calc((100% - 4px)/${n})`}}/>
+      {opts.map(o=><button key={o.value} onClick={()=>onChange(o.value)}>{o.label}</button>)}
+    </div>
+  </div>;
+}
+</script>
+
+<!-- ⑧ App shell -->
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentColor": "#b8956a",
+  "fontStyle": "elegante",
+  "showWatermark": true
+}/*EDITMODE-END*/;
+
+const TABS=[
+  {id:'vitrine',label:'Vitrine Pública',icon:'🛍'},
+  {id:'admin',label:'Painel da Loja',icon:'🏪'},
+  {id:'superadmin',label:'Super-Admin',icon:'⚙'},
+  {id:'auth',label:'Auth & Onboarding',icon:'🔑'},
+];
+
+function App(){
+  const[tab,setTab]=React.useState('vitrine');
+  const[tweaks,setTweak]=useTweaks(TWEAK_DEFAULTS);
+  return<div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
+    <header style={{background:C.surface,borderBottom:`1px solid ${C.border}`,display:'flex',
+      alignItems:'center',justifyContent:'space-between',padding:'0 20px',height:52,flexShrink:0,zIndex:100}}>
+      <div style={{display:'flex',alignItems:'center',gap:2}}>
+        {TABS.map(t=><button key={t.id} className={`vv-tab${tab===t.id?' on':''}`} onClick={()=>setTab(t.id)}>
+          <span style={{fontSize:14}}>{t.icon}</span>{t.label}
+        </button>)}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:5,padding:'5px 11px',background:'#f0f9f3',borderRadius:16,border:'1px solid #c8e8d4'}}>
+          <div style={{width:6,height:6,borderRadius:'50%',background:'#28c840'}}/>
+          <span style={{fontFamily:F.sans,fontSize:11.5,fontWeight:500,color:'#2d6a4f'}}>Protótipo interativo</span>
+        </div>
+        <VVLogo size={20}/>
+      </div>
+    </header>
+    <div key={tab} style={{flex:1,overflow:'hidden',animation:'vv-fade 0.2s ease'}}>
+      {tab==='vitrine'&&<PublicVitrine/>}
+      {tab==='admin'&&<AdminPanel/>}
+      {tab==='superadmin'&&<SuperAdmin/>}
+      {tab==='auth'&&<AuthScreens/>}
+    </div>
+    <TweaksPanel title="Tweaks">
+      <TweakSection title="Visual">
+        <TweakColor id="accentColor" label="Cor de acento" value={tweaks.accentColor} onChange={v=>setTweak('accentColor',v)}/>
+        <TweakRadio id="fontStyle" label="Tipografia" value={tweaks.fontStyle}
+          options={[{value:'elegante',label:'Elegante'},{value:'moderna',label:'Moderna'}]}
+          onChange={v=>setTweak('fontStyle',v)}/>
+      </TweakSection>
+      <TweakSection title="Vitrine">
+        <TweakToggle id="showWatermark" label="Rodapé vitrine.app" value={tweaks.showWatermark} onChange={v=>setTweak('showWatermark',v)}/>
+      </TweakSection>
+    </TweaksPanel>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

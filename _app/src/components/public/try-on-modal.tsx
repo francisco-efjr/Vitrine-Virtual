@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { VVLogo } from '@/components/brand/vv-logo'
 import { preparePreviewableImage } from '@/lib/images/client-standardize'
+import { downloadSimulacaoComMarca } from '@/lib/images/download-with-watermark'
 import {
   IMAGE_INVALID_FORMAT_MESSAGE,
   IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES,
@@ -100,27 +101,14 @@ export function TryOnModal({
     if (!resultUrl) return
     setDownloading(true)
     try {
-      const res = await fetch(resultUrl, { mode: 'cors' })
-      if (!res.ok) throw new Error('download_failed')
-      const blob = await res.blob()
-      const objectUrl = URL.createObjectURL(blob)
-      const safeName =
-        pecaNome
-          .normalize('NFKD')
-          .replace(/[^\w\s-]/g, '')
-          .trim()
-          .replace(/\s+/g, '-')
-          .toLowerCase()
-          .slice(0, 60) || 'simulacao'
-      const ext = blob.type.includes('png') ? 'png' : 'jpg'
-      const a = document.createElement('a')
-      a.href = objectUrl
-      a.download = `cabine-${safeName}.${ext}`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(objectUrl)
+      // Compõe canvas 1080×1920 com marca d'água "vv" + wordmark vitrine no rodapé
+      await downloadSimulacaoComMarca({
+        imageUrl: resultUrl,
+        pecaNome,
+        filenameSeed: pecaNome,
+      })
     } catch {
+      // Fallback: se canvas falhar (CORS, browser muito antigo), abre em nova aba
       if (resultUrl) window.open(resultUrl, '_blank', 'noopener,noreferrer')
     } finally {
       setDownloading(false)
@@ -229,79 +217,97 @@ export function TryOnModal({
 
   if (!open) return null
 
-  // ─── Result screen — full-bleed dark, emotional, minimal ───
+  // ─── Result screen — 9:16 card contido, fundo branco no card, badge "Simulação" ───
   if (step === 'result' && resultUrl) {
     return (
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Resultado da Cabine"
-        className="vv-fade-in fixed inset-0 z-[2000] flex flex-col bg-[#0e0c0a]"
+        className="vv-fade-in fixed inset-0 z-[2000] flex flex-col overflow-y-auto bg-[#0e0c0a]"
       >
-        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-4 py-4 sm:px-5">
-          <VVLogo size={22} variant="light" />
+        {/* Top bar */}
+        <div className="z-10 flex shrink-0 items-center justify-between px-5 py-4 sm:px-6">
+          <VVLogo size={26} variant="dark" />
           <button
             onClick={onClose}
-            className="rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs text-white/75 backdrop-blur transition hover:bg-white/20 sm:text-[12.5px]"
+            className="rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 font-sans text-[12.5px] text-white/80 backdrop-blur transition hover:bg-white/20"
           >
             Fechar
           </button>
         </div>
 
-        <div className="relative flex-1 overflow-hidden">
-          {cabineBackdropUrl ? (
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-15"
-              style={{ backgroundImage: `url("${cabineBackdropUrl}")` }}
-            />
-          ) : null}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={resultUrl}
-            alt="Resultado da Cabine"
-            className="vv-blur-in absolute inset-0 h-full w-full object-cover object-center"
-          />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-[#0e0c0a]/95 via-[#0e0c0a]/40 to-transparent" />
-
+        {/* Body */}
+        <div className="flex flex-1 flex-col items-center justify-center gap-5 px-5 pb-7 pt-1 sm:px-6">
           <div
-            aria-hidden="true"
-            className="pointer-events-none absolute right-4 top-[78px] flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 backdrop-blur-md"
-            style={{ animation: 'vv-fade 0.6s var(--e-out) 0.5s both' }}
+            className="font-serif text-[13px] italic text-white/55"
+            style={{ animation: 'vv-fade 0.5s var(--e-out) 0.1s both' }}
           >
-            <span className="block h-1 w-1 rounded-full bg-white/70" />
-            <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-white/80">
-              Simulação gerada
-            </span>
+            Veja como ficou em você
           </div>
 
+          {/* Imagem 9:16 contida — card branco garante leitura sobre qualquer cenário */}
           <div
-            className="absolute inset-x-0 bottom-0 px-5 pb-7 pt-6 sm:px-7 sm:pb-8"
-            style={{ animation: 'vv-fade-up 0.55s var(--e-out) 0.25s both' }}
+            className="relative overflow-hidden rounded-[14px] bg-white"
+            style={{
+              aspectRatio: '9 / 16',
+              height: 'min(64vh, 720px)',
+              maxWidth: 'min(92vw, 405px)',
+              boxShadow:
+                '0 22px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
+              animation: 'vv-fade-up 0.5s var(--e-out) 0.2s both',
+            }}
           >
-            <div className="font-serif text-[15px] italic tracking-wide text-white/55">
-              Veja como ficou em você
-            </div>
-            <div className="mt-2 font-serif text-[24px] font-semibold leading-tight tracking-tight text-white sm:text-[26px]">
-              {pecaNome}
-            </div>
-            {pecaTamanho ? (
-              <div className="mt-1 font-sans text-[13px] text-white/50">{pecaTamanho}</div>
+            {cabineBackdropUrl ? (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-cover bg-center opacity-15"
+                style={{ backgroundImage: `url("${cabineBackdropUrl}")` }}
+              />
             ) : null}
-            {exibirPreco && pecaPrecoCentavos != null ? (
-              <div className="mt-3 font-serif text-[20px] font-medium text-white/85">
-                {formatPreco(pecaPrecoCentavos)}
-              </div>
-            ) : null}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={resultUrl}
+              alt="Resultado da Cabine"
+              className="vv-blur-in absolute inset-0 h-full w-full object-contain"
+            />
+            {/* Badge "Simulação" — sempre visível sobre fundo claro ou escuro */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-[#0e0c0a]/80 px-2.5 py-1 backdrop-blur"
+            >
+              <span className="block h-1 w-1 rounded-full bg-white/80" />
+              <span className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.14em] text-white/90">
+                Simulação
+              </span>
+            </div>
+          </div>
 
-            <div className="mt-5 flex flex-wrap items-center gap-2.5">
+          {/* Info + CTAs */}
+          <div
+            className="flex w-full max-w-[520px] flex-col gap-3.5"
+            style={{ animation: 'vv-fade-up 0.5s var(--e-out) 0.35s both' }}
+          >
+            <div className="text-center">
+              <div className="font-serif text-[22px] font-semibold leading-tight tracking-tight text-white">
+                {pecaNome}
+              </div>
+              <div className="mt-1 font-sans text-[12.5px] text-white/50">
+                {pecaTamanho ?? ''}
+                {exibirPreco && pecaPrecoCentavos != null ? (
+                  <span className="ml-2 text-white/80">· {formatPreco(pecaPrecoCentavos)}</span>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
               {whatsappE164 ? (
                 <a
                   href={buildWhatsAppUrl(whatsappE164, buildVitrineMessage({ pecaNome })) ?? '#'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-sans text-sm font-semibold text-ink transition hover:opacity-90"
-                  style={{ minWidth: 180 }}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-sans text-sm font-semibold text-ink transition hover:opacity-90"
+                  style={{ flex: '1 1 200px' }}
                 >
                   <MessageCircle size={16} />
                   Falar com a loja
@@ -310,6 +316,7 @@ export function TryOnModal({
               <button
                 onClick={handleDownload}
                 disabled={downloading}
+                title="Baixar foto com marca d'água"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-4 py-3 font-sans text-[13.5px] font-medium text-white/90 backdrop-blur transition hover:bg-white/20 disabled:opacity-60"
               >
                 <Download size={14} />
@@ -319,11 +326,12 @@ export function TryOnModal({
                 onClick={handleTryAnother}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-4 py-3 font-sans text-[13.5px] text-white/70 transition hover:bg-white/10 hover:text-white"
               >
-                Experimentar outra peça
+                Outra peça
               </button>
             </div>
-            <div className="mt-3 text-center font-sans text-[11px] text-white/35">
-              Imagem gerada por simulação · expira em 24h e não é armazenada
+
+            <div className="text-center font-sans text-[11px] text-white/35">
+              Imagem 1080×1920 · simulação visual · expira em 24h e não é armazenada
             </div>
           </div>
         </div>
@@ -560,6 +568,7 @@ function UploadStep({
             onRemove={() => setMirrorPhoto(null)}
           />
         ) : (
+          // ─── Empty state minimalista: faixa horizontal (sem ocupar 3:4 grande) ───
           <div
             role="button"
             tabIndex={0}
@@ -578,8 +587,9 @@ function UploadStep({
               const f = e.dataTransfer.files?.[0] ?? null
               if (f) await onPick(f)
             }}
-            className="flex aspect-[3/4] w-full cursor-pointer flex-col items-center justify-center gap-3.5 rounded-xl transition"
+            className="flex w-full cursor-pointer items-center gap-3.5 rounded-xl px-5 py-4 transition"
             style={{
+              minHeight: 96,
               border: `1px ${drag ? 'solid' : 'dashed'} ${
                 uploadError ? '#c47a7a' : drag ? '#1e1a17' : 'rgba(30,26,23,0.10)'
               }`,
@@ -587,23 +597,23 @@ function UploadStep({
             }}
           >
             <div
-              className="flex h-9 w-9 items-center justify-center rounded-full"
+              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full"
               style={{
                 background: uploadError ? '#f7ebeb' : '#f5f0ea',
                 color: uploadError ? '#c47a7a' : '#6d6460',
               }}
             >
-              <Upload size={15} />
+              <Upload size={17} />
             </div>
-            <div className="max-w-[280px] px-4 text-center">
+            <div className="min-w-0 flex-1 text-left">
               <div
-                className="font-sans text-[13px] font-medium"
+                className="font-sans text-[13.5px] font-medium"
                 style={{ color: uploadError ? '#c47a7a' : '#1e1a17' }}
               >
-                {uploadError ?? 'Toque para selecionar uma foto'}
+                {uploadError ?? 'Toque para selecionar'}
               </div>
-              <div className="mt-1 font-sans text-[11.5px] text-ink-3">
-                {uploadError ? 'tente novamente' : 'ou arraste para esta área · JPEG · PNG · WebP'}
+              <div className="mt-0.5 font-sans text-[11.5px] text-ink-3">
+                {uploadError ? 'tente novamente' : 'ou arraste · JPEG · PNG · WebP'}
               </div>
             </div>
           </div>
@@ -699,11 +709,24 @@ function UploadPreview({
   return (
     <div className="flex flex-col gap-2.5" style={{ animation: 'vv-fade 0.32s var(--e-out)' }}>
       <div
-        className="group relative aspect-[3/4] w-full overflow-hidden rounded-2xl"
-        style={{ background: 'linear-gradient(180deg, #f5f0ea 0%, #ede6dc 100%)' }}
+        className="group relative mx-auto w-full overflow-hidden rounded-2xl"
+        style={{
+          aspectRatio: '9 / 16',
+          maxWidth: 300,
+          maxHeight: '52vh',
+          background: 'linear-gradient(180deg, #f5f0ea 0%, #ede6dc 100%)',
+        }}
       >
+        {/* object-contain ⇒ foto inteira visível em qualquer proporção */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={value.previewUrl} alt="Sua foto" className="block h-full w-full object-contain" />
+        {/* Badge canônico 9:16 1080×1920 — discreto, top-left */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-2 top-2 rounded-md bg-white/70 px-1.5 py-[3px] font-mono text-[9px] tracking-wider text-[#9a9189]"
+        >
+          9:16 · 1080×1920
+        </span>
         <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/45 via-transparent to-transparent p-3.5 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
           <div className="flex gap-1.5">
             <button

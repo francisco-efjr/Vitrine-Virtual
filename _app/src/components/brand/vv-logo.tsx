@@ -1,74 +1,56 @@
 import { cn } from '@/lib/utils'
 
 /**
- * Marca animada da Vitrine Virtual.
+ * Marca da Vitrine Virtual — monograma "vv" itálico em serif.
  *
- * Conforme handoff v3 (notes/design-handoff-v3/project/Vitrine Virtual.html),
- * a marca virou duas curvas suaves desenhadas (animação de stroke) + ponto
- * de apoio embaixo, em substituição às letras "vv" tipográficas.
+ * Conforme handoff v4 (notes/design-handoff-v4): a identidade voltou ao
+ * monograma escuro com "vv" branco em serif itálico (Bodoni Moda 600).
+ * É a mesma identidade que aparece no centro do disco de loading da
+ * Cabine, e agora se repete em todo o sistema — sidebar admin, login,
+ * banner da loja, topo da cabine etc.
+ *
+ * Default: variante "dark" (quadrado preto + vv branco) sem o wordmark.
  */
 export function VVLogo({
   size = 28,
   variant = 'dark',
-  showWordmark = true,
-  animated = true,
+  showWordmark = false,
   className,
 }: {
   size?: number
   variant?: 'dark' | 'light'
   showWordmark?: boolean
-  animated?: boolean
   className?: string
 }) {
-  const tileFill = variant === 'dark' ? '#1e1a17' : '#ffffff'
-  const strokeFill = variant === 'dark' ? '#ffffff' : '#1e1a17'
-  const textColor = variant === 'dark' ? 'text-ink' : 'text-white'
-  const uid = Math.random().toString(36).slice(2, 8)
+  const bg = variant === 'dark' ? '#1e1a17' : '#ffffff'
+  const fg = variant === 'dark' ? '#ffffff' : '#1e1a17'
+  const radius = Math.round(size * 0.235)
+  const innerFontSize = Math.round(size * 0.62)
   return (
     <span className={cn('inline-flex items-center gap-[9px]', className)}>
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 32 32"
+      <span
         aria-hidden="true"
-        style={{ transition: 'transform 600ms var(--e-spring)' }}
+        className="inline-flex shrink-0 items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-rotate-[4deg]"
+        style={{ width: size, height: size, background: bg, borderRadius: radius }}
       >
-        <rect width="32" height="32" rx="9" fill={tileFill} />
-        <path
-          d="M8 10 Q11 23 16 23 Q21 23 24 10"
-          stroke={strokeFill}
-          strokeWidth="2"
-          strokeLinecap="round"
-          fill="none"
-          style={
-            animated
-              ? {
-                  strokeDasharray: 50,
-                  strokeDashoffset: 50,
-                  animation: `vv-draw 900ms var(--e-out) forwards`,
-                }
-              : undefined
-          }
-        />
-        <circle
-          cx="16"
-          cy="23"
-          r="1.4"
-          fill={strokeFill}
-          style={
-            animated
-              ? {
-                  opacity: 0,
-                  animation: `vv-fade-in 400ms var(--e-out) 700ms forwards`,
-                }
-              : undefined
-          }
-        />
-      </svg>
+        <span
+          className="font-serif italic leading-none"
+          style={{
+            color: fg,
+            fontSize: innerFontSize,
+            fontWeight: 600,
+            letterSpacing: '0.02em',
+            transform: 'translateY(-1px)',
+          }}
+        >
+          vv
+        </span>
+      </span>
       {showWordmark ? (
         <span
-          className={cn('font-serif italic leading-none', textColor)}
+          className="font-serif italic leading-none"
           style={{
+            color: variant === 'dark' ? '#1e1a17' : '#ffffff',
             fontSize: size * 0.78,
             fontWeight: 400,
             letterSpacing: '-0.01em',
@@ -77,16 +59,14 @@ export function VVLogo({
           vitrine
         </span>
       ) : null}
-      {/* uid acts as a stable seed (no rerender flicker) */}
-      <span hidden>{uid}</span>
     </span>
   )
 }
 
 /**
- * LojaMark — exibe a logo da loja quando disponível, ou um monograma com
- * as iniciais quando não. Usado em todos os contextos onde a identidade da
- * loja precisa estar visível (vitrine pública, painel da loja, super-admin).
+ * LojaMark — exibe a logo da loja quando disponível, senão um monograma com
+ * as iniciais. Usado nos contextos onde a identidade da loja precisa
+ * aparecer (vitrine pública, painel da loja, super-admin).
  */
 export function LojaMark({
   loja,
