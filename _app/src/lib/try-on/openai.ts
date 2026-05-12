@@ -2,7 +2,7 @@ import 'server-only'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getServerEnv } from '@/lib/env'
 import { logger } from '@/lib/logger'
-import { VIRTUAL_TRYON_PROMPT } from './prompts/virtual-try-on-prompt'
+import { buildVirtualTryOnPrompt } from './prompts/virtual-try-on-prompt'
 import {
   TryOnProviderError,
   type TryOnProvider,
@@ -56,7 +56,12 @@ export const openAiProvider: TryOnProvider = {
     // 1. Baixar a foto da peça antes de montar o FormData
     //    (falha rápido se a URL já estiver expirada)
     // -------------------------------------------------------------------------
-    const garmentBuffer = await fetchImageBuffer(input.product.productImage)
+    const customBackgroundUrl =
+      input.background.mode === 'custom' ? input.background.backgroundImage : undefined
+    const [garmentImage, backgroundImage] = await Promise.all([
+      fetchImageAsset(input.product.productImage),
+      customBackgroundUrl ? fetchImageAsset(customBackgroundUrl) : Promise.resolve(null),
+    ])
 
     // -------------------------------------------------------------------------
     // 2. Montar FormData com as duas imagens
@@ -64,7 +69,7 @@ export const openAiProvider: TryOnProvider = {
     // -------------------------------------------------------------------------
     const formData = new FormData()
     formData.append('model', model)
-    formData.append('prompt', VIRTUAL_TRYON_PROMPT)
+    formData.append('prompt', buildVirtualTryOnPrompt(backgroundImage ? 'custom' : 'white'))
     formData.append('n', '1')
     // 'auto' deixa o modelo escolher o tamanho ideal — mais compatível
     formData.append('size', 'auto')
@@ -81,13 +86,26 @@ export const openAiProvider: TryOnProvider = {
     formData.append('image[]', customerBlob, `customer-photo.${customerExt}`)
 
     // GARMENT_IMAGE: exact product reference.
-    const garmentBlob = new Blob([new Uint8Array(garmentBuffer)], { type: 'image/jpeg' })
-    formData.append('image[]', garmentBlob, 'garment-image.jpg')
+    const garmentBlob = new Blob([new Uint8Array(garmentImage.buffer)], {
+      type: garmentImage.mimeType,
+    })
+    formData.append('image[]', garmentBlob, `garment-image.${garmentImage.ext}`)
+
+    if (backgroundImage) {
+      const backgroundBlob = new Blob([new Uint8Array(backgroundImage.buffer)], {
+        type: backgroundImage.mimeType,
+      })
+      formData.append('image[]', backgroundBlob, `background-image.${backgroundImage.ext}`)
+    }
 
     // -------------------------------------------------------------------------
     // 3. Chamar a API de edição de imagem
     // -------------------------------------------------------------------------
-    logger.info('OpenAI try-on: enviando request', { model, customerMime })
+    logger.info('OpenAI try-on: enviando request', {
+      model,
+      customerMime,
+      backgroundMode: backgroundImage ? 'custom' : 'white',
+    })
 
     const response = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
@@ -214,7 +232,17 @@ function mimeToExt(mime: string): string {
   return 'jpg'
 }
 
-async function fetchImageBuffer(url: string): Promise<Buffer> {
+function normalizeImageMime(contentType: string | null): string {
+  const mime = contentType?.split(';')[0]?.trim().toLowerCase()
+  if (mime === 'image/png' || mime === 'image/webp' || mime === 'image/jpeg') return mime
+  return 'image/jpeg'
+}
+
+async function fetchImageAsset(url: string): Promise<{
+  buffer: Buffer
+  mimeType: string
+  ext: string
+}> {
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
     throw new TryOnProviderError(
@@ -223,5 +251,15 @@ async function fetchImageBuffer(url: string): Promise<Buffer> {
       res.status >= 500,
     )
   }
-  return Buffer.from(await res.arrayBuffer())
+
+  const mimeType = normalizeImageMime(res.headers.get('Content-Type'))
+  return {
+    buffer: Buffer.from(await res.arrayBuffer()),
+    mimeType,
+    ext: mimeToExt(mimeType),
+  }
+}
+
+async function fetchImageBuffer(url: string): Promise<Buffer> {
+  return (await fetchImageAsset(url)).buffer
 }

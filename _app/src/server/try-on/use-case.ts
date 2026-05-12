@@ -7,6 +7,7 @@ import { generateTryOn } from '@/lib/try-on/orchestrator'
 import { buildTryOnProviderInput } from '@/lib/try-on/payload'
 import { checkTryOnRateLimit } from '@/lib/try-on/rate-limit'
 import { verifyTurnstileToken } from '@/lib/try-on/turnstile'
+import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
 import { checkLojaQuota } from './quota'
 
 export type TryOnError =
@@ -81,7 +82,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
 
   const { data: loja } = await supabase
     .from('lojas')
-    .select('id, ativa, cota_try_on_mensal')
+    .select('id, ativa, cota_try_on_mensal, provador_fundo_storage_path, provador_fundo_tipo')
     .eq('id', peca.loja_id)
     .single()
 
@@ -117,9 +118,28 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     return { ok: false, error: { kind: 'peca_unavailable' } }
   }
 
+  const provadorFundoUrl =
+    loja.provador_fundo_tipo === 'personalizado' && loja.provador_fundo_storage_path
+      ? buildLojaAssetPublicUrl(loja.provador_fundo_storage_path)
+      : null
+  const providerBackground = provadorFundoUrl
+    ? {
+        mode: 'custom' as const,
+        backgroundImage: provadorFundoUrl,
+      }
+    : {
+        mode: 'white' as const,
+      }
+
+  logger.info('Try-on: fundo parametrizado da loja', {
+    backgroundMode: providerBackground.mode,
+    hasCustomBackground: Boolean(provadorFundoUrl),
+  })
+
   const providerInput = buildTryOnProviderInput({
     customerPhoto: input.customerPhoto,
     productImage: garmentUrl,
+    background: providerBackground,
   })
 
   try {

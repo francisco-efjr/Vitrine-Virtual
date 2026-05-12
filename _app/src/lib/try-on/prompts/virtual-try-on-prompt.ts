@@ -62,6 +62,15 @@ SCENE AND COMPOSITION:
 - Floor shadows should be soft, minimal, and cast downward only — never onto the white background walls.
 - Prioritize a polished, premium, fashion-forward visual result consistent with professional e-commerce and studio fashion photography.
 
+QUALITY OVER SPEED:
+- Prioritize maximum image quality over generation speed.
+- It is acceptable to take longer processing time if needed to achieve a superior result.
+- Focus on excellence in realism, fidelity, detail accuracy, garment integration, and facial preservation.
+- Prefer a slower, higher-quality generation path rather than a faster, lower-quality output.
+- Optimize for the best possible final image, even if render time increases.
+- Do not simplify details in order to speed up processing.
+- Treat this as a premium-quality render where visual excellence is the top priority.
+
 PHOTOGRAPHIC STYLE:
 {
   "camera": {
@@ -128,6 +137,9 @@ QUALITY REQUIREMENTS:
 - Luxury visual direction.
 - 4K quality or higher.
 - Suitable for premium virtual try-on and fashion retail.
+- Extremely high fidelity to the source images.
+- Maximum clarity on face, garment details, and body structure.
+- Premium rendering quality with careful preservation of fine visual details.
 
 NEGATIVE INSTRUCTIONS:
 - Do not replace or substitute the customer with a generic or idealized model.
@@ -184,3 +196,58 @@ The final image must show:
 - the customer's complete appearance — full-body structure, pose, proportions, and face — accurately preserved from CUSTOMER_PHOTO,
 - the correct garment accurately derived from GARMENT_IMAGE,
 all combined into one seamless, realistic, premium high-fashion editorial image.`
+
+export type VirtualTryOnBackgroundMode = 'white' | 'custom'
+
+const WHITE_INPUT_ORDER = `The input images are provided in this semantic order:
+1. CUSTOMER_PHOTO
+2. GARMENT_IMAGE`
+
+const CUSTOM_INPUT_ORDER = `The input images are provided in this semantic order:
+1. CUSTOMER_PHOTO
+2. GARMENT_IMAGE
+3. BACKGROUND_IMAGE`
+
+const WHITE_BACKGROUND_INSTRUCTIONS = `- BACKGROUND: Always use a pure white studio background (#FFFFFF). This is mandatory and non-negotiable. The background must be a clean, seamless, infinite white — standard for professional fashion studio photography. No gradients, no shadows on background, no textures, no patterns, no environments, no props, no editorial styling on the background.
+- The white background must be flat, uniform, and extend seamlessly behind and around the subject.
+- Floor shadows should be soft, minimal, and cast downward only — never onto the white background walls.`
+
+const CUSTOM_BACKGROUND_INSTRUCTIONS = `- BACKGROUND: Use BACKGROUND_IMAGE as the mandatory background reference for the final image. This is the store's configured Cabine background and must replace the default white studio background.
+- Preserve the visual identity, colors, lighting mood, materials, and spatial feel of BACKGROUND_IMAGE while keeping the customer and garment as the main subject.
+- Integrate the person naturally into BACKGROUND_IMAGE with correct perspective, scale, contact shadows, and depth. Do not generate a pure white background unless BACKGROUND_IMAGE itself is pure white.`
+
+const WHITE_NEGATIVE_BACKGROUND_INSTRUCTIONS = `- No colored background.
+- No gradient background.
+- No textured background.
+- No environmental background (no streets, rooms, nature, or any scene).
+- No editorial background styling.
+- No dark background.
+- No gray background.
+- No background that is anything other than pure white (#FFFFFF).`
+
+const CUSTOM_NEGATIVE_BACKGROUND_INSTRUCTIONS = `- Do not ignore BACKGROUND_IMAGE.
+- Do not replace BACKGROUND_IMAGE with a pure white studio background.
+- Do not invent a different location or scene unrelated to BACKGROUND_IMAGE.
+- Do not let the background overpower the customer or garment.`
+
+export function buildVirtualTryOnPrompt(backgroundMode: VirtualTryOnBackgroundMode): string {
+  if (backgroundMode === 'white') return VIRTUAL_TRYON_PROMPT
+
+  return VIRTUAL_TRYON_PROMPT.replace(WHITE_INPUT_ORDER, CUSTOM_INPUT_ORDER)
+    .replace(
+      `2. GARMENT_IMAGE:
+A product/reference image of the exact store garment. Use this image to identify and apply the correct clothing item, including its category, design, structure, fit, color, pattern, fabric, texture, details, accessories, and styling direction.`,
+      `2. GARMENT_IMAGE:
+A product/reference image of the exact store garment. Use this image to identify and apply the correct clothing item, including its category, design, structure, fit, color, pattern, fabric, texture, details, accessories, and styling direction.
+
+3. BACKGROUND_IMAGE:
+The configured store background for the Cabine. Use this as the exact background reference when composing the final image.`,
+    )
+    .replace(WHITE_BACKGROUND_INSTRUCTIONS, CUSTOM_BACKGROUND_INSTRUCTIONS)
+    .replace(WHITE_NEGATIVE_BACKGROUND_INSTRUCTIONS, CUSTOM_NEGATIVE_BACKGROUND_INSTRUCTIONS)
+    .replace(
+      `- the correct garment accurately derived from GARMENT_IMAGE,`,
+      `- the correct garment accurately derived from GARMENT_IMAGE,
+- the configured store background accurately derived from BACKGROUND_IMAGE,`,
+    )
+}

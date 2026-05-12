@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   IMAGE_INVALID_FORMAT_MESSAGE,
+  IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES,
   buildStandardizedImageFilename,
   sanitizeImageFilename,
   validateImageUploadMeta,
@@ -35,6 +36,30 @@ describe('validateImageUploadMeta', () => {
         size: 11 * 1024 * 1024,
       }),
     ).toEqual({ ok: false, message: 'A imagem deve ter no máximo 10 MB.' })
+  })
+
+  it('aceita limite maior para foto do cliente no provador', () => {
+    expect(
+      validateImageUploadMeta(
+        {
+          filename: 'foto.jpg',
+          contentType: 'image/jpeg',
+          size: 59 * 1024 * 1024,
+        },
+        { maxBytes: IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES },
+      ),
+    ).toEqual({ ok: true })
+
+    expect(
+      validateImageUploadMeta(
+        {
+          filename: 'foto.jpg',
+          contentType: 'image/jpeg',
+          size: 61 * 1024 * 1024,
+        },
+        { maxBytes: IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES },
+      ),
+    ).toEqual({ ok: false, message: 'A imagem deve ter no máximo 60 MB.' })
   })
 
   it('rejeita nome de arquivo inseguro', () => {

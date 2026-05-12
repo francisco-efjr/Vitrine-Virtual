@@ -13,10 +13,13 @@ export const IMAGE_INVALID_FORMAT_MESSAGE =
   'Formato de imagem inválido. Envie uma foto em JPG, JPEG, PNG, HEIC ou WEBP.'
 
 export const IMAGE_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+export const IMAGE_TRY_ON_CUSTOMER_MAX_UPLOAD_BYTES = 60 * 1024 * 1024
 export const IMAGE_STANDARD_OUTPUT_MIME = 'image/webp'
 export const IMAGE_STANDARD_OUTPUT_EXTENSION = 'webp'
 export const IMAGE_STANDARD_QUALITY = 0.88
 export const IMAGE_STANDARD_MAX_DIMENSION = 1600
+export const IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_DIMENSION = 3840
+export const IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB = 60
 
 export interface ImageUploadMeta {
   filename: string
@@ -24,8 +27,15 @@ export interface ImageUploadMeta {
   size: number
 }
 
+export interface ImageUploadValidationOptions {
+  maxBytes?: number
+}
+
 export function sanitizeImageFilename(filename: string): string {
-  const trimmed = filename.trim().normalize('NFKD').replace(/[^\x00-\x7F]/g, '')
+  const trimmed = filename
+    .trim()
+    .normalize('NFKD')
+    .replace(/[^\x00-\x7F]/g, '')
   const normalized = trimmed
     .replace(/\.[^.]+$/, '')
     .toLowerCase()
@@ -54,7 +64,16 @@ export function isSafeImageFilename(filename: string): boolean {
   return !/[<>:"/\\|?*\u0000-\u001F]/.test(filename)
 }
 
-export function validateImageUploadMeta(meta: ImageUploadMeta): { ok: true } | { ok: false; message: string } {
+export function buildImageMaxUploadMessage(maxBytes: number = IMAGE_MAX_UPLOAD_BYTES): string {
+  return `A imagem deve ter no máximo ${Math.round(maxBytes / 1024 / 1024)} MB.`
+}
+
+export function validateImageUploadMeta(
+  meta: ImageUploadMeta,
+  options: ImageUploadValidationOptions = {},
+): { ok: true } | { ok: false; message: string } {
+  const maxBytes = options.maxBytes ?? IMAGE_MAX_UPLOAD_BYTES
+
   if (!isAcceptedImageMime(meta.contentType) || !isAcceptedImageExtension(meta.filename)) {
     return { ok: false, message: IMAGE_INVALID_FORMAT_MESSAGE }
   }
@@ -63,8 +82,8 @@ export function validateImageUploadMeta(meta: ImageUploadMeta): { ok: true } | {
     return { ok: false, message: IMAGE_INVALID_FORMAT_MESSAGE }
   }
 
-  if (meta.size <= 0 || meta.size > IMAGE_MAX_UPLOAD_BYTES) {
-    return { ok: false, message: 'A imagem deve ter no máximo 10 MB.' }
+  if (meta.size <= 0 || meta.size > maxBytes) {
+    return { ok: false, message: buildImageMaxUploadMessage(maxBytes) }
   }
 
   return { ok: true }

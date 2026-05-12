@@ -11,6 +11,12 @@ export interface TryOnProviderInput {
     /** URL pública da imagem da peça. */
     productImage: string
   }
+  background: {
+    /** Fundo parametrizado pela loja para a imagem final. */
+    mode: 'white' | 'custom'
+    /** URL pÃºblica do fundo cadastrado pela loja quando mode=custom. */
+    backgroundImage?: string
+  }
 }
 
 export interface TryOnProviderResult {

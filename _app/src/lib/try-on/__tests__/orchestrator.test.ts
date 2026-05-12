@@ -4,7 +4,7 @@ import { fashnProvider } from '../fashn'
 import { googleAiProvider } from '../google-ai'
 import { generateTryOn } from '../orchestrator'
 import { replicateProvider } from '../replicate'
-import { TryOnProviderError, type TryOnProvider } from '../types'
+import { TryOnProviderError, type TryOnProvider, type TryOnProviderInput } from '../types'
 
 const ORIGINAL_ENV = { ...process.env }
 
@@ -44,7 +44,7 @@ describe('orchestrator.generateTryOn', () => {
     vi.restoreAllMocks()
   })
 
-  const input = {
+  const input: TryOnProviderInput = {
     customer: {
       photoImage: 'data:image/jpeg;base64,foto',
     },
@@ -53,6 +53,9 @@ describe('orchestrator.generateTryOn', () => {
     },
     product: {
       productImage: 'https://x.com/g.jpg',
+    },
+    background: {
+      mode: 'white',
     },
   }
 
