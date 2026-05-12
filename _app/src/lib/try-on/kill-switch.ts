@@ -36,6 +36,17 @@ export async function setTryOnEnabled(enabled: boolean, byUserId?: string): Prom
   logger.info('Kill switch alterado', { enabled, by: byUserId })
 }
 
+export async function setTryOnBudget(usd: number, byUserId?: string): Promise<void> {
+  const supabase = createServiceClient()
+  const { error } = await supabase.from('system_settings').upsert({
+    key: 'try_on_monthly_budget_usd',
+    value: usd,
+    updated_by: byUserId,
+  })
+  if (error) throw error
+  logger.info('Orçamento mensal alterado', { budgetUsd: usd, by: byUserId })
+}
+
 export async function getTryOnBudget(): Promise<{ budgetUsd: number; costPerGen: number }> {
   const supabase = createServiceClient()
   const { data } = await supabase

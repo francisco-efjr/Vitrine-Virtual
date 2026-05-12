@@ -4,32 +4,38 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useState } from 'react'
 import { TryOnModal } from './try-on-modal'
 
+/**
+ * Botão "Experimentar" — entry-point para a Cabine Virtual.
+ * Visual alinhado ao handoff v3: pill escuro com starlet ✦ em accent.
+ */
 export function TryOnButton({
   pecaId,
   pecaNome,
+  pecaTamanho = null,
+  pecaPrecoCentavos = null,
+  exibirPreco = false,
   whatsappE164,
   garmentImageUrl = null,
   garmentThumbUrl = null,
   cabineBackdropUrl = null,
-  /**
-   * Para onde levar o cliente quando ele clicar em "Experimentar outra peça"
-   * dentro do resultado da Cabine. Default: apenas fecha o modal.
-   * Tipicamente usamos `/v/[slug]` (a grade da vitrine).
-   */
   vitrineHref = null,
+  size = 'lg',
 }: {
   pecaId: string
   pecaNome: string
+  pecaTamanho?: string | null
+  pecaPrecoCentavos?: number | null
+  exibirPreco?: boolean
   whatsappE164: string | null
   garmentImageUrl?: string | null
   garmentThumbUrl?: string | null
   /**
    * Imagem de fundo personalizada da Cabine (configurada pela lojista).
-   * Aparece como pano de fundo sutil durante a tela de loading. Não afeta
-   * o resultado gerado pela IA — apenas reforça a identidade visual da loja.
+   * Aparece como pano de fundo sutil durante a tela de loading.
    */
   cabineBackdropUrl?: string | null
   vitrineHref?: string | null
+  size?: 'sm' | 'md' | 'lg'
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -39,20 +45,24 @@ export function TryOnButton({
     if (vitrineHref) router.push(vitrineHref)
   }, [router, vitrineHref])
 
+  const sizing =
+    size === 'lg'
+      ? 'px-5 py-3 text-sm'
+      : size === 'sm'
+        ? 'px-3.5 py-2 text-xs'
+        : 'px-4 py-2.5 text-[13px]'
+
   return (
     <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="vv-shine group inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition duration-200 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:-translate-y-0.5 hover:bg-accent-dark hover:shadow-card-hover active:scale-[0.98]"
+        className={`inline-flex items-center justify-center gap-2 rounded-full bg-ink font-medium text-white shadow-sm transition duration-200 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:bg-[#2d2825] active:scale-[0.98] ${sizing}`}
       >
-        {/* Hanger icon */}
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 3a2 2 0 1 0 0 4" />
-          <path d="M12 7v2" />
-          <path d="M3 19h18l-9-9-9 9z" />
-        </svg>
-        Experimentar na Cabine
+        <span className="text-accent" aria-hidden="true">
+          ✦
+        </span>
+        Experimentar
       </button>
 
       <TryOnModal
@@ -61,6 +71,9 @@ export function TryOnButton({
         onTryAnother={vitrineHref ? handleTryAnother : undefined}
         pecaId={pecaId}
         pecaNome={pecaNome}
+        pecaTamanho={pecaTamanho}
+        pecaPrecoCentavos={pecaPrecoCentavos}
+        exibirPreco={exibirPreco}
         whatsappE164={whatsappE164}
         garmentImageUrl={garmentImageUrl}
         garmentThumbUrl={garmentThumbUrl}

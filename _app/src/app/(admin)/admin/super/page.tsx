@@ -1,6 +1,8 @@
-import { Plus } from 'lucide-react'
-import { Card } from '@/components/ui/card'
+import { Check, ListChecks, Sparkles, Store } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import { CountUp } from '@/components/motion'
+import { VVLogo } from '@/components/brand/vv-logo'
 import { requireSuperAdmin } from '@/server/auth/session'
 import { listLojasWithStats } from '@/server/lojas/list'
 import { getTryOnBudget, isTryOnEnabled } from '@/lib/try-on/kill-switch'
@@ -9,7 +11,7 @@ import { SuperAdminClient } from './super-client'
 export const dynamic = 'force-dynamic'
 
 export default async function SuperAdminPage() {
-  await requireSuperAdmin()
+  const session = await requireSuperAdmin()
   const [lojas, killEnabled, budget] = await Promise.all([
     listLojasWithStats(),
     isTryOnEnabled(),
@@ -21,27 +23,54 @@ export default async function SuperAdminPage() {
   const totalTryOns = lojas.reduce((a, l) => a + l.try_ons_mes, 0)
   const estCost = (totalTryOns * budget.costPerGen).toFixed(2)
 
+  const adminNome =
+    session.profile.nome_completo?.split(' ')[0] ?? session.user.email.split('@')[0] ?? 'Admin'
+
   return (
     <div className="min-h-screen bg-bg">
-      <header className="border-b border-border bg-surface px-4 py-4 sm:px-8">
-        <div className="flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-4 py-3 sm:px-7">
           <div className="flex items-center gap-3">
-            <span className="font-serif text-xl font-semibold">Super-admin</span>
-            <Badge label="Francisco" variant="admin" />
+            <VVLogo size={20} />
+            <div className="h-4 w-px bg-border" />
+            <span className="font-sans text-[13px] font-semibold text-ink">Super-Admin</span>
+            <Badge label={adminNome} variant="admin" />
           </div>
+          <span className="hidden truncate font-sans text-[12.5px] text-ink-2 sm:inline">
+            {session.user.email}
+          </span>
         </div>
       </header>
-      <main className="px-4 py-6 sm:px-6 sm:py-8 lg:px-9">
-        <h1 className="mb-4 font-serif text-[26px] font-semibold">Visão geral da plataforma</h1>
-        <section className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <KpiBlock label="Lojas ativas" value={lojas.filter((l) => l.ativa).length} sub={`de ${lojas.length} cadastradas`} />
-          <KpiBlock label="Peças na plataforma" value={totalPecas} sub="em todas as vitrines" />
-          <KpiBlock label="Peças vendidas" value={totalVendidas} sub="total" color="success" />
+
+      <main className="mx-auto max-w-[1100px] px-4 py-6 sm:px-7 sm:py-8">
+        <h1 className="mb-5 font-serif text-[24px] font-semibold tracking-tight text-ink sm:text-[26px]">
+          Visão geral da plataforma
+        </h1>
+
+        <section className="mb-7 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
           <KpiBlock
-            label="Provadores no mês"
+            label="Lojas ativas"
+            value={lojas.filter((l) => l.ativa).length}
+            sub={`de ${lojas.length} cadastradas`}
+            icon={<Store size={17} />}
+          />
+          <KpiBlock
+            label="Peças"
+            value={totalPecas}
+            sub="em todas as vitrines"
+            icon={<ListChecks size={17} />}
+          />
+          <KpiBlock
+            label="Vendidas"
+            value={totalVendidas}
+            sub="este mês"
+            icon={<Check size={17} />}
+          />
+          <KpiBlock
+            label="Cabines"
             value={totalTryOns}
             sub={`≈ US$ ${estCost} estimado`}
-            color="warning"
+            icon={<Sparkles size={17} />}
           />
         </section>
 
@@ -59,23 +88,29 @@ function KpiBlock({
   label,
   value,
   sub,
-  color = 'accent',
+  icon,
 }: {
   label: string
-  value: number | string
+  value: number
   sub?: string
-  color?: 'accent' | 'success' | 'warning'
+  icon?: React.ReactNode
 }) {
-  const tone = {
-    accent: 'text-ink',
-    success: 'text-success',
-    warning: 'text-warning',
-  }[color]
   return (
-    <Card className="p-5">
-      <div className="mb-2 text-xs font-medium uppercase tracking-widest text-ink-3">{label}</div>
-      <div className={`font-serif text-3xl font-semibold ${tone}`}>{value}</div>
-      {sub ? <div className="mt-1.5 text-xs text-ink-3">{sub}</div> : null}
+    <Card hoverable className="flex min-w-[130px] items-start justify-between p-5">
+      <div>
+        <div className="mb-2 font-sans text-[10.5px] font-semibold uppercase tracking-[0.07em] text-ink-3">
+          {label}
+        </div>
+        <div className="font-serif text-[28px] font-semibold leading-none tracking-tight text-ink">
+          <CountUp value={value} />
+        </div>
+        {sub ? <div className="mt-1.5 font-sans text-[11.5px] text-ink-3">{sub}</div> : null}
+      </div>
+      {icon ? (
+        <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent-light text-accent">
+          {icon}
+        </div>
+      ) : null}
     </Card>
   )
 }

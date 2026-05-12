@@ -16,6 +16,16 @@ interface ConfigClientProps {
   initialFundoUrl: string | null
 }
 
+/**
+ * Tela única de configurações da loja — handoff v3.
+ *
+ * Estrutura visual:
+ *   1. Identidade   — logo (tile 64×64) + nome + tagline
+ *   2. Contato      — WhatsApp + Instagram + TikTok
+ *   3. Vitrine      — toggle "Vitrine visível" + toggle "Mostrar preços"
+ *   4. Provador     — escolha entre fundo branco e personalizado (tiles compactos)
+ *   5. Salvar       — botão único no rodapé
+ */
 export function ConfigClient({
   initialLoja,
   initialLogoUrl,
@@ -34,7 +44,6 @@ export function ConfigClient({
   const logoInputRef = useRef<HTMLInputElement>(null)
   const fundoInputRef = useRef<HTMLInputElement>(null)
 
-  // Limpa qualquer blob: que tenhamos criado para o preview otimista
   useEffect(() => {
     return () => {
       if (logoUrl?.startsWith('blob:')) URL.revokeObjectURL(logoUrl)
@@ -80,9 +89,7 @@ export function ConfigClient({
       setLoja(result.loja)
       setLogoUrl(`${result.public_url}?t=${Date.now()}`)
     } catch (error) {
-      setLogoErr(
-        error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE,
-      )
+      setLogoErr(error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE)
     } finally {
       setLogoBusy(false)
     }
@@ -97,9 +104,7 @@ export function ConfigClient({
       setLoja(result.loja)
       setFundoUrl(`${result.public_url}?t=${Date.now()}`)
     } catch (error) {
-      setFundoErr(
-        error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE,
-      )
+      setFundoErr(error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE)
     } finally {
       setFundoBusy(false)
     }
@@ -109,19 +114,13 @@ export function ConfigClient({
     setFundoBusy(true)
     setFundoErr(null)
     try {
-      const res = await fetch('/api/loja/assets?kind=provador_fundo', {
-        method: 'DELETE',
-      })
+      const res = await fetch('/api/loja/assets?kind=provador_fundo', { method: 'DELETE' })
       const data = await res.json()
-      if (!res.ok || !data.ok) {
-        throw new Error(data?.error?.message ?? 'Falha ao remover')
-      }
+      if (!res.ok || !data.ok) throw new Error(data?.error?.message ?? 'Falha ao remover')
       setLoja(data.data as LojaRow)
       setFundoUrl(null)
     } catch (error) {
-      setFundoErr(
-        error instanceof Error ? error.message : 'Falha ao remover fundo.',
-      )
+      setFundoErr(error instanceof Error ? error.message : 'Falha ao remover fundo.')
     } finally {
       setFundoBusy(false)
     }
@@ -131,19 +130,13 @@ export function ConfigClient({
     setLogoBusy(true)
     setLogoErr(null)
     try {
-      const res = await fetch('/api/loja/assets?kind=logo', {
-        method: 'DELETE',
-      })
+      const res = await fetch('/api/loja/assets?kind=logo', { method: 'DELETE' })
       const data = await res.json()
-      if (!res.ok || !data.ok) {
-        throw new Error(data?.error?.message ?? 'Falha ao remover')
-      }
+      if (!res.ok || !data.ok) throw new Error(data?.error?.message ?? 'Falha ao remover')
       setLoja(data.data as LojaRow)
       setLogoUrl(null)
     } catch (error) {
-      setLogoErr(
-        error instanceof Error ? error.message : 'Falha ao remover logo.',
-      )
+      setLogoErr(error instanceof Error ? error.message : 'Falha ao remover logo.')
     } finally {
       setLogoBusy(false)
     }
@@ -185,26 +178,25 @@ export function ConfigClient({
   }
 
   return (
-    <div className="max-w-[640px] p-4 sm:p-6 lg:p-9">
-      <Reveal>
-        <h1 className="font-serif text-[26px] font-semibold text-ink">Configurações</h1>
-        <p className="mb-7 mt-2 text-sm text-ink-2">
-          Personalize como sua vitrine aparece para os clientes.
-        </p>
-      </Reveal>
+    <div className="p-4 sm:p-7 lg:p-9">
+      <div className="max-w-[480px]">
+        <Reveal>
+          <h1 className="mb-7 font-serif text-[24px] font-semibold tracking-tight text-ink">
+            Configurações
+          </h1>
+        </Reveal>
 
-      {/* ── Identidade ── */}
-      <Reveal delay={40}>
-        <SectionLabel>Identidade</SectionLabel>
-        <div className="mb-7 flex flex-col gap-4">
-          <div className="flex items-start gap-4">
+        {/* ── Identidade ── */}
+        <Reveal delay={40}>
+          <SectionLabel>Identidade</SectionLabel>
+          <div className="mb-5 flex items-start gap-4">
             <button
               type="button"
               onClick={() => !logoBusy && logoInputRef.current?.click()}
               disabled={logoBusy}
-              title={logoUrl ? 'Clique para trocar o logo' : 'Clique para enviar o logo'}
-              className="group relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-border bg-surface-2 transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-70"
+              title={logoUrl ? 'Trocar logo' : 'Enviar logo'}
               aria-label="Enviar logo da loja"
+              className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-[12px] border border-border bg-surface-2 transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-70"
             >
               {logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -212,17 +204,17 @@ export function ConfigClient({
               ) : (
                 <div className="flex h-full w-full flex-col items-center justify-center gap-1">
                   <ImageIcon size={18} className="text-ink-3" />
-                  <span className="text-[9px] text-ink-3">Logo</span>
+                  <span className="font-sans text-[9px] text-ink-3">Logo</span>
                 </div>
               )}
-              <div className="absolute inset-0 flex items-center justify-center bg-ink/0 transition group-hover:bg-ink/25">
+              <div className="absolute inset-0 flex items-center justify-center bg-ink/0 transition group-hover:bg-ink/30">
                 <ImageIcon
-                  size={14}
+                  size={16}
                   className="text-white opacity-0 transition group-hover:opacity-100"
                 />
               </div>
               {logoBusy ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-[10px] text-ink-2">
+                <div className="absolute inset-0 flex items-center justify-center bg-white/70 font-sans text-[10px] text-ink-2">
                   Enviando…
                 </div>
               ) : null}
@@ -238,8 +230,7 @@ export function ConfigClient({
                 handleLogoFile(file)
               }}
             />
-
-            <div className="flex flex-1 flex-col gap-3">
+            <div className="flex flex-1 flex-col gap-2">
               <Input
                 label="Nome da loja"
                 value={loja.nome}
@@ -268,11 +259,9 @@ export function ConfigClient({
                     Remover
                   </Button>
                 ) : null}
-                <div className="text-[11px] text-ink-3">
-                  PNG, JPG ou WEBP · até 10 MB
-                </div>
               </div>
-              {logoErr ? <p className="text-xs text-danger">{logoErr}</p> : null}
+              <p className="font-sans text-[11px] text-ink-3">PNG, JPG ou WebP · até 10 MB</p>
+              {logoErr ? <p className="font-sans text-xs text-danger">{logoErr}</p> : null}
             </div>
           </div>
           <Input
@@ -283,212 +272,217 @@ export function ConfigClient({
             helper={`${(loja.tagline ?? '').length}/140`}
             maxLength={140}
           />
-        </div>
-      </Reveal>
+        </Reveal>
 
-      <div className="mb-7 h-px bg-border" />
+        <div className="my-7 h-px bg-border" />
 
-      {/* ── Contato & redes ── */}
-      <Reveal delay={80}>
-        <SectionLabel>Contato &amp; redes</SectionLabel>
-        <div className="mb-7 flex flex-col gap-4">
-          <Input
-            label="WhatsApp"
-            value={loja.whatsapp_e164 ?? ''}
-            onChange={(e) => setLoja({ ...loja, whatsapp_e164: e.target.value })}
-            onBlur={(e) => setLoja({ ...loja, whatsapp_e164: normalizeWhatsApp(e.target.value) })}
-            placeholder="+5511998765432"
-            helper="Número completo com código do país."
-          />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* ── Contato & redes ── */}
+        <Reveal delay={80}>
+          <SectionLabel>Contato &amp; redes</SectionLabel>
+          <div className="flex flex-col gap-3.5">
             <Input
-              label="Instagram"
-              value={loja.instagram ?? ''}
-              onChange={(e) => setLoja({ ...loja, instagram: e.target.value })}
-              prefix="@"
-              placeholder="atelierlaila"
-            />
-            <Input
-              label="TikTok"
-              value={loja.tiktok ?? ''}
-              onChange={(e) => setLoja({ ...loja, tiktok: e.target.value })}
-              prefix="@"
-              placeholder="atelierlaila"
-            />
-          </div>
-        </div>
-      </Reveal>
-
-      <div className="mb-7 h-px bg-border" />
-
-      {/* ── Vitrine ── */}
-      <Reveal delay={120}>
-        <SectionLabel>Vitrine</SectionLabel>
-        <div className="mb-7 flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-ink">Vitrine visível para clientes</div>
-              <div className="mt-0.5 text-xs text-ink-3">
-                Quando desativada, ninguém consegue abrir sua vitrine pública.
-              </div>
-            </div>
-            <Toggle
-              checked={loja.vitrine_publica_visivel}
-              onCheckedChange={(v) => setLoja({ ...loja, vitrine_publica_visivel: v })}
-              label="Vitrine visível"
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-ink">Mostrar preço na vitrine</div>
-              <div className="mt-0.5 text-xs text-ink-3">
-                Clientes verão o preço das peças publicamente.
-              </div>
-            </div>
-            <Toggle
-              checked={loja.exibir_preco_publico}
-              onCheckedChange={(v) => setLoja({ ...loja, exibir_preco_publico: v })}
-              label="Mostrar preço"
-            />
-          </div>
-        </div>
-      </Reveal>
-
-      <div className="mb-7 h-px bg-border" />
-
-      {/* ── Provador (Cabine) ── */}
-      <Reveal delay={160}>
-        <SectionLabel>Cabine — fundo</SectionLabel>
-        <p className="mb-3 text-xs text-ink-3">
-          Escolha o fundo padrão das experimentações da sua vitrine.
-        </p>
-        <div className="mb-7 flex flex-wrap items-start gap-3">
-          {/* Tile 1 — fundo branco */}
-          <button
-            type="button"
-            onClick={() => setLoja({ ...loja, provador_fundo_tipo: 'branco' })}
-            className={`group flex flex-col items-center transition ${
-              loja.provador_fundo_tipo === 'branco' ? '' : 'opacity-90'
-            }`}
-          >
-            <div
-              className={`relative h-24 w-32 overflow-hidden rounded-xl border-2 bg-white transition ${
-                loja.provador_fundo_tipo === 'branco'
-                  ? 'border-accent shadow-card-hover'
-                  : 'border-border group-hover:border-border-2'
-              }`}
-            >
-              <SilhuetaIlustracao />
-              {loja.provador_fundo_tipo === 'branco' ? <SelectedDot /> : null}
-            </div>
-            <span
-              className={`mt-2 text-xs ${
-                loja.provador_fundo_tipo === 'branco' ? 'font-semibold text-ink' : 'text-ink-2'
-              }`}
-            >
-              Padrão branco
-            </span>
-          </button>
-
-          {/* Tile 2 — fundo da loja */}
-          <button
-            type="button"
-            onClick={() => {
-              if (fundoBusy) return
-              if (fundoUrl) {
-                setLoja({ ...loja, provador_fundo_tipo: 'personalizado' })
-              } else {
-                fundoInputRef.current?.click()
+              label="WhatsApp"
+              value={loja.whatsapp_e164 ?? ''}
+              onChange={(e) => setLoja({ ...loja, whatsapp_e164: e.target.value })}
+              onBlur={(e) =>
+                setLoja({ ...loja, whatsapp_e164: normalizeWhatsApp(e.target.value) })
               }
-            }}
-            disabled={fundoBusy}
-            className={`group flex flex-col items-center transition disabled:cursor-not-allowed ${
-              loja.provador_fundo_tipo === 'personalizado' ? '' : 'opacity-90'
-            }`}
-          >
-            <div
-              className={`relative flex h-24 w-32 items-center justify-center overflow-hidden rounded-xl border-2 bg-surface-2 transition ${
-                loja.provador_fundo_tipo === 'personalizado'
-                  ? 'border-accent shadow-card-hover'
-                  : 'border-border group-hover:border-border-2'
-              }`}
-            >
-              {fundoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={fundoUrl} alt="Fundo" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center gap-1 text-ink-3">
-                  <Upload size={18} />
-                  <span className="text-[10px]">Enviar foto</span>
-                </div>
-              )}
-              {loja.provador_fundo_tipo === 'personalizado' && fundoUrl ? <SelectedDot /> : null}
-              {fundoBusy ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-[10px] text-ink-2">
-                  Enviando…
-                </div>
-              ) : null}
+              placeholder="+5511998765432"
+              helper="Número completo com código do país."
+            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Input
+                label="Instagram"
+                value={loja.instagram ?? ''}
+                onChange={(e) => setLoja({ ...loja, instagram: e.target.value })}
+                prefix="@"
+                placeholder="atelierlaila"
+              />
+              <Input
+                label="TikTok"
+                value={loja.tiktok ?? ''}
+                onChange={(e) => setLoja({ ...loja, tiktok: e.target.value })}
+                prefix="@"
+                placeholder="atelierlaila"
+              />
             </div>
-            <span
-              className={`mt-2 text-xs ${
-                loja.provador_fundo_tipo === 'personalizado'
-                  ? 'font-semibold text-ink'
-                  : 'text-ink-2'
-              }`}
+          </div>
+        </Reveal>
+
+        <div className="my-7 h-px bg-border" />
+
+        {/* ── Vitrine ── */}
+        <Reveal delay={120}>
+          <SectionLabel>Vitrine</SectionLabel>
+          <div className="flex flex-col gap-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-sans text-[13.5px] font-medium text-ink">
+                  Vitrine visível para clientes
+                </div>
+                <div className="mt-0.5 font-sans text-xs text-ink-3">
+                  Quando desativada, ninguém consegue abrir sua vitrine pública.
+                </div>
+              </div>
+              <Toggle
+                checked={loja.vitrine_publica_visivel}
+                onCheckedChange={(v) => setLoja({ ...loja, vitrine_publica_visivel: v })}
+                label="Vitrine visível"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="font-sans text-[13.5px] font-medium text-ink">
+                  Mostrar preços
+                </div>
+                <div className="mt-0.5 font-sans text-xs text-ink-3">
+                  Clientes verão o preço das peças publicamente.
+                </div>
+              </div>
+              <Toggle
+                checked={loja.exibir_preco_publico}
+                onCheckedChange={(v) => setLoja({ ...loja, exibir_preco_publico: v })}
+                label="Mostrar preço"
+              />
+            </div>
+          </div>
+        </Reveal>
+
+        <div className="my-7 h-px bg-border" />
+
+        {/* ── Provador (Cabine) ── */}
+        <Reveal delay={160}>
+          <SectionLabel>Provador virtual</SectionLabel>
+          <p className="mb-3.5 font-sans text-xs text-ink-3">
+            Escolha o fundo padrão das experimentações da Cabine.
+          </p>
+          <div className="mb-3 flex flex-wrap items-start gap-2.5">
+            {/* Tile 1 — fundo branco */}
+            <button
+              type="button"
+              onClick={() => setLoja({ ...loja, provador_fundo_tipo: 'branco' })}
+              className="group flex flex-col items-center transition"
             >
-              Experiência da loja
+              <div
+                className={`relative flex h-[88px] w-[112px] items-center justify-center overflow-hidden rounded-[10px] border-2 bg-white transition ${
+                  loja.provador_fundo_tipo === 'branco'
+                    ? 'border-accent shadow-card-hover'
+                    : 'border-border group-hover:border-border-2'
+                }`}
+              >
+                <Silhueta />
+                {loja.provador_fundo_tipo === 'branco' ? <SelectedDot /> : null}
+              </div>
+              <span
+                className={`mt-2 font-sans text-xs ${
+                  loja.provador_fundo_tipo === 'branco'
+                    ? 'font-semibold text-ink'
+                    : 'text-ink-2'
+                }`}
+              >
+                Padrão branco
+              </span>
+            </button>
+
+            {/* Tile 2 — Experiência da loja */}
+            <button
+              type="button"
+              onClick={() => {
+                if (fundoBusy) return
+                if (fundoUrl) {
+                  setLoja({ ...loja, provador_fundo_tipo: 'personalizado' })
+                } else {
+                  fundoInputRef.current?.click()
+                }
+              }}
+              disabled={fundoBusy}
+              className="group flex flex-col items-center transition disabled:cursor-not-allowed"
+            >
+              <div
+                className={`relative flex h-[88px] w-[112px] items-center justify-center overflow-hidden rounded-[10px] border-2 bg-surface-2 transition ${
+                  loja.provador_fundo_tipo === 'personalizado'
+                    ? 'border-accent shadow-card-hover'
+                    : 'border-border group-hover:border-border-2'
+                }`}
+              >
+                {fundoBusy ? (
+                  <div className="flex h-full w-full items-center justify-center bg-white/70 font-sans text-[10px] text-ink-2">
+                    Enviando…
+                  </div>
+                ) : fundoUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={fundoUrl} alt="Fundo" className="h-full w-full object-cover" />
+                    {loja.provador_fundo_tipo === 'personalizado' ? <SelectedDot /> : null}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-1 text-ink-3">
+                    <Upload size={18} />
+                    <span className="font-sans text-[10px]">Enviar foto</span>
+                  </div>
+                )}
+              </div>
+              <span
+                className={`mt-2 font-sans text-xs ${
+                  loja.provador_fundo_tipo === 'personalizado'
+                    ? 'font-semibold text-ink'
+                    : 'text-ink-2'
+                }`}
+              >
+                Experiência da loja
+              </span>
+            </button>
+
+            {fundoUrl ? (
+              <div className="flex flex-col gap-1.5 self-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => fundoInputRef.current?.click()}
+                  disabled={fundoBusy}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-2.5 py-1 font-sans text-[11.5px] text-ink-2 transition hover:border-accent hover:text-accent disabled:opacity-60"
+                >
+                  <RefreshCw size={11} />
+                  Trocar
+                </button>
+                <button
+                  type="button"
+                  onClick={clearFundo}
+                  disabled={fundoBusy}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 font-sans text-[11.5px] text-ink-3 transition hover:text-danger disabled:opacity-60"
+                >
+                  <Trash2 size={11} />
+                  Remover
+                </button>
+              </div>
+            ) : null}
+
+            <input
+              ref={fundoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null
+                e.target.value = ''
+                handleFundoFile(file)
+              }}
+            />
+          </div>
+          {fundoErr ? <p className="mb-3 font-sans text-xs text-danger">{fundoErr}</p> : null}
+        </Reveal>
+
+        <div className="mt-9 flex items-center gap-3">
+          <Button variant="dark" onClick={save} disabled={saving}>
+            {saving ? 'Salvando…' : 'Salvar'}
+          </Button>
+          {saved ? (
+            <span className="vv-fade-in inline-flex items-center gap-1 font-sans text-sm text-success">
+              <Check size={14} />
+              Salvo
             </span>
-          </button>
-
-          {fundoUrl ? (
-            <div className="flex flex-col gap-2 self-center">
-              <button
-                type="button"
-                onClick={() => fundoInputRef.current?.click()}
-                disabled={fundoBusy}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11.5px] text-ink-2 transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw size={11} />
-                Trocar
-              </button>
-              <button
-                type="button"
-                onClick={clearFundo}
-                disabled={fundoBusy}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11.5px] text-ink-3 transition hover:text-danger disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Trash2 size={11} />
-                Remover
-              </button>
-            </div>
           ) : null}
-
-          <input
-            ref={fundoInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0] ?? null
-              e.target.value = ''
-              handleFundoFile(file)
-            }}
-          />
+          {err ? <span className="font-sans text-sm text-danger">{err}</span> : null}
         </div>
-        {fundoErr ? <p className="mb-3 text-xs text-danger">{fundoErr}</p> : null}
-      </Reveal>
-
-      <div className="flex items-center gap-3">
-        <Button variant="dark" onClick={save} disabled={saving}>
-          {saving ? 'Salvando...' : 'Salvar configurações'}
-        </Button>
-        {saved ? (
-          <span className="vv-fade-in inline-flex items-center gap-1 text-sm text-success">
-            <Check size={14} />
-            Salvo
-          </span>
-        ) : null}
-        {err ? <span className="text-sm text-danger">{err}</span> : null}
       </div>
     </div>
   )
@@ -511,7 +505,7 @@ async function fileToDataUrl(file: File): Promise<string> {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-3">
+    <div className="mb-3.5 font-sans text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-3">
       {children}
     </div>
   )
@@ -525,16 +519,9 @@ function SelectedDot() {
   )
 }
 
-function SilhuetaIlustracao() {
+function Silhueta() {
   return (
-    <svg
-      width="52"
-      height="64"
-      viewBox="0 0 52 64"
-      fill="none"
-      className="absolute inset-0 m-auto"
-      aria-hidden="true"
-    >
+    <svg width="52" height="64" viewBox="0 0 52 64" fill="none" aria-hidden="true">
       <ellipse cx="26" cy="14" rx="9" ry="9" fill="#e8e2db" />
       <path d="M10 64 C10 44 16 36 26 34 C36 36 42 44 42 64Z" fill="#ede8e0" />
     </svg>
