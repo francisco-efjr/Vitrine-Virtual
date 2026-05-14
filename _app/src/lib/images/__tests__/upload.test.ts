@@ -71,6 +71,66 @@ describe('validateImageUploadMeta', () => {
       }),
     ).toEqual({ ok: false, message: IMAGE_INVALID_FORMAT_MESSAGE })
   })
+
+  it('aceita HEIC do iOS Safari com MIME vazio (Files app / AirDrop)', () => {
+    expect(
+      validateImageUploadMeta({
+        filename: 'IMG_1234.HEIC',
+        contentType: '',
+        size: 3 * 1024 * 1024,
+      }),
+    ).toEqual({ ok: true })
+  })
+
+  it('aceita HEIC com MIME application/octet-stream (Chrome iOS)', () => {
+    expect(
+      validateImageUploadMeta({
+        filename: 'foto.heic',
+        contentType: 'application/octet-stream',
+        size: 3 * 1024 * 1024,
+      }),
+    ).toEqual({ ok: true })
+  })
+
+  it('aceita JPEG com MIME application/octet-stream + extensão válida', () => {
+    expect(
+      validateImageUploadMeta({
+        filename: 'IMG_2026.jpg',
+        contentType: 'application/octet-stream',
+        size: 2 * 1024 * 1024,
+      }),
+    ).toEqual({ ok: true })
+  })
+
+  it('aceita variante image/heic-sequence (Live Photo still)', () => {
+    expect(
+      validateImageUploadMeta({
+        filename: 'live.heic',
+        contentType: 'image/heic-sequence',
+        size: 4 * 1024 * 1024,
+      }),
+    ).toEqual({ ok: true })
+  })
+
+  it('rejeita extensão inválida mesmo com MIME ambíguo', () => {
+    expect(
+      validateImageUploadMeta({
+        filename: 'malware.pdf',
+        contentType: '',
+        size: 400,
+      }),
+    ).toEqual({ ok: false, message: IMAGE_INVALID_FORMAT_MESSAGE })
+  })
+
+  it('rejeita MIME explicitamente diferente mesmo com extensão válida', () => {
+    expect(
+      validateImageUploadMeta({
+        filename: 'foto.jpg',
+        contentType: 'image/svg+xml',
+        size: 400,
+      }),
+    ).toEqual({ ok: false, message: IMAGE_INVALID_FORMAT_MESSAGE })
+  })
 })
 
 describe('sanitizeImageFilename', () => {

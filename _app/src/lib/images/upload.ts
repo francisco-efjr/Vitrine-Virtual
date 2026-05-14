@@ -5,9 +5,13 @@ export const IMAGE_ACCEPTED_MIME_TYPES = [
   'image/webp',
   'image/heic',
   'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
 ] as const
 
 export const IMAGE_ACCEPTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'] as const
+
+const IMAGE_AMBIGUOUS_MIME_TYPES = ['', 'application/octet-stream'] as const
 
 export const IMAGE_INVALID_FORMAT_MESSAGE =
   'Formato de imagem inválido. Envie uma foto em JPG, JPEG, PNG, HEIC ou WEBP.'
@@ -55,6 +59,10 @@ export function isAcceptedImageMime(contentType: string): boolean {
   return (IMAGE_ACCEPTED_MIME_TYPES as readonly string[]).includes(contentType.toLowerCase())
 }
 
+export function isAmbiguousImageMime(contentType: string): boolean {
+  return (IMAGE_AMBIGUOUS_MIME_TYPES as readonly string[]).includes(contentType.toLowerCase())
+}
+
 export function isAcceptedImageExtension(filename: string): boolean {
   const ext = getImageExtension(filename)
   return (IMAGE_ACCEPTED_EXTENSIONS as readonly string[]).includes(ext)
@@ -68,13 +76,25 @@ export function buildImageMaxUploadMessage(maxBytes: number = IMAGE_MAX_UPLOAD_B
   return `A imagem deve ter no máximo ${Math.round(maxBytes / 1024 / 1024)} MB.`
 }
 
+/**
+ * Regra:
+ * - extensão DEVE estar na whitelist (defesa contra arquivos disfarçados);
+ * - MIME pode estar na whitelist OU ser ambíguo (vazio/octet-stream) —
+ *   iOS Safari e alguns Androids mandam HEIC com MIME vazio ou genérico,
+ *   então confiamos na extensão nesses casos. MIME explicitamente diferente
+ *   (ex: 'image/svg+xml', 'application/pdf') continua sendo rejeitado.
+ */
 export function validateImageUploadMeta(
   meta: ImageUploadMeta,
   options: ImageUploadValidationOptions = {},
 ): { ok: true } | { ok: false; message: string } {
   const maxBytes = options.maxBytes ?? IMAGE_MAX_UPLOAD_BYTES
 
-  if (!isAcceptedImageMime(meta.contentType) || !isAcceptedImageExtension(meta.filename)) {
+  if (!isAcceptedImageExtension(meta.filename)) {
+    return { ok: false, message: IMAGE_INVALID_FORMAT_MESSAGE }
+  }
+
+  if (!isAcceptedImageMime(meta.contentType) && !isAmbiguousImageMime(meta.contentType)) {
     return { ok: false, message: IMAGE_INVALID_FORMAT_MESSAGE }
   }
 

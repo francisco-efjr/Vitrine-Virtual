@@ -3,6 +3,7 @@
 import imageCompression from 'browser-image-compression'
 import {
   buildImageMaxUploadMessage,
+  getImageExtension,
   IMAGE_INVALID_FORMAT_MESSAGE,
   IMAGE_MAX_UPLOAD_BYTES,
   IMAGE_STANDARD_MAX_DIMENSION,
@@ -64,8 +65,15 @@ export async function standardizeImageFile(
       throw new Error(buildImageMaxUploadMessage(maxUploadBytes))
     }
 
+    const ext = getImageExtension(file.name)
+    const isHeic =
+      file.type === 'image/heic' ||
+      file.type === 'image/heif' ||
+      ext === 'heic' ||
+      ext === 'heif'
+
     throw new Error(
-      file.type === 'image/heic' || file.type === 'image/heif'
+      isHeic
         ? 'Não foi possível preparar esta foto HEIC neste navegador. Tente selecionar a imagem novamente ou envie em JPG, PNG ou WEBP.'
         : IMAGE_INVALID_FORMAT_MESSAGE,
     )
