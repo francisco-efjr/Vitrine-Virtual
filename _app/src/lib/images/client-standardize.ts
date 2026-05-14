@@ -13,6 +13,21 @@ import {
   validateImageUploadMeta,
 } from './upload'
 
+/**
+ * Safari iOS tem suporte instável a Web Workers em alguns contextos:
+ * Workers criados via Blob URL podem falhar silenciosamente, e o
+ * browser-image-compression usa exatamente esse padrão. Detectamos
+ * Safari iOS pelo userAgent e desabilitamos o worker — a compressão
+ * roda na main thread, que é estável.
+ */
+function isSafariIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document)
+  const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua)
+  return isIOS && isSafari
+}
+
 export interface StandardizedImage {
   file: File
   previewUrl: string
@@ -50,7 +65,7 @@ export async function standardizeImageFile(
     const compressed = await imageCompression(file, {
       maxSizeMB,
       maxWidthOrHeight,
-      useWebWorker: true,
+      useWebWorker: !isSafariIOS(),
       initialQuality: IMAGE_STANDARD_QUALITY,
       preserveExif: false,
       fileType: IMAGE_STANDARD_OUTPUT_MIME,
@@ -60,7 +75,16 @@ export async function standardizeImageFile(
       type: IMAGE_STANDARD_OUTPUT_MIME,
       lastModified: Date.now(),
     })
-  } catch {
+  } catch (error) {
+    if (typeof console !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.error('[client-standardize] imageCompression falhou', {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
     if (file.size > maxUploadBytes) {
       throw new Error(buildImageMaxUploadMessage(maxUploadBytes))
     }

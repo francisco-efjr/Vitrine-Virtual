@@ -195,7 +195,14 @@ export function TryOnModal({
         formData.set('garment_url_override', garmentImageUrl)
       }
 
-      const res = await fetch('/api/try-on', { method: 'POST', body: formData })
+      const res = await fetch('/api/try-on', {
+        method: 'POST',
+        body: formData,
+        // Safari iOS aborta connections "idle" longas mais agressivamente
+        // que Chrome; cache: 'no-store' evita retry/restart implícito do
+        // WebKit que costuma matar uploads multipart no meio.
+        cache: 'no-store',
+      })
       const data = await res.json()
       window.clearInterval(interval)
 
@@ -208,9 +215,20 @@ export function TryOnModal({
       setProgress(100)
       setResultUrl(data.data.result_url)
       window.setTimeout(() => setStep('result'), 250)
-    } catch {
+    } catch (error) {
       window.clearInterval(interval)
-      setErrorMsg('Erro de conexão. Tente novamente em instantes.')
+      const detail = error instanceof Error ? error.message : String(error)
+      // eslint-disable-next-line no-console
+      console.error('[try-on] fetch falhou', {
+        detail,
+        fileName: customerPhoto.file.name,
+        fileType: customerPhoto.file.type,
+        fileSize: customerPhoto.file.size,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+      })
+      setErrorMsg(
+        `Erro de conexão. Tente novamente em instantes.${detail ? ` (${detail})` : ''}`,
+      )
       setStep('error')
     }
   }
