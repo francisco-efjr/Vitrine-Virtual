@@ -1,3 +1,6 @@
 {
-  "rootDirectory": "_app"
+  "buildCommand": "cd _app && pnpm install --frozen-lockfile && pnpm build",
+  "outputDirectory": "_app/.next",
+  "installCommand": "cd _app && pnpm install --frozen-lockfile",
+  "framework": "nextjs"
 }
