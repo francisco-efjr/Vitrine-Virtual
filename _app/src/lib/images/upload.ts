@@ -86,8 +86,25 @@ export const IMAGE_STANDARD_OUTPUT_MIME = 'image/webp'
 export const IMAGE_STANDARD_OUTPUT_EXTENSION = 'webp'
 export const IMAGE_STANDARD_QUALITY = 0.88
 export const IMAGE_STANDARD_MAX_DIMENSION = 1600
-export const IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_DIMENSION = 3840
-export const IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB = 60
+
+/**
+ * Limites do upload do cliente no try-on.
+ *
+ * MAX_UPLOAD_BYTES (60 MB) é só para a foto ORIGINAL antes do standardize
+ * — aceita HEIC grande de iPhone. O standardize comprime para WebP
+ * antes de mandar pro server.
+ *
+ * STANDARD_MAX_SIZE_MB (4 MB) é o teto do WebP comprimido. Precisa ficar
+ * abaixo do limite de Vercel Serverless Functions (4.5 MB por request
+ * multipart) com margem para o envelope do FormData e outros campos.
+ *
+ * STANDARD_MAX_DIMENSION (2048 px) é mais que suficiente para qualquer
+ * provider de try-on (FASHN/Replicate/Google AI/OpenAI) — todos
+ * redimensionam para ≤ 2048 internamente. Output do try-on é gerado em
+ * alta resolução pelo provider, independente do tamanho do input.
+ */
+export const IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_DIMENSION = 2048
+export const IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB = 4
 
 export interface ImageUploadMeta {
   filename: string
