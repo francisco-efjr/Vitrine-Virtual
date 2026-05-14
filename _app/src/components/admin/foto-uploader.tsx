@@ -286,7 +286,7 @@ export const FotoUploader = forwardRef<
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
+            accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif"
             multiple
             hidden
             onChange={(e) => e.target.files && handleFiles(e.target.files)}

@@ -47,7 +47,7 @@ const LOADING_MESSAGES = [
 ]
 
 const ACCEPT =
-  'image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif'
+  'image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif'
 
 export function TryOnModal({
   open,
