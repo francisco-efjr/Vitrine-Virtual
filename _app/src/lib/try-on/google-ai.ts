@@ -147,7 +147,10 @@ export const googleAiProvider: TryOnProvider = {
     }
 
     const t0 = Date.now()
-    const primaryModel = env.GOOGLE_AI_MODEL ?? 'gemini-2.5-flash-image'
+    // Modelo escolhido por loja (Super-Admin → High/Medium). Sem override,
+    // cai no GOOGLE_AI_MODEL. A cadeia de fallback continua para resiliência.
+    const primaryModel =
+      input.generation?.googleModelOverride || env.GOOGLE_AI_MODEL || 'gemini-2.5-flash-image'
     const candidateModels = [
       primaryModel,
       ...MODEL_FALLBACK_CHAIN.filter((m) => m !== primaryModel),
@@ -423,6 +426,18 @@ export const googleAiProvider: TryOnProvider = {
         requestId,
         durationMs: Date.now() - t0,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        modelUsed: model,
+        finalPrompt: prompt,
+        generationParams: {
+          model,
+          temperature: generationConfig.temperature,
+          responseModalities: generationConfig.responseModalities,
+          aspectRatio: responseImageConfig.aspectRatio,
+          imageSize: responseImageConfig.imageSize ?? null,
+          backgroundMode: effectiveBackgroundMode,
+        },
+        resultBucket: 'try-on-results',
+        resultPath: storagePath,
       }
     }
 

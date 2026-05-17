@@ -6,12 +6,15 @@ import { usePathname } from 'next/navigation'
 import {
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   LayoutDashboard,
   List,
   ListChecks,
   LogOut,
   Menu,
   Settings,
+  Sparkles,
+  Store,
   X,
 } from 'lucide-react'
 import { LojaMark, VVLogo } from '@/components/brand/vv-logo'
@@ -109,7 +112,7 @@ export function AdminShell({
           !collapsed ? (
             <div className="px-4 pb-3">
               <div
-                className="flex items-center gap-2.5 rounded-[10px] bg-surface-2 p-2.5"
+                className="mb-2 flex items-center gap-2.5 rounded-[10px] bg-surface-2 p-2.5"
                 title={loja.nome}
               >
                 <LojaMark loja={loja} size={26} radius={7} />
@@ -117,7 +120,25 @@ export function AdminShell({
                   <div className="truncate font-sans text-[12.5px] font-semibold text-ink">
                     {loja.nome}
                   </div>
+                  <div className="truncate font-mono text-[10px] text-ink-3">
+                    /v/{loja.slug}
+                  </div>
                 </div>
+              </div>
+              {/* Preview — fácil de achar, sem poluir */}
+              <div className="flex flex-col gap-px">
+                <PreviewLink
+                  href={`/v/${loja.slug}`}
+                  title="Abrir a vitrine pública como o cliente vê"
+                  icon={<Store size={13} />}
+                  label="Ver vitrine"
+                />
+                <PreviewLink
+                  href={`/v/${loja.slug}?cabine=1`}
+                  title="Abrir o fluxo do cliente — provador virtual"
+                  icon={<Sparkles size={13} />}
+                  label="Ver experiência"
+                />
               </div>
             </div>
           ) : (
@@ -218,6 +239,32 @@ export function AdminShell({
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
+  )
+}
+
+function PreviewLink({
+  href,
+  title,
+  icon,
+  label,
+}: {
+  href: string
+  title: string
+  icon: React.ReactNode
+  label: string
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={title}
+      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 font-sans text-[12px] text-ink-2 transition hover:bg-surface-2 hover:text-ink"
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <ExternalLink size={10} className="shrink-0 opacity-55" />
+    </a>
   )
 }
 

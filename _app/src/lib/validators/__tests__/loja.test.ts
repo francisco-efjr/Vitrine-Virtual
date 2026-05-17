@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { lojaCreateSchema, lojaUpdateSchema, nomeToSlug, slugSchema } from '../loja'
+import {
+  lojaCreateSchema,
+  lojaUpdateSchema,
+  nomeToSlug,
+  sanitizeSlug,
+  slugSchema,
+  trimSlugHyphens,
+  validateSlug,
+} from '../loja'
 
 describe('slugSchema', () => {
   it.each([
@@ -53,6 +61,43 @@ describe('nomeToSlug', () => {
   })
 })
 
+describe('sanitizeSlug (digitação no campo, por tecla)', () => {
+  it('minúsculas, sem acento, só [a-z0-9-]', () => {
+    expect(sanitizeSlug('Studio Manú!')).toBe('studio-manu-')
+  })
+  it('colapsa hífens duplicados mas NÃO apara as pontas (não trava o input)', () => {
+    expect(sanitizeSlug('a--b')).toBe('a-b')
+    expect(sanitizeSlug('-ate')).toBe('-ate')
+    expect(sanitizeSlug('ate-')).toBe('ate-')
+  })
+  it('lida com string vazia', () => {
+    expect(sanitizeSlug('')).toBe('')
+  })
+})
+
+describe('trimSlugHyphens', () => {
+  it('apara hífens das pontas (blur/save)', () => {
+    expect(trimSlugHyphens('-studio-manu-')).toBe('studio-manu')
+    expect(trimSlugHyphens('studio-manu')).toBe('studio-manu')
+  })
+})
+
+describe('validateSlug (mensagens da UI)', () => {
+  it('ok para slug válido', () => {
+    expect(validateSlug('studio-manu')).toEqual({ ok: true, msg: '' })
+  })
+  it.each([
+    ['', 'vazio'],
+    ['ab', 'curto'],
+    ['-abc', 'começa com hífen'],
+    ['abc-', 'termina com hífen'],
+    ['admin', 'reservado'],
+    ['vitrine', 'reservado'],
+  ])('rejeita "%s" (%s)', (slug) => {
+    expect(validateSlug(slug).ok).toBe(false)
+  })
+})
+
 describe('lojaCreateSchema', () => {
   it('aceita payload válido', () => {
     const result = lojaCreateSchema.safeParse({
@@ -62,6 +107,25 @@ describe('lojaCreateSchema', () => {
       cota_try_on_mensal: 200,
     })
     expect(result.success).toBe(true)
+  })
+
+  it('aplica default de modelo IA = medium', () => {
+    const r = lojaCreateSchema.parse({
+      nome: 'X',
+      slug: 'xxx',
+      email: 'a@b.com',
+    })
+    expect(r.ai_image_model).toBe('medium')
+  })
+
+  it('aceita ai_image_model high', () => {
+    const r = lojaCreateSchema.parse({
+      nome: 'X',
+      slug: 'xxx',
+      email: 'a@b.com',
+      ai_image_model: 'high',
+    })
+    expect(r.ai_image_model).toBe('high')
   })
 
   it('aplica default de cota', () => {

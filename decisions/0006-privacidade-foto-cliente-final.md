@@ -1,8 +1,14 @@
 # ADR 0006 — Privacidade da foto do cliente final no provador virtual
 
-> **Status:** Aceita
+> **Status:** ⚠️ **Substituída por [[0009-armazenamento-foto-e-aprendizado-qualidade|ADR 0009]]** (2026-05-17)
 > **Data:** 2026-04-25
 > **Decisores:** Francisco (cliente/PO) + Claude
+>
+> **Nota:** a decisão de *nunca* persistir a foto do cliente foi revista. O PO
+> priorizou uma base de aprendizado de qualidade de imagem e optou, de forma
+> informada, por armazenar a foto em bucket privado com acesso restrito. Veja a
+> [[0009-armazenamento-foto-e-aprendizado-qualidade|ADR 0009]] para a decisão
+> vigente e as pendências de LGPD. Este documento é mantido como histórico.
 
 ## Contexto
 

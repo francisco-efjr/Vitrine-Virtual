@@ -5,17 +5,23 @@ import { CountUp } from '@/components/motion'
 import { VVLogo } from '@/components/brand/vv-logo'
 import { requireSuperAdmin } from '@/server/auth/session'
 import { listLojasWithStats } from '@/server/lojas/list'
-import { getTryOnBudget, isTryOnEnabled } from '@/lib/try-on/kill-switch'
+import {
+  getDefaultAiImageModel,
+  getTryOnBudget,
+  isTryOnEnabled,
+} from '@/lib/try-on/kill-switch'
+import { ContactAnalytics } from '@/components/admin/contact-analytics'
 import { SuperAdminClient } from './super-client'
 
 export const dynamic = 'force-dynamic'
 
 export default async function SuperAdminPage() {
   const session = await requireSuperAdmin()
-  const [lojas, killEnabled, budget] = await Promise.all([
+  const [lojas, killEnabled, budget, defaultAiModel] = await Promise.all([
     listLojasWithStats(),
     isTryOnEnabled(),
     getTryOnBudget(),
+    getDefaultAiImageModel(),
   ])
 
   const totalPecas = lojas.reduce((a, l) => a + l.pecas_count, 0)
@@ -74,10 +80,15 @@ export default async function SuperAdminPage() {
           />
         </section>
 
+        <ContactAnalytics
+          lojas={lojas.map((l) => ({ id: l.id, nome: l.nome, contatos: l.contatos }))}
+        />
+
         <SuperAdminClient
           initialLojas={lojas}
           initialKillEnabled={killEnabled}
           initialBudget={budget.budgetUsd}
+          initialDefaultModel={defaultAiModel}
         />
       </main>
     </div>

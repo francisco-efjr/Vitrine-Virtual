@@ -21,6 +21,9 @@ describe('buildTryOnProviderInput', () => {
       background: {
         mode: 'white',
       },
+      generation: {
+        googleModelOverride: null,
+      },
     })
   })
 

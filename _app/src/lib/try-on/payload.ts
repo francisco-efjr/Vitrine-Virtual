@@ -4,10 +4,12 @@ export function buildTryOnProviderInput({
   customerPhoto,
   productImage,
   background,
+  googleModelOverride,
 }: {
   customerPhoto: string
   productImage: string
   background?: TryOnProviderInput['background']
+  googleModelOverride?: string | null
 }): TryOnProviderInput {
   return {
     customer: {
@@ -21,6 +23,9 @@ export function buildTryOnProviderInput({
     },
     background: background ?? {
       mode: 'white',
+    },
+    generation: {
+      googleModelOverride: googleModelOverride ?? null,
     },
   }
 }

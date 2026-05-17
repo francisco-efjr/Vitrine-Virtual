@@ -7,8 +7,11 @@ import { generateTryOn } from '@/lib/try-on/orchestrator'
 import { buildTryOnProviderInput } from '@/lib/try-on/payload'
 import { checkTryOnRateLimit } from '@/lib/try-on/rate-limit'
 import { verifyTurnstileToken } from '@/lib/try-on/turnstile'
+import { resolveGoogleModel } from '@/lib/try-on/model-selection'
 import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
 import { checkLojaQuota } from './quota'
+import { recordGeneration } from './generation-log'
+import type { AiImageModel } from '@/types/database'
 
 export type TryOnError =
   | { kind: 'kill_switch_off' }
@@ -25,6 +28,8 @@ export interface TryOnSuccess {
   // Mantemos 'google' por compatibilidade com dados/histórico, mas hoje esse fluxo
   // representa o provider Gemini Nano Banana.
   provider: 'fashn' | 'replicate' | 'google' | 'openai'
+  /** Id da geração na base de qualidade — usado pelo feedback opcional. */
+  generationId?: string | null
 }
 
 export type TryOnResult = TryOnSuccess | { ok: false; error: TryOnError }
@@ -82,7 +87,9 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
 
   const { data: loja } = await supabase
     .from('lojas')
-    .select('id, ativa, cota_try_on_mensal, provador_fundo_storage_path, provador_fundo_tipo')
+    .select(
+      'id, ativa, cota_try_on_mensal, provador_fundo_storage_path, provador_fundo_tipo, ai_image_model',
+    )
     .eq('id', peca.loja_id)
     .single()
 
@@ -99,6 +106,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   }
 
   let garmentUrl = input.garmentImageUrlOverride ?? ''
+  let garmentStoragePath: string | null = null
   if (!garmentUrl && peca.foto_principal_id) {
     const { data: foto } = await supabase
       .from('pecas_fotos')
@@ -107,6 +115,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       .single()
 
     if (foto?.storage_path) {
+      garmentStoragePath = foto.storage_path
       const { data: signed } = await supabase.storage
         .from('pecas-fotos')
         .createSignedUrl(foto.storage_path, 60 * 5)
@@ -136,10 +145,14 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     hasCustomBackground: Boolean(provadorFundoUrl),
   })
 
+  const aiImageModel = (loja.ai_image_model ?? null) as AiImageModel | null
+  const googleModelOverride = resolveGoogleModel(aiImageModel)
+
   const providerInput = buildTryOnProviderInput({
     customerPhoto: input.customerPhoto,
     productImage: garmentUrl,
     background: providerBackground,
+    googleModelOverride,
   })
 
   try {
@@ -156,6 +169,26 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       duration_ms: result.durationMs,
     })
 
+    // Base de aprendizado de qualidade (ADR 0009) — best-effort, nunca quebra o fluxo.
+    const generationId = await recordGeneration({
+      lojaId: loja.id,
+      pecaId: peca.id,
+      sessionId: input.sessionId ?? null,
+      ipHash,
+      aiImageModel,
+      status: 'success',
+      provider: result.provider,
+      providerRequestId: result.requestId,
+      modelResolved: result.modelUsed ?? googleModelOverride,
+      finalPrompt: result.finalPrompt ?? null,
+      generationParams: result.generationParams ?? null,
+      resultBucket: result.resultBucket ?? null,
+      resultPath: result.resultPath ?? null,
+      durationMs: result.durationMs,
+      customerPhotoDataUrl: input.customerPhoto,
+      productImagePath: garmentStoragePath,
+    })
+
     logger.info('Try-on bem-sucedido', {
       provider: result.provider,
       duration_ms: result.durationMs,
@@ -167,6 +200,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       resultUrl: result.resultUrl,
       expiresAt: result.expiresAt,
       provider: result.provider,
+      generationId,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -179,6 +213,20 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       success: false,
       error_code: 'provider_failed',
       duration_ms: Date.now() - t0,
+    })
+
+    await recordGeneration({
+      lojaId: loja.id,
+      pecaId: peca.id,
+      sessionId: input.sessionId ?? null,
+      ipHash,
+      aiImageModel,
+      status: 'error',
+      modelResolved: googleModelOverride,
+      errorCode: 'provider_failed',
+      durationMs: Date.now() - t0,
+      customerPhotoDataUrl: input.customerPhoto,
+      productImagePath: garmentStoragePath,
     })
 
     logger.warn('Try-on falhou', { message })

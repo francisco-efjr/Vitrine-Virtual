@@ -52,7 +52,8 @@ SaaS multi-loja de vitrine online para lojas de roupas, com **provador virtual p
 - [[decisions/0003-onboarding-manual-super-admin|🧭 ADR 0003 — Onboarding manual]]
 - [[decisions/0004-anti-abuso-quatro-camadas|🧭 ADR 0004 — Anti-abuso da IA]]
 - [[decisions/0005-multi-tenancy-rls-postgres|🧭 ADR 0005 — Multi-tenancy via RLS]]
-- [[decisions/0006-privacidade-foto-cliente-final|🧭 ADR 0006 — Privacidade da foto]]
+- [[decisions/0006-privacidade-foto-cliente-final|🧭 ADR 0006 — Privacidade da foto (substituída por 0009)]]
+- [[decisions/0009-armazenamento-foto-e-aprendizado-qualidade|🧭 ADR 0009 — Armazenamento da foto + base de qualidade]]
 - [[notes/2026-04-25-discovery|📝 Discovery inicial — 25/04]]
 - [[notes/proposta-tecnica-v1|📄 Proposta Técnica v1 (completa)]]
 - `notes/` → reuniões, descobertas, experimentos

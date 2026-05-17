@@ -11,6 +11,7 @@ export interface Database {
     Tables: {
       lojas: {
         Row: {
+          ai_image_model: 'high' | 'medium'
           ativa: boolean
           cota_try_on_mensal: number
           created_at: string
@@ -30,6 +31,7 @@ export interface Database {
           whatsapp_e164: string | null
         }
         Insert: {
+          ai_image_model?: 'high' | 'medium'
           ativa?: boolean
           cota_try_on_mensal?: number
           created_at?: string
@@ -49,6 +51,7 @@ export interface Database {
           whatsapp_e164?: string | null
         }
         Update: {
+          ai_image_model?: 'high' | 'medium'
           ativa?: boolean
           cota_try_on_mensal?: number
           created_at?: string
@@ -66,6 +69,123 @@ export interface Database {
           updated_at?: string
           vitrine_publica_visivel?: boolean
           whatsapp_e164?: string | null
+        }
+        Relationships: []
+      }
+      contact_clicks: {
+        Row: {
+          channel: 'instagram' | 'tiktok' | 'whatsapp'
+          created_at: string
+          device_type: string | null
+          id: string
+          ip_hash: string | null
+          loja_id: string
+          referrer: string | null
+          session_id: string | null
+          user_agent: string | null
+          visitor_id: string | null
+        }
+        Insert: {
+          channel: 'instagram' | 'tiktok' | 'whatsapp'
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          ip_hash?: string | null
+          loja_id: string
+          referrer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          visitor_id?: string | null
+        }
+        Update: {
+          channel?: 'instagram' | 'tiktok' | 'whatsapp'
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          ip_hash?: string | null
+          loja_id?: string
+          referrer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          visitor_id?: string | null
+        }
+        Relationships: []
+      }
+      try_on_generations: {
+        Row: {
+          ai_image_model: 'high' | 'medium' | null
+          created_at: string
+          customer_photo_path: string | null
+          duration_ms: number | null
+          error_code: string | null
+          feedback_at: string | null
+          feedback_comentario: string | null
+          feedback_positivo: boolean | null
+          final_prompt: string | null
+          generation_params: Json | null
+          id: string
+          ip_hash: string | null
+          loja_id: string
+          model_resolved: string | null
+          peca_id: string | null
+          product_image_path: string | null
+          provider: Database['public']['Enums']['try_on_provider'] | null
+          provider_request_id: string | null
+          result_bucket: string | null
+          result_path: string | null
+          session_id: string | null
+          status: 'success' | 'error' | 'fallback'
+          user_id: string | null
+        }
+        Insert: {
+          ai_image_model?: 'high' | 'medium' | null
+          created_at?: string
+          customer_photo_path?: string | null
+          duration_ms?: number | null
+          error_code?: string | null
+          feedback_at?: string | null
+          feedback_comentario?: string | null
+          feedback_positivo?: boolean | null
+          final_prompt?: string | null
+          generation_params?: Json | null
+          id?: string
+          ip_hash?: string | null
+          loja_id: string
+          model_resolved?: string | null
+          peca_id?: string | null
+          product_image_path?: string | null
+          provider?: Database['public']['Enums']['try_on_provider'] | null
+          provider_request_id?: string | null
+          result_bucket?: string | null
+          result_path?: string | null
+          session_id?: string | null
+          status?: 'success' | 'error' | 'fallback'
+          user_id?: string | null
+        }
+        Update: {
+          ai_image_model?: 'high' | 'medium' | null
+          created_at?: string
+          customer_photo_path?: string | null
+          duration_ms?: number | null
+          error_code?: string | null
+          feedback_at?: string | null
+          feedback_comentario?: string | null
+          feedback_positivo?: boolean | null
+          final_prompt?: string | null
+          generation_params?: Json | null
+          id?: string
+          ip_hash?: string | null
+          loja_id?: string
+          model_resolved?: string | null
+          peca_id?: string | null
+          product_image_path?: string | null
+          provider?: Database['public']['Enums']['try_on_provider'] | null
+          provider_request_id?: string | null
+          result_bucket?: string | null
+          result_path?: string | null
+          session_id?: string | null
+          status?: 'success' | 'error' | 'fallback'
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -260,7 +380,7 @@ export interface Database {
     }
     Enums: {
       peca_status: 'disponivel' | 'vendida'
-      try_on_provider: 'fashn' | 'replicate' | 'google'
+      try_on_provider: 'fashn' | 'replicate' | 'google' | 'openai'
       user_role: 'lojista' | 'super_admin'
     }
     CompositeTypes: { [_ in never]: never }
@@ -278,3 +398,7 @@ export type LojaRow = Tables<'lojas'>
 export type PecaRow = Tables<'pecas'>
 export type PecaFotoRow = Tables<'pecas_fotos'>
 export type ProfilesRow = Tables<'profiles'>
+export type ContactClickRow = Tables<'contact_clicks'>
+export type TryOnGenerationRow = Tables<'try_on_generations'>
+export type AiImageModel = 'high' | 'medium'
+export type ContactChannel = 'instagram' | 'tiktok' | 'whatsapp'

@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation'
-import { MessageCircle } from 'lucide-react'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { PublicLiveRefresh } from '@/components/public/public-live-refresh'
 import { VitrineGrid } from '@/components/public/vitrine-grid'
+import { ContactLinks } from '@/components/public/contact-links'
 import { LojaMark, VVLogo } from '@/components/brand/vv-logo'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
@@ -143,39 +143,13 @@ export default async function VitrinePage({ params }: { params: { slug: string }
             </div>
           </div>
           <nav className="flex items-center gap-2">
-            {data.loja.instagram ? (
-              <a
-                href={`https://instagram.com/${data.loja.instagram}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-ink-2 transition hover:bg-surface-3 hover:text-ink"
-              >
-                <IconInstagram />
-              </a>
-            ) : null}
-            {data.loja.tiktok ? (
-              <a
-                href={`https://tiktok.com/@${data.loja.tiktok}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="TikTok"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-2 text-ink-2 transition hover:bg-surface-3 hover:text-ink"
-              >
-                <IconTikTok />
-              </a>
-            ) : null}
-            {wa ? (
-              <a
-                href={wa}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="WhatsApp"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#25d366] text-white transition hover:bg-[#1fb155]"
-              >
-                <MessageCircle size={16} />
-              </a>
-            ) : null}
+            <ContactLinks
+              lojaId={data.loja.loja_id}
+              instagram={data.loja.instagram}
+              tiktok={data.loja.tiktok}
+              whatsappUrl={wa}
+              variant="header"
+            />
           </nav>
         </div>
       </header>
@@ -228,39 +202,13 @@ export default async function VitrinePage({ params }: { params: { slug: string }
             </div>
           ) : null}
           <div className="mb-6 flex items-center justify-center gap-3">
-            {data.loja.instagram ? (
-              <a
-                href={`https://instagram.com/${data.loja.instagram}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-              >
-                <IconInstagram />
-              </a>
-            ) : null}
-            {data.loja.tiktok ? (
-              <a
-                href={`https://tiktok.com/@${data.loja.tiktok}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="TikTok"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-              >
-                <IconTikTok />
-              </a>
-            ) : null}
-            {wa ? (
-              <a
-                href={wa}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="WhatsApp"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#25d366] text-white transition hover:bg-[#1fb155]"
-              >
-                <MessageCircle size={18} />
-              </a>
-            ) : null}
+            <ContactLinks
+              lojaId={data.loja.loja_id}
+              instagram={data.loja.instagram}
+              tiktok={data.loja.tiktok}
+              whatsappUrl={wa}
+              variant="footer"
+            />
           </div>
           <div className="mt-4 flex justify-center">
             <VVLogo size={18} variant="light" />
@@ -268,32 +216,5 @@ export default async function VitrinePage({ params }: { params: { slug: string }
         </div>
       </footer>
     </div>
-  )
-}
-
-function IconInstagram() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="2" y="2" width="20" height="20" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  )
-}
-
-function IconTikTok() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.17 8.17 0 004.78 1.52v-3.4a4.85 4.85 0 01-1.01-.12z" />
-    </svg>
   )
 }

@@ -39,7 +39,10 @@ const serverSchema = z.object({
   REPLICATE_VTON_MODEL: z.string().min(1).optional(),
   // Google AI (Gemini Nano Banana) — provider de try-on via Google AI Studio
   GOOGLE_AI_API_KEY: z.string().min(1).optional(),
+  // "High" — modelo de maior qualidade. Recomendado: gemini-3.1-flash-image-preview.
   GOOGLE_AI_MODEL: z.string().min(1).default('gemini-2.5-flash-image'),
+  // "Medium" — modelo de fallback / padrão de plataforma. gemini-2.5-flash-image (GA).
+  GOOGLE_AI_FALLBACK_MODEL: z.string().min(1).default('gemini-2.5-flash-image'),
   // Tamanho da imagem gerada. Usado apenas por modelos Gemini Image que aceitam
   // generationConfig.imageConfig.imageSize (ex: gemini-3.1-flash-image-preview e
   // gemini-3-pro-image-preview). O gemini-2.5-flash-image retorna resoluções

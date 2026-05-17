@@ -47,6 +47,30 @@ export async function setTryOnBudget(usd: number, byUserId?: string): Promise<vo
   logger.info('Orçamento mensal alterado', { budgetUsd: usd, by: byUserId })
 }
 
+export async function getDefaultAiImageModel(): Promise<'high' | 'medium'> {
+  const supabase = createServiceClient()
+  const { data } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'default_ai_image_model')
+    .maybeSingle()
+  return data?.value === 'high' ? 'high' : 'medium'
+}
+
+export async function setDefaultAiImageModel(
+  model: 'high' | 'medium',
+  byUserId?: string,
+): Promise<void> {
+  const supabase = createServiceClient()
+  const { error } = await supabase.from('system_settings').upsert({
+    key: 'default_ai_image_model',
+    value: model,
+    updated_by: byUserId,
+  })
+  if (error) throw error
+  logger.info('Modelo IA padrão alterado', { model, by: byUserId })
+}
+
 export async function getTryOnBudget(): Promise<{ budgetUsd: number; costPerGen: number }> {
   const supabase = createServiceClient()
   const { data } = await supabase
