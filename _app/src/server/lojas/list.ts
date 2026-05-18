@@ -1,11 +1,16 @@
 import 'server-only'
 import { createServiceClient } from '@/lib/supabase/service'
-import type { LojaRow } from '@/types/database'
+import {
+  getContactClickStatsByLoja,
+  type ContactClickStats,
+} from '@/server/analytics/contact-clicks'
+import type { AiImageModel, LojaRow } from '@/types/database'
 
 export interface LojaWithStats extends LojaRow {
   pecas_count: number
   vendidas_count: number
   try_ons_mes: number
+  contatos: ContactClickStats
 }
 
 /**
@@ -55,12 +60,28 @@ export async function listLojasWithStats(): Promise<LojaWithStats[]> {
     tryOnMap.set(t.loja_id, (tryOnMap.get(t.loja_id) ?? 0) + 1)
   }
 
+  const contatosMap = await getContactClickStatsByLoja(ids, 30)
+
   return lojas.map((l) => ({
     ...l,
     pecas_count: pecasMap.get(l.id)?.total ?? 0,
     vendidas_count: pecasMap.get(l.id)?.vendidas ?? 0,
     try_ons_mes: tryOnMap.get(l.id) ?? 0,
+    contatos: contatosMap.get(l.id) ?? { instagram: 0, tiktok: 0, whatsapp: 0 },
   }))
+}
+
+/** Atualiza o modelo de imagem (High/Medium) de uma loja. Super-admin only. */
+export async function setLojaAiModel(
+  lojaId: string,
+  aiImageModel: AiImageModel,
+): Promise<void> {
+  const supabase = createServiceClient()
+  const { error } = await supabase
+    .from('lojas')
+    .update({ ai_image_model: aiImageModel })
+    .eq('id', lojaId)
+  if (error) throw error
 }
 
 export async function setLojaAtiva(lojaId: string, ativa: boolean): Promise<void> {

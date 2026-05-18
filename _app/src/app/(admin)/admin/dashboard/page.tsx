@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ListChecks, Check, List, Plus, ExternalLink } from 'lucide-react'
+import { ListChecks, Check, List, Plus, ExternalLink, Store, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { CountUp, Reveal, Stagger } from '@/components/motion'
@@ -41,14 +41,28 @@ export default async function DashboardPage() {
           <h1 className="font-serif text-[26px] font-semibold tracking-tight text-ink sm:text-[28px]">
             {saudacao()}, {nomeCurto} 👋
           </h1>
-          <Link
-            href={`/v/${session.loja.slug}`}
-            target="_blank"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 font-sans text-[12.5px] font-medium text-ink-2 transition hover:border-accent hover:text-accent"
-          >
-            <ExternalLink size={12} />
-            Visualizar vitrine
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/v/${session.loja.slug}`}
+              target="_blank"
+              title="Abrir a vitrine pública como o cliente vê"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 font-sans text-[12.5px] font-medium text-ink-2 transition hover:border-ink hover:text-ink"
+            >
+              <Store size={13} />
+              Ver vitrine
+              <ExternalLink size={10} className="opacity-60" />
+            </Link>
+            <Link
+              href={`/v/${session.loja.slug}?cabine=1`}
+              target="_blank"
+              title="Abrir a experiência do cliente — provador virtual"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 font-sans text-[12.5px] font-medium text-ink-2 transition hover:border-ink hover:text-ink"
+            >
+              <Sparkles size={13} />
+              Ver experiência do cliente
+              <ExternalLink size={10} className="opacity-60" />
+            </Link>
+          </div>
         </header>
         <p className="mb-6 font-sans text-[13.5px] text-ink-2">
           Sua vitrine está ativa · Atualizado agora

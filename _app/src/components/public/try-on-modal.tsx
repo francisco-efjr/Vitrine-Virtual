@@ -83,6 +83,7 @@ export function TryOnModal({
   const [progress, setProgress] = useState(0)
   const [msgIdx, setMsgIdx] = useState(0)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const [generationId, setGenerationId] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -153,6 +154,7 @@ export function TryOnModal({
       setCustomerPhoto(null)
       setProgress(0)
       setResultUrl(null)
+      setGenerationId(null)
       setErrorMsg(null)
       setUploadError(null)
     }, 250)
@@ -214,6 +216,7 @@ export function TryOnModal({
 
       setProgress(100)
       setResultUrl(data.data.result_url)
+      setGenerationId(data.data.generation_id ?? null)
       window.setTimeout(() => setStep('result'), 250)
     } catch (error) {
       window.clearInterval(interval)
@@ -348,8 +351,10 @@ export function TryOnModal({
               </button>
             </div>
 
+            <FeedbackBlock generationId={generationId} />
+
             <div className="text-center font-sans text-[11px] text-white/35">
-              Imagem 1080×1920 · simulação visual · expira em 24h e não é armazenada
+              Imagem 1080×1920 · simulação visual · a prévia expira em 24h
             </div>
           </div>
         </div>
@@ -689,8 +694,8 @@ function UploadStep({
           {agreed ? <Check size={9} className="text-white" /> : null}
         </span>
         <span className="font-sans text-[11.5px] leading-relaxed text-ink-2">
-          Concordo com o uso temporário da minha foto para gerar a simulação. A imagem não é
-          armazenada.{' '}
+          Concordo com o uso da minha foto para gerar a simulação e aprimorar a qualidade das
+          prévias.{' '}
           <a
             href="/privacidade"
             target="_blank"
@@ -1017,6 +1022,104 @@ function ErrorStep({
           Tentar novamente
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Feedback opcional, minimalista e dispensável sobre a prévia.
+ * Sem termos técnicos, sem "IA". Não bloqueia nem interrompe o fluxo —
+ * o cliente pode simplesmente ignorar.
+ */
+function FeedbackBlock({ generationId }: { generationId: string | null }) {
+  const [positive, setPositive] = useState<boolean | null>(null)
+  const [comment, setComment] = useState('')
+  const [sentThanks, setSentThanks] = useState(false)
+
+  if (!generationId) return null
+
+  function send(p: boolean, withComment: boolean) {
+    try {
+      void fetch('/api/try-on/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          generation_id: generationId,
+          positive: p,
+          comment: withComment && comment.trim() ? comment.trim() : undefined,
+        }),
+        keepalive: true,
+        cache: 'no-store',
+      }).catch(() => {})
+    } catch {
+      /* feedback é opcional — silenciar */
+    }
+  }
+
+  if (sentThanks) {
+    return (
+      <div className="text-center font-sans text-[11.5px] text-white/45">
+        Obrigado pelo retorno ✓
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2.5">
+      {positive === null ? (
+        <div className="flex items-center gap-3">
+          <span className="font-sans text-[12.5px] text-white/55">O resultado ficou bom?</span>
+          <button
+            type="button"
+            onClick={() => {
+              setPositive(true)
+              send(true, false)
+            }}
+            className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
+          >
+            Sim
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPositive(false)
+              send(false, false)
+            }}
+            className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
+          >
+            Não
+          </button>
+        </div>
+      ) : (
+        <div className="flex w-full max-w-[360px] flex-col items-center gap-2">
+          <input
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="O que poderia melhorar? (opcional)"
+            maxLength={1000}
+            className="w-full rounded-full border border-white/15 bg-white/5 px-4 py-2 text-center font-sans text-[12.5px] text-white/85 outline-none transition placeholder:text-white/30 focus:border-white/30"
+          />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSentThanks(true)}
+              className="font-sans text-[11.5px] text-white/40 transition hover:text-white/70"
+            >
+              Pular
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                send(positive, true)
+                setSentThanks(true)
+              }}
+              className="rounded-full bg-white/90 px-4 py-1.5 font-sans text-[12px] font-medium text-ink transition hover:bg-white"
+            >
+              Enviar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

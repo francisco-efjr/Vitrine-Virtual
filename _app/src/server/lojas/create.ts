@@ -83,6 +83,7 @@ export async function createLojaWithInvite(
       slug: data.slug,
       nome: data.nome,
       cota_try_on_mensal: data.cota_try_on_mensal,
+      ai_image_model: data.ai_image_model,
     })
     .select('*')
     .single()

@@ -1,29 +1,8 @@
 import 'server-only'
 import { createServiceClient } from '@/lib/supabase/service'
-import { nomeToSlug, slugSchema } from '@/lib/validators/loja'
+import { nomeToSlug, slugSchema, SLUG_RESERVED } from '@/lib/validators/loja'
 
-const RESERVED_SLUGS = new Set([
-  'admin',
-  'api',
-  'auth',
-  'login',
-  'signup',
-  'logout',
-  'super',
-  'privacidade',
-  'termos',
-  'contato',
-  'about',
-  'sobre',
-  'help',
-  'ajuda',
-  'v',
-  '_next',
-  'static',
-  'public',
-  'app',
-  'www',
-])
+const RESERVED_SLUGS = new Set(SLUG_RESERVED)
 
 export function isReservedSlug(slug: string): boolean {
   return RESERVED_SLUGS.has(slug.toLowerCase())

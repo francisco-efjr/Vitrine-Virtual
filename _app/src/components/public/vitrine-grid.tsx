@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, LayoutGrid, Maximize2, X } from 'lucide-react'
 import { Stagger } from '@/components/motion'
@@ -50,6 +50,20 @@ export function VitrineGrid({
   const [focusIdx, setFocusIdx] = useState(0)
   const [drawerPeca, setDrawerPeca] = useState<Peca | null>(null)
   const [cabinePeca, setCabinePeca] = useState<Peca | null>(null)
+  const cabineDeepLinkDone = useRef(false)
+
+  // Deep-link "Ver experiência do cliente" (Admin → ?cabine=1):
+  // abre a Cabine da primeira peça disponível para o admin pré-visualizar
+  // o fluxo do cliente. Só dispara uma vez e só com o parâmetro presente.
+  useEffect(() => {
+    if (cabineDeepLinkDone.current) return
+    if (typeof window === 'undefined') return
+    const wants = new URLSearchParams(window.location.search).get('cabine') === '1'
+    if (!wants) return
+    if (pecas.length === 0) return
+    cabineDeepLinkDone.current = true
+    setCabinePeca(pecas[0] ?? null)
+  }, [pecas])
 
   // Categorias presentes na vitrine
   const availableCats = useMemo(() => {

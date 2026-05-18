@@ -1,7 +1,7 @@
 # To-do — Vitrine Virtual
 
 > Lista viva. Itens concluídos podem virar anotações em `notes/`.
-> Última atualização: 2026-04-25
+> Última atualização: 2026-05-17
 
 ## Próximo passo (P0)
 
@@ -54,6 +54,13 @@
 
 ## Concluído (últimos 7 dias)
 
+- [x] 2026-05-17 — Handoff Admin/Super-Admin (Vitrine Virtual.html) implementado:
+  - Tracking de intenção de contato (Instagram/TikTok/WhatsApp) + analytics no Super-Admin
+  - Modelo de imagem por loja (High/Medium) + modelo padrão de plataforma
+  - Fix do bug de digitação do slug + redesign da tela "Nova loja" (preview de URL, validação ao vivo, reservados)
+  - Links de preview no Admin (Ver vitrine / Ver experiência do cliente)
+  - Base de aprendizado de qualidade (`try_on_generations`) + feedback opcional minimalista
+  - [[decisions/0009-armazenamento-foto-e-aprendizado-qualidade|ADR 0009]] (substitui [[decisions/0006-privacidade-foto-cliente-final|0006]])
 - [x] 2026-04-25 — Discovery inicial: 8 perguntas estruturadas para o cliente, todas respondidas
 - [x] 2026-04-25 — [[notes/proposta-tecnica-v1|Proposta Técnica v1]] elaborada e entregue
 - [x] 2026-04-25 — Estrutura do projeto criada no vault Obsidian

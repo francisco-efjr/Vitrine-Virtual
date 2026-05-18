@@ -36,7 +36,7 @@ describe('TryOnModal', () => {
     const continueButton = screen.getByRole('button', { name: /^continuar$/i })
     expect(continueButton).toBeDisabled()
 
-    fireEvent.click(screen.getByText(/concordo com o uso temporário/i))
+    fireEvent.click(screen.getByText(/concordo com o uso da minha foto/i))
     expect(continueButton).toBeDisabled() // still no photo
 
     const fileInputs = Array.from(container.querySelectorAll('input[type="file"]'))
@@ -81,7 +81,7 @@ describe('TryOnModal', () => {
     const photoFile = new File(['foto'], 'foto.jpg', { type: 'image/jpeg' })
     fireEvent.change(fileInputs[1] as HTMLInputElement, { target: { files: [photoFile] } })
 
-    fireEvent.click(screen.getByText(/concordo com o uso temporário/i))
+    fireEvent.click(screen.getByText(/concordo com o uso da minha foto/i))
     const continueButton = screen.getByRole('button', { name: /^continuar$/i })
     await waitFor(() => expect(continueButton).toBeEnabled())
     fireEvent.click(continueButton)

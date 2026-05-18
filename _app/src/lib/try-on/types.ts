@@ -17,6 +17,11 @@ export interface TryOnProviderInput {
     /** URL pÃºblica do fundo cadastrado pela loja quando mode=custom. */
     backgroundImage?: string
   }
+  /** Parâmetros de geração resolvidos por loja (modelo, etc). */
+  generation?: {
+    /** Modelo Gemini técnico resolvido a partir do ai_image_model da loja. */
+    googleModelOverride?: string | null
+  }
 }
 
 export interface TryOnProviderResult {
@@ -28,6 +33,16 @@ export interface TryOnProviderResult {
   durationMs: number
   /** Quando a URL expira (ISO). */
   expiresAt: string
+  /** Nome técnico do modelo efetivamente usado (para a base de qualidade). */
+  modelUsed?: string
+  /** Prompt final enviado ao modelo (base de aprendizado — ADR 0009). */
+  finalPrompt?: string
+  /** Parâmetros de geração enviados ao modelo. */
+  generationParams?: Record<string, unknown>
+  /** Bucket onde o resultado foi persistido (quando o provider salva). */
+  resultBucket?: string
+  /** Caminho do resultado no bucket. */
+  resultPath?: string
 }
 
 export interface TryOnProvider {

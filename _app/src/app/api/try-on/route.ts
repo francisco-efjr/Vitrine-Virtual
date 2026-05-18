@@ -108,5 +108,6 @@ export async function POST(req: NextRequest) {
     result_url: result.resultUrl,
     expires_at: result.expiresAt,
     provider: result.provider,
+    generation_id: result.generationId ?? null,
   })
 }
