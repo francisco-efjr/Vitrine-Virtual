@@ -4,7 +4,7 @@ import {
   getContactClickStatsByLoja,
   type ContactClickStats,
 } from '@/server/analytics/contact-clicks'
-import type { AiImageModel, LojaRow } from '@/types/database'
+import type { LojaRow } from '@/types/database'
 
 export interface LojaWithStats extends LojaRow {
   pecas_count: number
@@ -29,23 +29,22 @@ export async function listLojasWithStats(): Promise<LojaWithStats[]> {
 
   // Stats em paralelo
   const ids = lojas.map((l) => l.id)
-  const [pecasRes, tryOnRes] = await Promise.all([
-    supabase.from('pecas').select('loja_id, status').in('loja_id', ids),
-    supabase.rpc('try_on_uso_mes_atual', { p_loja_id: ids[0]! }), // placeholder — vamos chamar por loja
-  ])
 
-  // Como try_on_uso_mes_atual é por loja, preferimos query direta:
+  // BUG-009: removida a chamada RPC try_on_uso_mes_atual (era feita só para a
+  // 1ª loja e o resultado era descartado com `void`). Os try-ons do mês são
+  // obtidos pela query direta abaixo, agregada por loja.
   const inicioMes = new Date()
   inicioMes.setUTCDate(1)
   inicioMes.setUTCHours(0, 0, 0, 0)
-  const { data: tryOnRows } = await supabase
-    .from('try_on_uses')
-    .select('loja_id, success')
-    .in('loja_id', ids)
-    .eq('success', true)
-    .gte('created_at', inicioMes.toISOString())
-
-  void tryOnRes // suprime warning do exemplo de RPC
+  const [pecasRes, { data: tryOnRows }] = await Promise.all([
+    supabase.from('pecas').select('loja_id, status').in('loja_id', ids),
+    supabase
+      .from('try_on_uses')
+      .select('loja_id, success')
+      .in('loja_id', ids)
+      .eq('success', true)
+      .gte('created_at', inicioMes.toISOString()),
+  ])
 
   const pecasMap = new Map<string, { total: number; vendidas: number }>()
   for (const p of pecasRes.data ?? []) {
@@ -71,21 +70,5 @@ export async function listLojasWithStats(): Promise<LojaWithStats[]> {
   }))
 }
 
-/** Atualiza o modelo de imagem (High/Medium) de uma loja. Super-admin only. */
-export async function setLojaAiModel(
-  lojaId: string,
-  aiImageModel: AiImageModel,
-): Promise<void> {
-  const supabase = createServiceClient()
-  const { error } = await supabase
-    .from('lojas')
-    .update({ ai_image_model: aiImageModel })
-    .eq('id', lojaId)
-  if (error) throw error
-}
-
-export async function setLojaAtiva(lojaId: string, ativa: boolean): Promise<void> {
-  const supabase = createServiceClient()
-  const { error } = await supabase.from('lojas').update({ ativa }).eq('id', lojaId)
-  if (error) throw error
-}
+// BUG-010: mutações setLojaAtiva / setLojaAiModel movidas para ./update.ts
+// (list.ts deve conter apenas leitura — separação de responsabilidades).

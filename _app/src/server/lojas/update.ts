@@ -1,9 +1,10 @@
 import 'server-only'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { lojaUpdateSchema, type LojaUpdateInput } from '@/lib/validators/loja'
 import { LojaError } from './errors'
 import { logger } from '@/lib/logger'
-import type { LojaRow } from '@/types/database'
+import type { AiImageModel, LojaRow } from '@/types/database'
 
 /**
  * Atualiza dados da loja do usuário logado.
@@ -35,4 +36,28 @@ export async function updateOwnLoja(
   }
 
   return loja
+}
+
+// ── Mutações administrativas (super-admin) — movidas de list.ts (BUG-010) ──
+// Usam service client (bypassa RLS). O caller DEVE ter passado por
+// requireSuperAdmin() antes de invocar.
+
+/** Ativa/desativa uma loja. Super-admin only. */
+export async function setLojaAtiva(lojaId: string, ativa: boolean): Promise<void> {
+  const supabase = createServiceClient()
+  const { error } = await supabase.from('lojas').update({ ativa }).eq('id', lojaId)
+  if (error) throw error
+}
+
+/** Atualiza o modelo de imagem (High/Medium) de uma loja. Super-admin only. */
+export async function setLojaAiModel(
+  lojaId: string,
+  aiImageModel: AiImageModel,
+): Promise<void> {
+  const supabase = createServiceClient()
+  const { error } = await supabase
+    .from('lojas')
+    .update({ ai_image_model: aiImageModel })
+    .eq('id', lojaId)
+  if (error) throw error
 }

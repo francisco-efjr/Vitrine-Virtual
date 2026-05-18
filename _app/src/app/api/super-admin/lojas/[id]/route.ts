@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { handleRoute } from '@/lib/api/response'
 import { requireSuperAdmin } from '@/server/auth/session'
-import { setLojaAiModel, setLojaAtiva } from '@/server/lojas/list'
+import { setLojaAiModel, setLojaAtiva } from '@/server/lojas/update'
 import { aiImageModelSchema } from '@/lib/validators/loja'
 
 const patchSchema = z

@@ -22,7 +22,7 @@ export function RecuperarSenhaClient() {
     // Anti-enumeration: a UI mostra a mesma mensagem genérica seja qual for o resultado.
     // Não importa se a conta existe ou não — não revelamos.
     await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/redefinir-senha`,
+      redirectTo: `${window.location.origin}/api/auth/callback?next=/redefinir-senha`,
     })
     setLoading(false)
     setSent(true)
