@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { DEFAULT_NEXT, safeNext } from '@/lib/auth/safe-next'
 
 /**
  * Callback de magic link / OAuth.
@@ -9,22 +10,8 @@ import { createClient } from '@/lib/supabase/server'
  *   - Recuperação de senha:               `?type=recovery&next=/redefinir-senha`
  *   - Login com magic link genérico:      `?next=/admin` (default)
  *
- * Whitelist de `next` para evitar open redirect:
- * só aceita paths internos (que começam com /).
+ * Proteção contra open redirect centralizada em @/lib/auth/safe-next.
  */
-
-const ALLOWED_NEXT_PREFIXES = ['/admin', '/redefinir-senha']
-const DEFAULT_NEXT = '/admin'
-
-function safeNext(input: string | null): string {
-  if (!input) return DEFAULT_NEXT
-  if (!input.startsWith('/')) return DEFAULT_NEXT
-  if (input.startsWith('//')) return DEFAULT_NEXT // protocol-relative
-  if (!ALLOWED_NEXT_PREFIXES.some((p) => input === p || input.startsWith(`${p}/`))) {
-    return DEFAULT_NEXT
-  }
-  return input
-}
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)

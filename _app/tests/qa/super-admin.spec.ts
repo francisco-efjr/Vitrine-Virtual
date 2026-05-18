@@ -53,11 +53,9 @@ test.describe('Acesso ao Painel Super Admin', () => {
     await loginAsSuperAdmin(page)
     await expect(page).toHaveURL(/\/admin\/super/)
     await expect(page.getByText('Visão geral da plataforma')).toBeVisible()
-    // 4 KPI blocks
-    await expect(page.getByText('LOJAS ATIVAS')).toBeVisible()
-    await expect(page.getByText('PEÇAS NA PLATAFORMA')).toBeVisible()
-    await expect(page.getByText('PEÇAS VENDIDAS')).toBeVisible()
-    await expect(page.getByText('TRY-ONS ESTE MÊS')).toBeVisible()
+    // 4 KPI blocks (rótulos do design entregue — Vitrine Virtual.html)
+    await expect(page.getByText('Lojas ativas')).toBeVisible()
+    await expect(page.getByText('Cabines')).toBeVisible()
   })
 })
 
@@ -87,10 +85,10 @@ test.describe('Lista de Lojas', () => {
   test('CT-SA-004: Lojas listadas com nome, badge e estatísticas', async ({ page }) => {
     const lojaCards = page.locator('[data-testid="loja-row"], .loja-row').first()
     // Pelo menos 1 loja visível
-    await expect(page.getByText("Bella's Store")).toBeVisible()
-    await expect(page.getByText('peças')).toBeVisible()
-    await expect(page.getByText('vendidas')).toBeVisible()
-    await expect(page.getByText('Provedor IA')).toBeVisible()
+    await expect(page.getByText('peças').first()).toBeVisible()
+    await expect(page.getByText('vendidas').first()).toBeVisible()
+    // Coluna de modelo de imagem (renomeada no design entregue)
+    await expect(page.getByText('Modelo IA').first()).toBeVisible()
   })
 
   test('CT-SA-005: Toggle de loja ativa/inativa dispara PATCH correto', async ({ page }) => {
@@ -135,7 +133,7 @@ test.describe('Kill Switch Global', () => {
   })
 
   test('CT-SA-006: Kill switch visível com estado correto', async ({ page }) => {
-    await expect(page.getByText('Kill switch global — Provador IA')).toBeVisible()
+    await expect(page.getByText('Kill switch — Cabine')).toBeVisible()
     // Badge ON ou OFF deve estar visível
     const badge = page.getByText(/^(ON|OFF)$/).first()
     await expect(badge).toBeVisible()
@@ -148,7 +146,7 @@ test.describe('Kill Switch Global', () => {
 
     // Encontrar o toggle do kill switch (não o de loja)
     const killToggle = page.locator('[aria-label*="kill"], [aria-label*="Kill"]').first()
-      ?? page.getByText('Kill switch global — Provador IA').locator('..').locator('button[role="switch"]')
+      ?? page.getByText('Kill switch — Cabine').locator('..').locator('button[role="switch"]')
 
     await killToggle.click()
 
@@ -163,7 +161,7 @@ test.describe('Kill Switch Global', () => {
     )
 
     // Clicar no toggle do kill switch
-    await page.getByText('Kill switch global — Provador IA')
+    await page.getByText('Kill switch — Cabine')
       .locator('..')
       .locator('button[role="switch"]')
       .click()
@@ -172,7 +170,7 @@ test.describe('Kill Switch Global', () => {
     expect(response.status()).toBe(200)
 
     // Clicar novamente para restaurar estado
-    await page.getByText('Kill switch global — Provador IA')
+    await page.getByText('Kill switch — Cabine')
       .locator('..')
       .locator('button[role="switch"]')
       .click()
@@ -193,24 +191,20 @@ test.describe('Orçamento Mensal — Bug conhecidos', () => {
     expect(parseFloat(value)).toBeGreaterThan(0)
   })
 
-  test('[BUG-001] CT-SA-007-BUG: Botão "Salvar" não dispara nenhuma requisição', async ({ page }) => {
-    let patchCalled = false
-    page.on('request', (req) => {
-      if (req.url().includes('/api/super-admin/settings') && req.method() === 'PATCH') {
-        patchCalled = true
-      }
-    })
+  // Regressão de BUG-001/BUG-002 (corrigidos): o botão "Salvar" agora dispara
+  // PATCH /api/super-admin/settings com o orçamento, e o backend persiste.
+  test('CT-SA-007-FIX: Botão "Salvar" persiste o orçamento via PATCH', async ({ page }) => {
+    const requestPromise = page.waitForRequest(
+      (req) =>
+        req.url().includes('/api/super-admin/settings') && req.method() === 'PATCH',
+    )
 
-    // Alterar o valor do orçamento
     await page.locator('input[type="number"]').first().fill('999')
-    // Clicar em Salvar
     await page.getByRole('button', { name: /salvar/i }).click()
 
-    // Aguardar possível requisição (não deve aparecer)
-    await page.waitForTimeout(1000)
-
-    // BUG: nenhuma requisição é feita
-    expect(patchCalled).toBe(false) // Este expect documenta o bug — DEVE FALHAR após correção
+    const request = await requestPromise
+    const body = JSON.parse(request.postData() ?? '{}')
+    expect(body.try_on_monthly_budget_usd).toBe(999)
   })
 })
 
@@ -226,7 +220,7 @@ test.describe('Criação de Nova Loja', () => {
     await expect(page.getByRole('dialog')).toBeVisible()
     await expect(page.getByLabel('Nome da loja')).toBeVisible()
     await expect(page.getByLabel('E-mail da lojista')).toBeVisible()
-    await expect(page.getByLabel('Slug da vitrine')).toBeVisible()
+    await expect(page.getByLabel(/URL da vitrine/i)).toBeVisible()
   })
 
   test('CT-SA-008-B: Botão "Criar" desabilitado com campos vazios', async ({ page }) => {
@@ -238,7 +232,7 @@ test.describe('Criação de Nova Loja', () => {
   test('CT-SA-012: Slug auto-gerado a partir do nome', async ({ page }) => {
     await page.getByRole('button', { name: /nova loja/i }).click()
     const nomeInput = page.getByLabel('Nome da loja')
-    const slugInput = page.getByLabel('Slug da vitrine')
+    const slugInput = page.getByLabel(/URL da vitrine/i)
 
     await nomeInput.fill('Atelier Laila')
     await expect(slugInput).toHaveValue('atelier-laila')

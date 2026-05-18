@@ -6,11 +6,13 @@ import { VVLogo } from '@/components/brand/vv-logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase/client'
+import { safeNext } from '@/lib/auth/safe-next'
 
 export function LoginForm() {
   const router = useRouter()
   const params = useSearchParams()
-  const next = params.get('next') ?? '/admin'
+  // BUG-007: validar `next` para impedir open redirect (ex: ?next=https://evil.com)
+  const next = safeNext(params.get('next'))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)

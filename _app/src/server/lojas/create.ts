@@ -11,6 +11,33 @@ import {
 import { isReservedSlug, isSlugAvailable } from './slug'
 import type { LojaRow } from '@/types/database'
 
+type ServiceClient = ReturnType<typeof createServiceClient>
+
+/**
+ * Procura um usuário do Supabase Auth por e-mail, paginando TODAS as páginas.
+ *
+ * BUG-003: a versão anterior usava `perPage: 1`, então só o primeiro usuário
+ * era inspecionado e qualquer duplicata além dele passava — permitindo criar
+ * uma 2ª loja para um e-mail já cadastrado e quebrando o modelo 1:1 do RLS.
+ */
+async function findAuthUserByEmail(admin: ServiceClient, email: string) {
+  const target = email.toLowerCase()
+  const perPage = 1000
+  const maxPages = 100 // teto de segurança (100k usuários) — evita loop infinito
+  for (let page = 1; page <= maxPages; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+    if (error) {
+      logger.error('Erro ao listar usuários ao criar loja', { code: error.message })
+      throw new LojaError('Falha ao verificar e-mail', 'LIST_USERS_FAIL', 500)
+    }
+    const users = data?.users ?? []
+    const match = users.find((u) => u.email?.toLowerCase() === target)
+    if (match) return match
+    if (users.length < perPage) break // última página
+  }
+  return undefined
+}
+
 /**
  * Cria uma loja + usuário lojista de uma vez (super-admin only).
  * - Valida payload com Zod.
@@ -34,17 +61,10 @@ export async function createLojaWithInvite(
   const admin = createServiceClient()
   const env = getPublicEnv()
 
-  // 1. Verifica se já existe usuário com esse e-mail
-  // (Supabase Auth não tem .getUserByEmail no SDK público — listUsers é a rota oficial)
-  const { data: existingList, error: listError } = await admin.auth.admin.listUsers({
-    page: 1,
-    perPage: 1,
-  })
-  if (listError) {
-    logger.error('Erro ao listar usuários ao criar loja', { code: listError.message })
-    throw new LojaError('Falha ao verificar e-mail', 'LIST_USERS_FAIL', 500)
-  }
-  const found = existingList.users.find((u) => u.email?.toLowerCase() === data.email)
+  // 1. Verifica se já existe usuário com esse e-mail.
+  // (Supabase Auth não tem .getUserByEmail no SDK público — listUsers é a rota
+  //  oficial; precisamos paginar TODAS as páginas, senão duplicatas passam.)
+  const found = await findAuthUserByEmail(admin, data.email)
 
   let userId: string
   let invitationSent = false
@@ -63,7 +83,7 @@ export async function createLojaWithInvite(
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
       data.email,
       {
-        redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/admin/definir-senha`,
+        redirectTo: `${env.NEXT_PUBLIC_APP_URL}/api/auth/callback?next=/admin/definir-senha`,
         data: { nome_loja: data.nome },
       },
     )

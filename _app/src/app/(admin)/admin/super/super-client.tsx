@@ -46,6 +46,7 @@ export function SuperAdminClient({
   const [savingBudget, setSavingBudget] = useState(false)
   const [savedBudget, setSavedBudget] = useState(false)
   const [confirmKill, setConfirmKill] = useState<boolean | null>(null)
+  const [killError, setKillError] = useState<string | null>(null)
 
   async function toggleLoja(id: string, ativa: boolean) {
     const prev = lojas
@@ -81,12 +82,26 @@ export function SuperAdminClient({
   }
 
   async function applyKillSwitch(v: boolean) {
+    const prev = killEnabled
     setKillEnabled(v)
-    await fetch('/api/super-admin/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ try_on_enabled: v }),
-    })
+    let ok = false
+    try {
+      const r = await fetch('/api/super-admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ try_on_enabled: v }),
+      })
+      ok = r.ok
+    } catch {
+      ok = false
+    }
+    // BUG-005: sem rollback, o admin podia achar que desligou a Cabine de
+    // todas as lojas enquanto o banco continuava no estado anterior.
+    if (!ok) {
+      setKillEnabled(prev)
+      setKillError('Falha ao atualizar o kill switch. Estado revertido — tente novamente.')
+      setTimeout(() => setKillError(null), 5000)
+    }
   }
 
   function requestKillToggle(v: boolean) {
@@ -253,6 +268,15 @@ export function SuperAdminClient({
               />
             </div>
           </div>
+
+          {killError ? (
+            <div
+              role="alert"
+              className="rounded-[10px] bg-danger-light px-4 py-3 font-sans text-[12.5px] text-danger"
+            >
+              {killError}
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-[10px] bg-surface-2 p-4">
             <div className="min-w-0 flex-1">

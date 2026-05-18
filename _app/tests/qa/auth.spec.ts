@@ -231,9 +231,12 @@ test.describe('Recuperação de Senha', () => {
   })
 })
 
-// ─── Grupo: Callback de Magic Link (BUG-004) ──────────────────────────────────
+// ─── Grupo: Callback de Magic Link (BUG-004 — corrigido) ──────────────────────
+// BUG-004 corrigido: os e-mails de convite/recuperação agora apontam para
+// /api/auth/callback (create.ts + recuperar-client.tsx). O teste que
+// documentava o 404 de /auth/callback foi removido conforme instrução do QA.
 
-test.describe('[BUG-004] Callback de Magic Link', () => {
+test.describe('Callback de Magic Link', () => {
   test('GET /api/auth/callback sem code → redireciona para /login?error=missing_code', async ({
     page,
   }) => {
@@ -246,13 +249,6 @@ test.describe('[BUG-004] Callback de Magic Link', () => {
   }) => {
     await page.goto(`${BASE_URL}/api/auth/callback?code=codigo_invalido_xyz`)
     await expect(page).toHaveURL(/login.*error=callback_failed/)
-  })
-
-  test('[BUG-004] /auth/callback (sem /api) retorna 404', async ({ page }) => {
-    const response = await page.goto(`${BASE_URL}/auth/callback`)
-    // BUG: Esta rota não existe. Códigos de convite e recuperação apontam para ela.
-    expect(response?.status()).toBe(404)
-    // Quando corrigido, este teste deve ser removido (a rota /auth/callback não deve existir)
   })
 })
 

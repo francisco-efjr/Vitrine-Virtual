@@ -344,3 +344,30 @@ export async function setLojaAtiva(lojaId: string, ativa: boolean): Promise<void
 | BUG-010 | **P3** | setLojaAtiva em arquivo de listagem (SRP) | list.ts:66 |
 
 **Total: 4 críticos · 1 alto · 3 médios · 2 baixos**
+
+---
+
+## Status de Resolução — 2026-05-18
+
+> Correções aplicadas a partir da `main` (pós-merge do handoff Admin/Super-Admin).
+> Verificação: `tsc` limpo · 274 testes unit/integration passando.
+
+| ID | Status | Onde / como foi resolvido |
+|----|--------|---------------------------|
+| BUG-001 | ✅ Corrigido | Já resolvido no handoff: `super-client.tsx` tem `saveBudget()` com `onClick`. Spec `[BUG-001]` convertida em regressão positiva `CT-SA-007-FIX`. |
+| BUG-002 | ✅ Corrigido | Já resolvido no handoff: `settings/route.ts` processa `try_on_monthly_budget_usd` via `setTryOnBudget()` (kill-switch.ts). |
+| BUG-003 | ✅ Corrigido | `create.ts`: novo `findAuthUserByEmail()` pagina TODAS as páginas (perPage 1000, teto 100 páginas) em vez de `perPage: 1`. |
+| BUG-004 | ✅ Corrigido | `create.ts` e `recuperar-client.tsx`: `redirectTo` agora aponta para `/api/auth/callback`. Spec do 404 removida (conforme instrução do QA). |
+| BUG-005 | ✅ Corrigido | `super-client.tsx`: `applyKillSwitch` faz rollback do estado + mensagem de erro visível quando o PATCH falha. (toggleLoja já tinha rollback). |
+| BUG-006 | ✅ Corrigido | Já resolvido no handoff: `super/page.tsx` usa `adminNome` derivado da sessão, não "Francisco" fixo. |
+| BUG-007 | ✅ Corrigido | Novo `src/lib/auth/safe-next.ts` (M-SEC-001) reusado em `login-form.tsx` e `/api/auth/callback`. 16 testes unitários cobrindo open redirect. |
+| BUG-008 | ✅ Corrigido | Já resolvido no handoff: badge do kill switch usa `variant 'success'/'neutral'`, não `'vendida'`. |
+| BUG-009 | ✅ Corrigido | `list.ts`: removida a chamada RPC morta `try_on_uso_mes_atual` e o `void tryOnRes`. |
+| BUG-010 | ✅ Corrigido | `setLojaAtiva` e `setLojaAiModel` movidas de `list.ts` para `update.ts`; import do route atualizado. |
+
+**Observação sobre os specs E2E (`*.spec.ts`):** são Playwright e exigem
+servidor + Supabase + browsers + usuários semeados — não executáveis no
+ambiente de CI atual deste worktree. Seletores que quebraram apenas por causa
+do redesign aprovado (handoff) foram atualizados para a UI entregue
+("URL da vitrine", "Modelo IA", "Kill switch — Cabine", rótulos de KPI). A
+validação E2E completa depende de uma execução com ambiente vivo.
