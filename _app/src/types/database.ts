@@ -22,7 +22,7 @@ export interface Database {
           nome: string
           owner_user_id: string
           provador_fundo_storage_path: string | null
-          provador_fundo_tipo: 'branco' | 'personalizado'
+          provador_fundo_tipo: 'branco' | 'personalizado' | 'cliente'
           slug: string
           tagline: string | null
           tiktok: string | null
@@ -42,7 +42,7 @@ export interface Database {
           nome: string
           owner_user_id: string
           provador_fundo_storage_path?: string | null
-          provador_fundo_tipo?: 'branco' | 'personalizado'
+          provador_fundo_tipo?: 'branco' | 'personalizado' | 'cliente'
           slug: string
           tagline?: string | null
           tiktok?: string | null
@@ -62,7 +62,7 @@ export interface Database {
           nome?: string
           owner_user_id?: string
           provador_fundo_storage_path?: string | null
-          provador_fundo_tipo?: 'branco' | 'personalizado'
+          provador_fundo_tipo?: 'branco' | 'personalizado' | 'cliente'
           slug?: string
           tagline?: string | null
           tiktok?: string | null

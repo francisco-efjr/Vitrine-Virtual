@@ -148,16 +148,24 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     return { ok: false, error: { kind: 'peca_unavailable' } }
   }
 
-  // ─── Quality gate (research §5) ────────────────────────────────────────
+  // ─── Quality gate (research §5, design v4) ─────────────────────────────
   //
-  // Roda antes do Gemini para evitar gastar com fotos ruins. Hoje o gate
-  // confia nos signals que o cliente envia (MediaPipe no navegador). Quando
-  // os signals estão ausentes (cliente antigo) seguimos o fluxo legado —
-  // não quebrar a vitrine em produção é prioridade sobre cobertura.
+  // Soft-by-default: o design (chat7) explicitamente diz para NÃO bloquear
+  // o usuário quando o sistema não identifica rosto/blur/iluminação. Em vez
+  // disso, geramos mesmo assim — o resultado pode ser ruim mas é o que o
+  // cliente pediu. Os signals continuam sendo coletados/logados para tuning.
   //
-  // TODO (acceptance): adicionar double-check server-side com sharp +
-  // detector leve para signals críticos (resolução, NSFW). O gate puro JS
-  // já bloqueia ~80% dos rejeitos visíveis sem custo extra.
+  // Só duas razões mantêm hard-block:
+  //   - low_resolution  → Gemini falha com imagens minúsculas
+  //   - garment_unclear → sem peça reconhecível não há try-on possível
+  //
+  // Resto vira proceed_with_warning. O cliente já viu a foto antes de enviar;
+  // o servidor confia.
+  const HARD_BLOCK_REASONS: ReadonlySet<RejectionReason> = new Set([
+    'low_resolution',
+    'garment_unclear',
+  ])
+
   let gateVerdict: 'proceed' | 'proceed_with_warning' | 'reject' | null = null
   let gateReason: RejectionReason | null = null
   let gateSignalsForLog: Record<string, unknown> | null = null
@@ -181,7 +189,11 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       warnings: combined.warnings,
     }
 
-    if (combined.verdict === 'reject' && combined.reason) {
+    if (
+      combined.verdict === 'reject' &&
+      combined.reason &&
+      HARD_BLOCK_REASONS.has(combined.reason)
+    ) {
       // Log da rejeição (best-effort) — sem gastar Gemini, sem salvar foto.
       await recordGeneration({
         lojaId: loja.id,
@@ -196,7 +208,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
         gateSignals: gateSignalsForLog,
       })
 
-      logger.info('Try-on: gate rejeitou antes do provider', {
+      logger.info('Try-on: gate hard-block antes do provider', {
         reason: combined.reason,
         warnings: combined.warnings,
       })
@@ -205,20 +217,27 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
         error: { kind: 'gate_rejected', reason: combined.reason },
       }
     }
+
+    if (combined.verdict === 'reject') {
+      // Reject "soft": downgrade pra warning + segue gerando. Loga pro tuning.
+      logger.info('Try-on: gate soft warning (design v4 não-bloqueante)', {
+        reason: combined.reason,
+        warnings: combined.warnings,
+      })
+      gateVerdict = 'proceed_with_warning'
+    }
   }
 
   const provadorFundoUrl =
     loja.provador_fundo_tipo === 'personalizado' && loja.provador_fundo_storage_path
       ? buildLojaAssetPublicUrl(loja.provador_fundo_storage_path)
       : null
-  const providerBackground = provadorFundoUrl
-    ? {
-        mode: 'custom' as const,
-        backgroundImage: provadorFundoUrl,
-      }
-    : {
-        mode: 'white' as const,
-      }
+  const providerBackground: { mode: 'white' | 'custom' | 'customer'; backgroundImage?: string } =
+    loja.provador_fundo_tipo === 'cliente'
+      ? { mode: 'customer' }
+      : provadorFundoUrl
+        ? { mode: 'custom', backgroundImage: provadorFundoUrl }
+        : { mode: 'white' }
 
   logger.info('Try-on: fundo parametrizado da loja', {
     backgroundMode: providerBackground.mode,
@@ -243,7 +262,11 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   const customerPhotoType = input.customerSignals?.detectedType ?? 'full_body'
   const garmentPhotoType = input.garmentSignals?.detectedPhotoType ?? 'auto'
   const tierBackgroundMode: TierRouteContext['backgroundMode'] =
-    providerBackground.mode === 'custom' ? 'store_background' : 'white'
+    providerBackground.mode === 'custom'
+      ? 'store_background'
+      : providerBackground.mode === 'customer'
+        ? 'preserve_customer'
+        : 'white'
 
   const routeCtx: TierRouteContext = {
     customerPhotoType,

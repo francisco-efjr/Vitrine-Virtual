@@ -1,12 +1,12 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { TryOnModal } from './try-on-modal'
+import { IconHanger } from '@/components/brand/icon-hanger'
 
 /**
  * Botão "Experimentar" — entry-point para a Cabine Virtual.
- * Visual alinhado ao handoff v3: pill escuro com starlet ✦ em accent.
+ * Visual alinhado ao handoff v3: pill escuro com ícone de cabide em accent.
  */
 export function TryOnButton({
   pecaId,
@@ -18,7 +18,6 @@ export function TryOnButton({
   garmentImageUrl = null,
   garmentThumbUrl = null,
   cabineBackdropUrl = null,
-  vitrineHref = null,
   size = 'lg',
 }: {
   pecaId: string
@@ -34,16 +33,9 @@ export function TryOnButton({
    * Aparece como pano de fundo sutil durante a tela de loading.
    */
   cabineBackdropUrl?: string | null
-  vitrineHref?: string | null
   size?: 'sm' | 'md' | 'lg'
 }) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
-
-  const handleTryAnother = useCallback(() => {
-    setOpen(false)
-    if (vitrineHref) router.push(vitrineHref)
-  }, [router, vitrineHref])
 
   const sizing =
     size === 'lg'
@@ -60,7 +52,7 @@ export function TryOnButton({
         className={`inline-flex items-center justify-center gap-2 rounded-full bg-ink font-medium text-white shadow-sm transition duration-200 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:bg-[#2d2825] active:scale-[0.98] ${sizing}`}
       >
         <span className="text-accent" aria-hidden="true">
-          ✦
+          <IconHanger size={size === 'lg' ? 15 : 13} strokeWidth={1.8} />
         </span>
         Experimentar
       </button>
@@ -68,7 +60,6 @@ export function TryOnButton({
       <TryOnModal
         open={open}
         onClose={() => setOpen(false)}
-        onTryAnother={vitrineHref ? handleTryAnother : undefined}
         pecaId={pecaId}
         pecaNome={pecaNome}
         pecaTamanho={pecaTamanho}

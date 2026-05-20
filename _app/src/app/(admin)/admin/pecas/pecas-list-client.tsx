@@ -11,6 +11,7 @@ import { Stagger } from '@/components/motion'
 import { CATEGORIAS, getCategoriaLabel } from '@/lib/categorias'
 import { PecaFormModal } from './peca-form-modal'
 import { formatPreco } from '@/lib/validators/peca'
+import { formatSizes, parseSizes, sortSizes } from '@/lib/sizes'
 import type { PecaRow } from '@/types/database'
 
 type PecaListItem = PecaRow & { foto_principal_url: string | null }
@@ -18,11 +19,7 @@ type PecaListItem = PecaRow & { foto_principal_url: string | null }
 const TODAS_CAT = '__todas__'
 
 function parseTamanhos(tamanho: string | null): string[] {
-  if (!tamanho) return []
-  return tamanho
-    .split(/[,·\s]+/)
-    .map((t) => t.trim())
-    .filter(Boolean)
+  return sortSizes(parseSizes(tamanho))
 }
 
 export function PecasListClient({
@@ -60,6 +57,12 @@ export function PecasListClient({
         .map((id) => ({ id, label: getCategoriaLabel(id) })),
     ]
   }, [initialPecas])
+
+  // Categorias personalizadas (não pré-definidas) para reutilização no modal
+  const categoriasExtra = useMemo(
+    () => catsDisponiveis.filter((c) => !CATEGORIAS.some((cat) => cat.id === c.id)).map((c) => c.id),
+    [catsDisponiveis],
+  )
 
   // Ordenação fixa: mais antigas primeiro (regra do handoff v3)
   const filtered = useMemo(() => {
@@ -267,8 +270,8 @@ export function PecasListClient({
                     variant={p.status}
                   />
                 </div>
-                <div className="mt-1 min-h-[34px] font-sans text-[11.5px] text-ink-3">
-                  {p.tamanho || '—'}
+                <div className="mt-1 min-h-[34px]">
+                  <SizesRow sizes={p.tamanho} />
                 </div>
                 <div className="font-serif text-[17px] font-semibold text-ink">
                   {formatPreco(p.preco_centavos) || (
@@ -347,7 +350,7 @@ export function PecasListClient({
                     {p.nome}
                   </div>
                   <div className="mt-0.5 font-sans text-[11.5px] text-ink-3">
-                    {[getCategoriaLabel(p.categoria_id), p.tamanho].filter(Boolean).join(' · ') ||
+                    {[getCategoriaLabel(p.categoria_id), formatSizes(p.tamanho, ' · ')].filter(Boolean).join(' · ') ||
                       '—'}
                   </div>
                 </div>
@@ -414,6 +417,7 @@ export function PecasListClient({
           setEditPeca(null)
           startTransition(() => router.refresh())
         }}
+        categoriasExtra={categoriasExtra}
       />
 
       <Modal
@@ -516,6 +520,23 @@ export function PecasListClient({
           Esta ação é irreversível. A peça e todas as fotos serão removidas.
         </p>
       </Modal>
+    </div>
+  )
+}
+
+function SizesRow({ sizes }: { sizes: string | null }) {
+  const sorted = sortSizes(parseSizes(sizes))
+  if (sorted.length === 0) return <span className="font-sans text-[11.5px] text-ink-3">—</span>
+  return (
+    <div className="-mx-0.5 flex flex-wrap gap-1 overflow-x-auto [scrollbar-width:none]">
+      {sorted.map((t) => (
+        <span
+          key={t}
+          className="shrink-0 rounded border border-border px-1.5 py-0.5 font-sans text-[10.5px] text-ink-3"
+        >
+          {t}
+        </span>
+      ))}
     </div>
   )
 }

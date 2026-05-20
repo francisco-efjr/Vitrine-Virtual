@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, ImageIcon, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { Toggle } from '@/components/ui/toggle'
 import { Reveal } from '@/components/motion'
 import { preparePreviewableImage } from '@/lib/images/client-standardize'
@@ -433,6 +434,33 @@ export function ConfigClient({
               </span>
             </button>
 
+            {/* Tile 3 — Foto do cliente */}
+            <button
+              type="button"
+              onClick={() => setLoja({ ...loja, provador_fundo_tipo: 'cliente' })}
+              className="group flex flex-col items-center transition"
+            >
+              <div
+                className={`relative flex h-[88px] w-[112px] items-center justify-center overflow-hidden rounded-[10px] border-2 bg-gradient-to-br from-[#f0ebe4] to-[#e2d9ce] transition ${
+                  loja.provador_fundo_tipo === 'cliente'
+                    ? 'border-accent shadow-card-hover'
+                    : 'border-border group-hover:border-border-2'
+                }`}
+              >
+                <Silhueta />
+                {loja.provador_fundo_tipo === 'cliente' ? <SelectedDot /> : null}
+              </div>
+              <span
+                className={`mt-2 font-sans text-xs ${
+                  loja.provador_fundo_tipo === 'cliente'
+                    ? 'font-semibold text-ink'
+                    : 'text-ink-2'
+                }`}
+              >
+                Foto do cliente
+              </span>
+            </button>
+
             {fundoUrl ? (
               <div className="flex flex-col gap-1.5 self-center pt-1">
                 <button
@@ -473,6 +501,7 @@ export function ConfigClient({
 
         <div className="mt-9 flex items-center gap-3">
           <Button variant="dark" onClick={save} disabled={saving}>
+            {saving ? <Spinner size={14} className="text-white" /> : null}
             {saving ? 'Salvando…' : 'Salvar'}
           </Button>
           {saved ? (

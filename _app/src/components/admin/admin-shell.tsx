@@ -13,7 +13,6 @@ import {
   LogOut,
   Menu,
   Settings,
-  Sparkles,
   Store,
   X,
 } from 'lucide-react'
@@ -133,12 +132,6 @@ export function AdminShell({
                   icon={<Store size={13} />}
                   label="Ver vitrine"
                 />
-                <PreviewLink
-                  href={`/v/${loja.slug}?cabine=1`}
-                  title="Abrir o fluxo do cliente — provador virtual"
-                  icon={<Sparkles size={13} />}
-                  label="Ver experiência"
-                />
               </div>
             </div>
           ) : (
@@ -148,7 +141,7 @@ export function AdminShell({
           )
         ) : null}
 
-        <nav className={`flex-1 ${collapsed ? 'px-2' : 'px-2.5'}`}>
+        <nav className={`min-h-0 flex-1 overflow-y-auto ${collapsed ? 'px-2' : 'px-2.5'}`}>
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname?.startsWith(`${href}/`)
             return (
@@ -171,7 +164,7 @@ export function AdminShell({
         </nav>
 
         <div
-          className={`border-t border-border ${
+          className={`shrink-0 border-t border-border bg-surface ${
             collapsed ? 'flex flex-col items-center gap-2.5 px-2 py-3' : 'p-4'
           }`}
         >

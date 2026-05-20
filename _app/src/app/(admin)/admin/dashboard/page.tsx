@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { ListChecks, Check, List, Plus, ExternalLink, Store, Sparkles } from 'lucide-react'
+import { ListChecks, Check, List, Plus, ExternalLink, Store } from 'lucide-react'
+import { IconHanger } from '@/components/brand/icon-hanger'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { CountUp, Reveal, Stagger } from '@/components/motion'
@@ -52,16 +53,6 @@ export default async function DashboardPage() {
               Ver vitrine
               <ExternalLink size={10} className="opacity-60" />
             </Link>
-            <Link
-              href={`/v/${session.loja.slug}?cabine=1`}
-              target="_blank"
-              title="Abrir a experiência do cliente — provador virtual"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 font-sans text-[12.5px] font-medium text-ink-2 transition hover:border-ink hover:text-ink"
-            >
-              <Sparkles size={13} />
-              Ver experiência do cliente
-              <ExternalLink size={10} className="opacity-60" />
-            </Link>
           </div>
         </header>
         <p className="mb-6 font-sans text-[13.5px] text-ink-2">
@@ -93,11 +84,18 @@ export default async function DashboardPage() {
       <Reveal delay={120}>
         <Card className="mb-6 p-5 sm:p-6">
           <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-            <span className="font-sans text-sm font-medium text-ink">Cota da Cabine</span>
+            <div className="flex items-center gap-2">
+              <IconHanger size={15} className="text-accent" />
+              <span className="font-sans text-sm font-medium text-ink">Consultas da cabine</span>
+            </div>
             <Badge
               label={`${metrics.try_ons_mes} de ${metrics.cota_mensal} usos`}
               variant={cotaPct > 80 ? 'warning' : 'neutral'}
             />
+          </div>
+          <div className="mb-2 font-serif text-[26px] font-semibold leading-none tracking-tight text-ink">
+            <CountUp value={metrics.try_ons_mes} />
+            <span className="ml-1.5 font-sans text-[13px] font-normal text-ink-3">realizadas</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-border">
             <div
@@ -109,7 +107,7 @@ export default async function DashboardPage() {
             />
           </div>
           <p className="mt-2 font-sans text-xs text-ink-3">
-            Restam {Math.max(0, metrics.cota_mensal - metrics.try_ons_mes)} usos este mês.
+            {Math.max(0, metrics.cota_mensal - metrics.try_ons_mes)} restantes este mês.
           </p>
         </Card>
       </Reveal>

@@ -12,9 +12,14 @@ export interface TryOnProviderInput {
     productImage: string
   }
   background: {
-    /** Fundo parametrizado pela loja para a imagem final. */
-    mode: 'white' | 'custom'
-    /** URL pÃºblica do fundo cadastrado pela loja quando mode=custom. */
+    /**
+     * Fundo parametrizado pela loja para a imagem final.
+     *   - white    → padrão branco (default)
+     *   - custom   → imagem cadastrada pela loja (backgroundImage)
+     *   - customer → preserva o fundo da própria foto enviada pelo cliente
+     */
+    mode: 'white' | 'custom' | 'customer'
+    /** URL pública do fundo cadastrado pela loja quando mode=custom. */
     backgroundImage?: string
   }
   /** Parâmetros de geração resolvidos por loja (modelo, etc). */

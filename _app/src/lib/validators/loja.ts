@@ -117,7 +117,7 @@ export const lojaCreateSchema = z.object({
 })
 export type LojaCreateInput = z.infer<typeof lojaCreateSchema>
 
-export const provadorFundoTipoSchema = z.enum(['branco', 'personalizado'])
+export const provadorFundoTipoSchema = z.enum(['branco', 'personalizado', 'cliente'])
 
 export const lojaUpdateSchema = z.object({
   nome: z.string().trim().min(1, 'Nome da loja é obrigatório').max(80, 'Nome da loja muito longo').optional(),

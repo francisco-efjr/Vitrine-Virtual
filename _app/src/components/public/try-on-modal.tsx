@@ -1,13 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Camera,
   Check,
   Download,
   Image as ImageIcon,
+  Info,
   MessageCircle,
   RefreshCcw,
+  ThumbsDown,
+  ThumbsUp,
   Trash2,
   Upload,
   X,
@@ -22,10 +25,9 @@ import {
   IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB,
 } from '@/lib/images/upload'
 import { computeCustomerSignals } from '@/lib/try-on/quality-gate/client-signals'
-import { REJECTION_MESSAGES } from '@/lib/try-on/quality-gate/rejection-messages'
 import type { CustomerPhotoSignals } from '@/lib/try-on/quality-gate/types'
-import { FEEDBACK_REASONS, type FeedbackReason } from '@/lib/try-on/feedback/types'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
+import { IconHanger } from '@/components/brand/icon-hanger'
 
 type Step = 'upload' | 'confirm' | 'processing' | 'result' | 'error'
 
@@ -58,7 +60,6 @@ const ACCEPT =
 export function TryOnModal({
   open,
   onClose,
-  onTryAnother,
   pecaId,
   pecaNome,
   pecaTamanho = null,
@@ -71,8 +72,6 @@ export function TryOnModal({
 }: {
   open: boolean
   onClose: () => void
-  /** Levar de volta para a grade de peças quando o usuário clica "Experimentar outra peça". */
-  onTryAnother?: () => void
   pecaId: string
   pecaNome: string
   pecaTamanho?: string | null
@@ -93,16 +92,20 @@ export function TryOnModal({
   const [downloading, setDownloading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [rating, setRating] = useState<'sim' | 'nao' | null>(null)
+  // Face warning: design v4 (chat7) — aviso amigável NÃO bloqueante quando o
+  // gate cliente (MediaPipe) não consegue identificar o rosto.
+  const [faceWarnDismissed, setFaceWarnDismissed] = useState(false)
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
 
-  const handleTryAnother = useCallback(() => {
-    if (onTryAnother) {
-      onTryAnother()
-      return
-    }
-    onClose()
-  }, [onTryAnother, onClose])
+  function handleRetry() {
+    setStep('upload')
+    setResultUrl(null)
+    setGenerationId(null)
+    setRating(null)
+    setFaceWarnDismissed(false)
+  }
 
   async function handleDownload() {
     if (!resultUrl) return
@@ -163,6 +166,8 @@ export function TryOnModal({
       setGenerationId(null)
       setErrorMsg(null)
       setUploadError(null)
+      setRating(null)
+      setFaceWarnDismissed(false)
     }, 250)
     return () => window.clearTimeout(timer)
   }, [open, customerPhoto])
@@ -170,6 +175,8 @@ export function TryOnModal({
   async function onPick(file: File | null) {
     if (!file) return
     setUploadError(null)
+    // Foto nova → recomeça o ciclo de detecção de rosto.
+    setFaceWarnDismissed(false)
     try {
       const prepared = await preparePreviewableImage(file, {
         maxSizeMB: IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB,
@@ -230,15 +237,10 @@ export function TryOnModal({
       window.clearInterval(interval)
 
       if (!res.ok || !data?.ok) {
-        // Quality gate rejeitou: usar a copy PT-BR localizada (research §7).
-        const code = typeof data?.error?.code === 'string' ? data.error.code : ''
-        if (code.startsWith('GATE_')) {
-          const reasonKey = code.slice('GATE_'.length).toLowerCase() as keyof typeof REJECTION_MESSAGES
-          const message = REJECTION_MESSAGES[reasonKey]?.ptBr ?? data?.error?.message
-          setErrorMsg(message ?? 'Não conseguimos usar esta foto. Envie outra.')
-          setStep('error')
-          return
-        }
+        // Gate hard-block (low_resolution / garment_unclear) e qualquer outro
+        // erro caem aqui. Per design v4, NÃO mapeamos códigos GATE_* para copy
+        // específica — mostramos a mensagem genérica do servidor e o usuário
+        // pode tentar de novo. A copy do servidor já vem amigável em PT-BR.
         setErrorMsg(data?.error?.message ?? 'Não foi possível gerar a visualização agora.')
         setStep('error')
         return
@@ -351,13 +353,14 @@ export function TryOnModal({
               </div>
             </div>
 
+            {/* Row 1 — CTAs principais: WhatsApp + Baixar imagem */}
             <div className="flex flex-wrap items-center justify-center gap-2.5">
               {whatsappE164 ? (
                 <a
                   href={buildWhatsAppUrl(whatsappE164, buildVitrineMessage({ pecaNome })) ?? '#'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-sans text-sm font-semibold text-ink transition hover:opacity-90"
+                  className="inline-flex items-center justify-center gap-2 rounded-[10px] bg-white px-5 py-3 font-sans text-sm font-semibold text-ink transition hover:opacity-90"
                   style={{ flex: '1 1 200px' }}
                 >
                   <MessageCircle size={16} />
@@ -367,24 +370,43 @@ export function TryOnModal({
               <button
                 onClick={handleDownload}
                 disabled={downloading}
-                title="Baixar foto com marca d'água"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-4 py-3 font-sans text-[13.5px] font-medium text-white/90 backdrop-blur transition hover:bg-white/20 disabled:opacity-60"
+                title="Baixar imagem"
+                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] border border-white/20 bg-white/10 px-4 py-3 font-sans text-[13.5px] font-medium text-white/90 backdrop-blur transition hover:bg-white/20 disabled:opacity-60"
+                style={{ flex: '1 1 160px' }}
               >
                 <Download size={14} />
-                {downloading ? 'Baixando…' : 'Baixar'}
-              </button>
-              <button
-                onClick={handleTryAnother}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-4 py-3 font-sans text-[13.5px] text-white/70 transition hover:bg-white/10 hover:text-white"
-              >
-                Outra peça
+                {downloading ? 'Baixando…' : 'Baixar imagem'}
               </button>
             </div>
 
-            <FeedbackBlock generationId={generationId} />
+            {/* Row 2 — Rating "Gostou do resultado?" (Sim/Não com thumbs) */}
+            <ResultRating
+              rating={rating}
+              onRate={(v) => {
+                setRating(v)
+                postRatingTelemetry(generationId, v)
+              }}
+            />
 
-            <div className="text-center font-sans text-[11px] text-white/35">
-              Imagem 1080×1920 · simulação visual · a prévia expira em 24h
+            {/* Row 3 — Tentar novamente. Só habilita após o rating (qualquer um). */}
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={handleRetry}
+                disabled={!rating}
+                aria-disabled={!rating}
+                className="inline-flex items-center justify-center gap-1.5 rounded-full border px-5 py-2.5 font-sans text-[13px] font-medium backdrop-blur transition-all duration-300 disabled:cursor-not-allowed"
+                style={{
+                  borderColor: rating ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.08)',
+                  background: rating ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                  color: rating ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.32)',
+                  opacity: rating ? 1 : 0.6,
+                  transform: rating ? 'translateY(0)' : 'translateY(2px)',
+                }}
+              >
+                <RefreshCcw size={13} />
+                Tentar novamente
+              </button>
             </div>
           </div>
         </div>
@@ -412,7 +434,8 @@ export function TryOnModal({
 
         <div className="flex items-start justify-between gap-3.5 px-5 pb-1.5 pt-2 sm:px-6">
           <div className="min-w-0 flex-1">
-            <div className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-ink-3">
+            <div className="flex items-center gap-1 font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-ink-3">
+              <IconHanger size={11} strokeWidth={1.8} />
               Cabine Virtual
             </div>
             <div className="mt-1 truncate font-serif text-[21px] font-normal leading-tight tracking-tight text-ink">
@@ -438,6 +461,7 @@ export function TryOnModal({
                 cleanupSelection(customerPhoto)
                 setCustomerPhoto(p)
                 setUploadError(null)
+                setFaceWarnDismissed(false)
               }}
               uploadError={uploadError}
               pecaNome={pecaNome}
@@ -449,6 +473,16 @@ export function TryOnModal({
               onCamera={() => cameraRef.current?.click()}
               onGallery={() => galleryRef.current?.click()}
               onPick={onPick}
+              faceWarnDismissed={faceWarnDismissed}
+              onContinueAnyway={() => {
+                setFaceWarnDismissed(true)
+                setStep('confirm')
+              }}
+              onReupload={() => {
+                cleanupSelection(customerPhoto)
+                setCustomerPhoto(null)
+                setFaceWarnDismissed(false)
+              }}
             />
           ) : null}
 
@@ -563,6 +597,9 @@ function UploadStep({
   onCamera,
   onGallery,
   onPick,
+  faceWarnDismissed,
+  onContinueAnyway,
+  onReupload,
 }: {
   mirrorPhoto: SelectedPhoto | null
   setMirrorPhoto: (p: SelectedPhoto | null) => void
@@ -576,9 +613,21 @@ function UploadStep({
   onCamera: () => void
   onGallery: () => void
   onPick: (file: File | null) => Promise<void>
+  faceWarnDismissed: boolean
+  onContinueAnyway: () => void
+  onReupload: () => void
 }) {
   const [drag, setDrag] = useState(false)
   const canConfirm = !!mirrorPhoto && agreed
+  // Face warning aparece quando: temos foto, signals já chegaram (não estão
+  // undefined), MediaPipe disse `faceVisible: false`, e o usuário ainda não
+  // dismissou. NÃO bloqueia: só esconde o "Continuar" principal e oferece
+  // dois caminhos claros (outra foto / continuar mesmo assim).
+  const showFaceWarn =
+    !!mirrorPhoto &&
+    mirrorPhoto.signals !== undefined &&
+    mirrorPhoto.signals.faceVisible === false &&
+    !faceWarnDismissed
 
   return (
     <div className="flex flex-col gap-[22px]" style={{ animation: 'vv-fade 0.25s var(--e-out)' }}>
@@ -709,6 +758,10 @@ function UploadStep({
         ) : null}
       </div>
 
+      {showFaceWarn ? (
+        <FaceWarning onReupload={onReupload} onContinue={agreed ? onContinueAnyway : undefined} />
+      ) : null}
+
       <button
         type="button"
         onClick={() => setAgreed(!agreed)}
@@ -737,14 +790,91 @@ function UploadStep({
         </span>
       </button>
 
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={!canConfirm}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-ink px-7 py-3.5 font-sans text-[15px] font-medium text-white transition hover:bg-[#2d2825] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Continuar
-      </button>
+      {/* "Continuar" principal só aparece quando não há warning de rosto.
+          Caso o warning esteja visível, os 2 botões dele substituem este CTA. */}
+      {!showFaceWarn ? (
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!canConfirm}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-ink px-7 py-3.5 font-sans text-[15px] font-medium text-white transition hover:bg-[#2d2825] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Continuar
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Aviso amigável quando o gate cliente (MediaPipe) NÃO identifica o rosto
+ * na foto. Design v4 (chat7): NÃO bloqueia o usuário — explica de forma
+ * suave que o resultado pode não ter tanta fidelidade e oferece dois
+ * caminhos claros (outra foto / continuar mesmo assim).
+ *
+ * Visual: cartão warm amber + ícone de info + título serif + corpo sans
+ * + 2 botões pill (ghost = outra foto, dark = continuar). Reveal animado.
+ */
+function FaceWarning({
+  onContinue,
+  onReupload,
+}: {
+  /** Quando undefined, o usuário ainda precisa marcar consentimento. */
+  onContinue?: () => void
+  onReupload: () => void
+}) {
+  return (
+    <div
+      className="flex flex-col gap-3.5 rounded-[14px] border px-4 py-4"
+      style={{
+        borderColor: '#e7d8a955',
+        background: 'linear-gradient(180deg, #fdf6e7 0%, #faf0d8 100%)',
+        animation: 'vv-reveal-up 0.45s var(--e-out) both',
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-white"
+          style={{ color: '#c8a04a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+        >
+          <Info size={17} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-serif text-[16px] font-medium leading-snug tracking-tight text-ink">
+            Não conseguimos identificar bem o rosto
+          </div>
+          <p className="mt-1 font-sans text-[12.5px] leading-relaxed text-ink-2">
+            Você pode continuar com esta foto mesmo assim — só lembre que, nesse caso, o resultado
+            pode não representar você com tanta fidelidade. Ou, se preferir, envie outra imagem
+            mais nítida.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onReupload}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2.5 font-sans text-[13px] font-medium text-ink-2 transition hover:bg-surface-2"
+          style={{ flexBasis: '130px' }}
+        >
+          <RefreshCcw size={13} />
+          Enviar outra foto
+        </button>
+        <button
+          type="button"
+          onClick={onContinue}
+          disabled={!onContinue}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-ink px-4 py-2.5 font-sans text-[13px] font-medium text-white transition hover:bg-[#2d2825] disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ flexBasis: '150px' }}
+        >
+          Continuar mesmo assim
+        </button>
+      </div>
+      {!onContinue ? (
+        <p className="-mt-1 text-center font-sans text-[11px] italic text-ink-3">
+          Marque o consentimento abaixo para continuar.
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -773,13 +903,6 @@ function UploadPreview({
         {/* object-contain ⇒ foto inteira visível em qualquer proporção */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={value.previewUrl} alt="Sua foto" className="block h-full w-full object-contain" />
-        {/* Badge canônico 9:16 1080×1920 — discreto, top-left */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute left-2 top-2 rounded-md bg-white/70 px-1.5 py-[3px] font-mono text-[9px] tracking-wider text-[#9a9189]"
-        >
-          9:16 · 1080×1920
-        </span>
         <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/45 via-transparent to-transparent p-3.5 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
           <div className="flex gap-1.5">
             <button
@@ -1057,149 +1180,92 @@ function ErrorStep({
 }
 
 /**
- * Feedback opcional, minimalista e dispensável sobre a prévia.
- * Sem termos técnicos, sem "IA". Não bloqueia nem interrompe o fluxo —
- * o cliente pode simplesmente ignorar.
+ * Rating "Gostou do resultado?" pós-resultado (design v4 / chat7).
  *
- * Em "Sim": registra positivo e some.
- * Em "Não": mostra 6 motivos estruturados (research §9.2). Em "Outro",
- * abre um campo livre opcional. PII-screening é responsabilidade upstream.
+ * - Pergunta única em serif italic, centralizada.
+ * - Sim / Não como pills com ícones (thumbs-up / thumbs-down).
+ * - Clique commita IMEDIATAMENTE (sem confirmação): a UX é "tap to commit".
+ * - Selecionado fica em branco sólido + scale(1.04); não-selecionado em
+ *   pill translúcida glassy. Animação suave 220ms.
+ *
+ * Telemetria via `onRate`: o callback é responsável por POSTar para
+ * /api/try-on/feedback (silencioso, best-effort). A infra de 6 motivos
+ * estruturados continua disponível na API e no schema (`feedback_reason`
+ * em try_on_generations) para uso interno/admin — não é exposta aqui.
  */
-function FeedbackBlock({ generationId }: { generationId: string | null }) {
-  const [positive, setPositive] = useState<boolean | null>(null)
-  const [reason, setReason] = useState<FeedbackReason | null>(null)
-  const [comment, setComment] = useState('')
-  const [sentThanks, setSentThanks] = useState(false)
-
-  if (!generationId) return null
-
-  function send(
-    p: boolean,
-    payload: { reason?: FeedbackReason | null; comment?: string | null } = {},
-  ) {
-    try {
-      void fetch('/api/try-on/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          generation_id: generationId,
-          positive: p,
-          reason: payload.reason ?? undefined,
-          comment: payload.comment?.trim() ? payload.comment.trim() : undefined,
-        }),
-        keepalive: true,
-        cache: 'no-store',
-      }).catch(() => {})
-    } catch {
-      /* feedback é opcional — silenciar */
-    }
-  }
-
-  if (sentThanks) {
-    return (
-      <div className="text-center font-sans text-[11.5px] text-white/45">
-        Obrigado pelo retorno ✓
-      </div>
-    )
-  }
-
-  if (positive === null) {
-    return (
-      <div className="flex items-center justify-center gap-3">
-        <span className="font-sans text-[12.5px] text-white/55">O resultado ficou bom?</span>
-        <button
-          type="button"
-          onClick={() => {
-            setPositive(true)
-            send(true)
-            setSentThanks(true)
-          }}
-          className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
-        >
-          Sim
-        </button>
-        <button
-          type="button"
-          onClick={() => setPositive(false)}
-          className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
-        >
-          Não
-        </button>
-      </div>
-    )
-  }
-
-  // positive === false → mostra os 6 motivos
-  if (reason === null) {
-    return (
-      <div className="flex w-full max-w-[420px] flex-col items-center gap-2">
-        <span className="font-sans text-[12.5px] text-white/55">O que não ficou bom?</span>
-        <div className="flex flex-wrap justify-center gap-1.5">
-          {FEEDBACK_REASONS.map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => {
-                setReason(opt.key)
-                if (opt.key !== 'other') {
-                  send(false, { reason: opt.key })
-                  setSentThanks(true)
-                }
-              }}
-              className="rounded-full border border-white/15 px-3 py-1 font-sans text-[11.5px] text-white/80 transition hover:bg-white/10"
-            >
-              {opt.ptBr}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            send(false)
-            setSentThanks(true)
-          }}
-          className="font-sans text-[11px] text-white/35 transition hover:text-white/70"
-        >
-          Pular
-        </button>
-      </div>
-    )
-  }
-
-  // reason === 'other' → campo livre
+function ResultRating({
+  rating,
+  onRate,
+}: {
+  rating: 'sim' | 'nao' | null
+  onRate: (v: 'sim' | 'nao') => void
+}) {
+  const opts: Array<{ id: 'sim' | 'nao'; label: string; Icon: typeof ThumbsUp }> = [
+    { id: 'sim', label: 'Sim', Icon: ThumbsUp },
+    { id: 'nao', label: 'Não', Icon: ThumbsDown },
+  ]
   return (
-    <div className="flex w-full max-w-[360px] flex-col items-center gap-2">
-      <input
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder="O que poderia melhorar?"
-        maxLength={1000}
-        className="w-full rounded-full border border-white/15 bg-white/5 px-4 py-2 text-center font-sans text-[12.5px] text-white/85 outline-none transition placeholder:text-white/30 focus:border-white/30"
-      />
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            send(false, { reason: 'other' })
-            setSentThanks(true)
-          }}
-          className="font-sans text-[11.5px] text-white/40 transition hover:text-white/70"
-        >
-          Pular
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            send(false, { reason: 'other', comment })
-            setSentThanks(true)
-          }}
-          className="rounded-full bg-white/90 px-4 py-1.5 font-sans text-[12px] font-medium text-ink transition hover:bg-white"
-        >
-          Enviar
-        </button>
+    <div
+      className="flex flex-col items-center gap-2.5"
+      style={{ animation: 'vv-fade-up 0.5s var(--e-out) 0.45s both' }}
+    >
+      <div className="font-serif text-[14px] italic tracking-[0.01em] text-white/70">
+        Gostou do resultado?
+      </div>
+      <div className="flex gap-2.5">
+        {opts.map(({ id, label, Icon }) => {
+          const on = rating === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onRate(id)}
+              aria-pressed={on}
+              className="inline-flex items-center gap-1.5 rounded-full border px-5 py-2 font-sans text-[13px] backdrop-blur"
+              style={{
+                background: on ? '#ffffff' : 'rgba(255,255,255,0.08)',
+                color: on ? '#1e1a17' : 'rgba(255,255,255,0.86)',
+                borderColor: on ? '#ffffff' : 'rgba(255,255,255,0.18)',
+                fontWeight: on ? 600 : 500,
+                transform: on ? 'scale(1.04)' : 'scale(1)',
+                transition: 'all 0.22s var(--e-out)',
+              }}
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
+}
+
+/**
+ * Posta a avaliação para `/api/try-on/feedback`. Silencioso: feedback é
+ * opcional e nunca deve interromper o fluxo do cliente.
+ *
+ * O schema do servidor aceita também um campo `reason` (uma das 6 chaves
+ * FeedbackReason — research §9.2). O design v4 não expõe os 6 motivos na
+ * UI pública; mantemos só `positive`. A infra está pronta caso decidamos
+ * coletar motivos via outro canal (NPS, admin, etc.).
+ */
+function postRatingTelemetry(generationId: string | null, rating: 'sim' | 'nao') {
+  if (!generationId) return
+  try {
+    void fetch('/api/try-on/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        generation_id: generationId,
+        positive: rating === 'sim',
+      }),
+      keepalive: true,
+      cache: 'no-store',
+    }).catch(() => {})
+  } catch {
+    /* telemetria silenciosa */
+  }
 }
 
 function cleanupSelection(photo: SelectedPhoto | null) {

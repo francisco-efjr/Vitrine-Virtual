@@ -6,6 +6,7 @@ import { TryOnButton } from '@/components/public/try-on-button'
 import { GaleriaFotos } from '@/components/public/galeria-fotos'
 import { LojaMark } from '@/components/brand/vv-logo'
 import { formatPreco } from '@/lib/validators/peca'
+import { formatSizes } from '@/lib/sizes'
 import { createClient as createServerSupabase } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
@@ -117,7 +118,7 @@ export default async function PecaPublicaPage({
             {peca.tamanho ? (
               <p className="mt-2 font-sans text-[13px] text-ink-3">
                 Tamanhos disponíveis:{' '}
-                <strong className="font-medium text-ink-2">{peca.tamanho}</strong>
+                <strong className="font-medium text-ink-2">{formatSizes(peca.tamanho, ' · ')}</strong>
               </p>
             ) : null}
 
@@ -144,7 +145,6 @@ export default async function PecaPublicaPage({
                 garmentImageUrl={garmentSignedUrl}
                 garmentThumbUrl={fotosComUrl[0]?.url ?? null}
                 cabineBackdropUrl={cabineBackdropUrl}
-                vitrineHref={`/v/${params.slug}`}
                 size="lg"
               />
 
