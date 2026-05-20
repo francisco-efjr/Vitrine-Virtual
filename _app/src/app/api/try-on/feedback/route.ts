@@ -12,9 +12,19 @@ import { recordGenerationFeedback } from '@/server/try-on/generation-log'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const FEEDBACK_REASON_KEYS = [
+  'face_didnt_look_like_me',
+  'body_shape_changed',
+  'clothing_looked_wrong',
+  'image_not_realistic',
+  'background_looked_bad',
+  'other',
+] as const
+
 const schema = z.object({
   generation_id: z.string().uuid('generation_id inválido'),
   positive: z.boolean(),
+  reason: z.enum(FEEDBACK_REASON_KEYS).optional(),
   comment: z.string().trim().max(1000).optional(),
 })
 
@@ -33,6 +43,7 @@ export async function POST(req: NextRequest) {
     parsed.data.generation_id,
     parsed.data.positive,
     parsed.data.comment ?? null,
+    parsed.data.reason ?? null,
   )
 
   // Nunca falha de forma ruidosa para o cliente — feedback é opcional.

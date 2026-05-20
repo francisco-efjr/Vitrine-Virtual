@@ -37,6 +37,16 @@ interface RecordGenerationInput {
   customerPhotoDataUrl?: string | null
   /** caminho da foto da peça no bucket pecas-fotos, quando disponível. */
   productImagePath?: string | null
+  /** Veredito do quality gate (research §5). */
+  gateVerdict?: 'proceed' | 'proceed_with_warning' | 'reject' | null
+  /** Chave do RejectionReason quando gateVerdict !== 'proceed'. */
+  gateReason?: string | null
+  /** Signals brutos enviados pelo cliente, para tuning. */
+  gateSignals?: Record<string, unknown> | null
+  /** Tier ideal (chooseTier). */
+  tierChosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+  /** Tier efetivamente executado. */
+  tierEffective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
 }
 
 function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null {
@@ -100,6 +110,11 @@ export async function recordGeneration(input: RecordGenerationInput): Promise<st
       duration_ms: input.durationMs ?? null,
       customer_photo_path: customerPhotoPath,
       product_image_path: input.productImagePath ?? null,
+      gate_verdict: input.gateVerdict ?? null,
+      gate_reason: input.gateReason ?? null,
+      gate_signals: (input.gateSignals ?? null) as TryOnGenerationRow['gate_signals'],
+      tier_chosen: input.tierChosen ?? null,
+      tier_effective: input.tierEffective ?? null,
     }
 
     const { data, error } = await supabase
@@ -124,11 +139,16 @@ export async function recordGeneration(input: RecordGenerationInput): Promise<st
 /**
  * Anexa o feedback opcional do cliente a uma geração existente.
  * Idempotente o suficiente para o MVP: sobrescreve se reenviado.
+ *
+ * Aceita um `reason` estruturado (uma das 6 chaves FeedbackReason, research §9.2)
+ * além do comentário livre. Ambos opcionais — o cliente pode mandar só o
+ * positive=true/false e seguir.
  */
 export async function recordGenerationFeedback(
   generationId: string,
   positive: boolean,
   comment?: string | null,
+  reason?: string | null,
 ): Promise<boolean> {
   try {
     const supabase = createServiceClient()
@@ -137,6 +157,7 @@ export async function recordGenerationFeedback(
       .update({
         feedback_positivo: positive,
         feedback_comentario: comment?.trim() ? comment.trim().slice(0, 1000) : null,
+        feedback_reason: reason?.trim() ? reason.trim() : null,
         feedback_at: new Date().toISOString(),
       })
       .eq('id', generationId)

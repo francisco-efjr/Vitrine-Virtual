@@ -12,11 +12,10 @@ export interface TryOnProviderInput {
     productImage: string
   }
   background: {
-    /** Fundo parametrizado pela loja para a imagem final. */
     /**
      * Fundo parametrizado pela loja para a imagem final.
-     *   - white   → padrão branco (default)
-     *   - custom  → imagem cadastrada pela loja (backgroundImage)
+     *   - white    → padrão branco (default)
+     *   - custom   → imagem cadastrada pela loja (backgroundImage)
      *   - customer → preserva o fundo da própria foto enviada pelo cliente
      */
     mode: 'white' | 'custom' | 'customer'
@@ -28,6 +27,17 @@ export interface TryOnProviderInput {
     /** Modelo Gemini técnico resolvido a partir do ai_image_model da loja. */
     googleModelOverride?: string | null
   }
+}
+
+export interface SafetyRating {
+  /** ex.: HARM_CATEGORY_SEXUALLY_EXPLICIT, HARM_CATEGORY_DANGEROUS_CONTENT. */
+  category: string
+  /** ex.: NEGLIGIBLE | LOW | MEDIUM | HIGH. */
+  probability: 'NEGLIGIBLE' | 'LOW' | 'MEDIUM' | 'HIGH' | string
+  /** Score 0..1 quando o provider devolve. */
+  probabilityScore?: number
+  /** Flag de bloqueio explícito do provider. */
+  blocked?: boolean
 }
 
 export interface TryOnProviderResult {
@@ -49,6 +59,9 @@ export interface TryOnProviderResult {
   resultBucket?: string
   /** Caminho do resultado no bucket. */
   resultPath?: string
+  /** Safety ratings retornados pelo provider quando disponíveis (research §14
+   *  nsfwClean). Hoje só o Google preenche. */
+  safetyRatings?: SafetyRating[]
 }
 
 export interface TryOnProvider {

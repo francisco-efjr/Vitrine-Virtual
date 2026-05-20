@@ -5,6 +5,7 @@ import { getServerEnv } from '@/lib/env'
 import { logger } from '@/lib/logger'
 import {
   TryOnProviderError,
+  type SafetyRating,
   type TryOnProvider,
   type TryOnProviderInput,
   type TryOnProviderResult,
@@ -22,12 +23,41 @@ interface GeminiPart {
   text?: string
 }
 
+interface GeminiSafetyRating {
+  category?: string
+  probability?: string
+  probabilityScore?: number
+  blocked?: boolean
+}
+
+interface GeminiCandidate {
+  content?: {
+    parts?: GeminiPart[]
+  }
+  safetyRatings?: GeminiSafetyRating[]
+}
+
 interface GeminiResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: GeminiPart[]
-    }
-  }>
+  candidates?: GeminiCandidate[]
+  promptFeedback?: {
+    safetyRatings?: GeminiSafetyRating[]
+  }
+}
+
+function normalizeSafetyRatings(
+  candidate: GeminiCandidate | undefined,
+  feedback: GeminiResponse['promptFeedback'],
+): SafetyRating[] | undefined {
+  const raw = candidate?.safetyRatings ?? feedback?.safetyRatings ?? []
+  if (!raw.length) return undefined
+  return raw
+    .filter((r): r is GeminiSafetyRating & { category: string } => typeof r.category === 'string')
+    .map((r) => ({
+      category: r.category,
+      probability: (r.probability ?? 'NEGLIGIBLE') as SafetyRating['probability'],
+      ...(typeof r.probabilityScore === 'number' ? { probabilityScore: r.probabilityScore } : {}),
+      ...(typeof r.blocked === 'boolean' ? { blocked: r.blocked } : {}),
+    }))
 }
 
 // Fallback models tried in order when the primary fails with 503/429/404.
@@ -318,6 +348,7 @@ export const googleAiProvider: TryOnProvider = {
       const candidate = payload.candidates?.[0]
       const parts = candidate?.content?.parts ?? []
       const imagePart = parts.find((part) => part.inlineData?.mimeType?.startsWith('image/'))
+      const safetyRatings = normalizeSafetyRatings(candidate, payload.promptFeedback)
 
       if (!imagePart?.inlineData?.data) {
         logger.warn('Nano Banana: resposta sem imagem gerada', {
@@ -438,6 +469,7 @@ export const googleAiProvider: TryOnProvider = {
         },
         resultBucket: 'try-on-results',
         resultPath: storagePath,
+        ...(safetyRatings ? { safetyRatings } : {}),
       }
     }
 

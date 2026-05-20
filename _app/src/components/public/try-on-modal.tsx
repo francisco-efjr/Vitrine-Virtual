@@ -21,6 +21,8 @@ import {
   IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_DIMENSION,
   IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB,
 } from '@/lib/images/upload'
+import { computeCustomerSignals } from '@/lib/try-on/quality-gate/client-signals'
+import type { CustomerPhotoSignals } from '@/lib/try-on/quality-gate/types'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 import { IconHanger } from '@/components/brand/icon-hanger'
 
@@ -29,6 +31,8 @@ type Step = 'upload' | 'confirm' | 'processing' | 'result' | 'error'
 type SelectedPhoto = {
   file: File
   previewUrl: string
+  /** Signals computados via MediaPipe ao escolher a foto. */
+  signals?: CustomerPhotoSignals
 }
 
 const STEP_INDEX: Record<Exclude<Step, 'error'>, number> = {
@@ -81,6 +85,7 @@ export function TryOnModal({
   const [progress, setProgress] = useState(0)
   const [msgIdx, setMsgIdx] = useState(0)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
+  const [generationId, setGenerationId] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -91,6 +96,7 @@ export function TryOnModal({
   function handleRetry() {
     setStep('upload')
     setResultUrl(null)
+    setGenerationId(null)
     setRating(null)
   }
 
@@ -150,6 +156,7 @@ export function TryOnModal({
       setCustomerPhoto(null)
       setProgress(0)
       setResultUrl(null)
+      setGenerationId(null)
       setErrorMsg(null)
       setUploadError(null)
       setRating(null)
@@ -168,6 +175,18 @@ export function TryOnModal({
       })
       cleanupSelection(customerPhoto)
       setCustomerPhoto(prepared)
+
+      // Quality gate cliente (research §5): MediaPipe + métricas simples.
+      // Best-effort — se falhar, deixa o servidor decidir.
+      void computeCustomerSignals(prepared.file)
+        .then((signals) => {
+          setCustomerPhoto((current) =>
+            current && current.file === prepared.file ? { ...current, signals } : current,
+          )
+        })
+        .catch(() => {
+          /* sem signals → o servidor segue o fluxo legado */
+        })
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE)
     }
@@ -192,6 +211,9 @@ export function TryOnModal({
       if (garmentImageUrl) {
         formData.set('garment_url_override', garmentImageUrl)
       }
+      if (customerPhoto.signals) {
+        formData.set('customer_signals', JSON.stringify(customerPhoto.signals))
+      }
 
       const res = await fetch('/api/try-on', {
         method: 'POST',
@@ -205,6 +227,10 @@ export function TryOnModal({
       window.clearInterval(interval)
 
       if (!res.ok || !data?.ok) {
+        // Gate hard-block (low_resolution / garment_unclear) e qualquer outro
+        // erro caem aqui. Per design v4, NÃO mapeamos códigos GATE_* para copy
+        // específica — mostramos a mensagem genérica do servidor e o usuário
+        // pode tentar de novo. A copy do servidor já vem amigável em PT-BR.
         setErrorMsg(data?.error?.message ?? 'Não foi possível gerar a visualização agora.')
         setStep('error')
         return
@@ -212,6 +238,7 @@ export function TryOnModal({
 
       setProgress(100)
       setResultUrl(data.data.result_url)
+      setGenerationId(data.data.generation_id ?? null)
       window.setTimeout(() => setStep('result'), 250)
     } catch (error) {
       window.clearInterval(interval)
@@ -347,7 +374,13 @@ export function TryOnModal({
               </button>
             </div>
 
-            <ResultRating rating={rating} onRate={setRating} />
+            <ResultRating
+              rating={rating}
+              onRate={(v) => {
+                setRating(v)
+                postRatingTelemetry(generationId, v)
+              }}
+            />
           </div>
         </div>
       </div>
@@ -1012,6 +1045,18 @@ function ErrorStep({
   )
 }
 
+/**
+ * Rating "Sim / Não" pós-resultado.
+ *
+ * UX (design v4, chat7): pergunta única, toggle minimalista. Quando o
+ * usuário escolhe qualquer um dos lados o botão "Tentar novamente" libera.
+ *
+ * Telemetria: o callback `onRate` é encarregado de POSTar para
+ * /api/try-on/feedback (best-effort, silencioso). A infra de feedback
+ * estruturado (6 motivos / comentário livre) continua disponível na API e
+ * no schema (`feedback_reason` em try_on_generations) para uso interno/admin
+ * — apenas não é exposta na UI pública.
+ */
 function ResultRating({
   rating,
   onRate,
@@ -1046,6 +1091,33 @@ function ResultRating({
       </button>
     </div>
   )
+}
+
+/**
+ * Posta a avaliação para `/api/try-on/feedback`. Silencioso: feedback é
+ * opcional e nunca deve interromper o fluxo do cliente.
+ *
+ * O schema do servidor aceita também um campo `reason` (uma das 6 chaves
+ * FeedbackReason — research §9.2). O design v4 não expõe os 6 motivos na
+ * UI pública; mantemos só `positive`. A infra está pronta caso decidamos
+ * coletar motivos via outro canal (NPS, admin, etc.).
+ */
+function postRatingTelemetry(generationId: string | null, rating: 'sim' | 'nao') {
+  if (!generationId) return
+  try {
+    void fetch('/api/try-on/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        generation_id: generationId,
+        positive: rating === 'sim',
+      }),
+      keepalive: true,
+      cache: 'no-store',
+    }).catch(() => {})
+  } catch {
+    /* telemetria silenciosa */
+  }
 }
 
 function cleanupSelection(photo: SelectedPhoto | null) {
