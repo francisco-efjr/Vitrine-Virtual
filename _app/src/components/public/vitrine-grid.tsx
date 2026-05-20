@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, LayoutGrid, Maximize2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LayoutGrid, Maximize2 } from 'lucide-react'
 import { Stagger } from '@/components/motion'
 import { CATEGORIAS, getCategoriaLabel } from '@/lib/categorias'
 import { formatPreco } from '@/lib/validators/peca'
+import { formatSizes } from '@/lib/sizes'
+import { IconHanger } from '@/components/brand/icon-hanger'
 import { TryOnModal } from './try-on-modal'
 
 interface Peca {
@@ -48,7 +50,6 @@ export function VitrineGrid({
   const [catFilter, setCatFilter] = useState<string>('todas')
   const [viewMode, setViewMode] = useState<ViewMode>('grade')
   const [focusIdx, setFocusIdx] = useState(0)
-  const [drawerPeca, setDrawerPeca] = useState<Peca | null>(null)
   const [cabinePeca, setCabinePeca] = useState<Peca | null>(null)
   const cabineDeepLinkDone = useRef(false)
 
@@ -155,7 +156,7 @@ export function VitrineGrid({
             <button
               key={p.peca_id}
               type="button"
-              onClick={() => setDrawerPeca(p)}
+              onClick={() => setCabinePeca(p)}
               className="vv-hover-lift group flex h-full flex-col overflow-hidden rounded-card bg-surface text-left shadow-card transition"
             >
               <div
@@ -172,9 +173,10 @@ export function VitrineGrid({
                 ) : null}
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-white/95 px-2.5 py-1 font-sans text-[10.5px] font-semibold text-ink backdrop-blur"
+                  className="pointer-events-none absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 font-sans text-[10.5px] font-semibold text-ink backdrop-blur"
                 >
-                  ✦ Cabine
+                  <IconHanger size={11} strokeWidth={1.8} />
+                  Cabine
                 </span>
               </div>
               <div className="flex flex-1 flex-col p-3 sm:p-4">
@@ -182,7 +184,7 @@ export function VitrineGrid({
                   {p.nome}
                 </div>
                 {p.tamanho ? (
-                  <div className="mt-1 font-sans text-[11.5px] text-ink-3">{p.tamanho}</div>
+                  <div className="mt-1 font-sans text-[11.5px] text-ink-3">{formatSizes(p.tamanho, ' · ')}</div>
                 ) : null}
                 <div className="mt-auto pt-3">
                   {exibirPreco && p.preco_centavos != null ? (
@@ -203,27 +205,15 @@ export function VitrineGrid({
           focusIdx={focusIdx}
           setFocusIdx={setFocusIdx}
           exibirPreco={exibirPreco}
-          onExperimentar={(p) => setDrawerPeca(p)}
+          onExperimentar={(p) => setCabinePeca(p)}
           slug={slug}
         />
       )}
-
-      <PecaDrawer
-        peca={drawerPeca}
-        open={!!drawerPeca}
-        onClose={() => setDrawerPeca(null)}
-        exibirPreco={exibirPreco}
-        onCabine={(p) => {
-          setDrawerPeca(null)
-          setCabinePeca(p)
-        }}
-      />
 
       {cabinePeca ? (
         <TryOnModal
           open={!!cabinePeca}
           onClose={() => setCabinePeca(null)}
-          onTryAnother={() => setCabinePeca(null)}
           pecaId={cabinePeca.peca_id}
           pecaNome={cabinePeca.nome}
           pecaTamanho={cabinePeca.tamanho}
@@ -351,7 +341,7 @@ function FocoView({
             {peca.nome}
           </div>
           {peca.tamanho ? (
-            <div className="mt-1 font-sans text-xs text-ink-3">{peca.tamanho}</div>
+            <div className="mt-1 font-sans text-xs text-ink-3">{formatSizes(peca.tamanho, ' · ')}</div>
           ) : null}
         </div>
         {exibirPreco && peca.preco_centavos != null ? (
@@ -364,7 +354,7 @@ function FocoView({
           onClick={() => onExperimentar(peca)}
           className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-ink px-5 py-3 font-sans text-[13.5px] font-medium text-white transition hover:bg-[#2d2825]"
         >
-          <span className="text-accent">✦</span>
+          <span className="text-accent"><IconHanger size={15} strokeWidth={1.8} /></span>
           Experimentar
         </button>
         <Link
@@ -381,115 +371,3 @@ function FocoView({
   )
 }
 
-function PecaDrawer({
-  peca,
-  open,
-  onClose,
-  exibirPreco,
-  onCabine,
-}: {
-  peca: Peca | null
-  open: boolean
-  onClose: () => void
-  exibirPreco: boolean
-  onCabine: (p: Peca) => void
-}) {
-  useEffect(() => {
-    if (!open) return
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handler)
-    return () => {
-      document.body.style.overflow = prevOverflow
-      document.removeEventListener('keydown', handler)
-    }
-  }, [open, onClose])
-
-  if (!open || !peca) return null
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-      className="fixed inset-0 z-[1500] flex items-end justify-center bg-[rgba(18,14,12,0.5)] backdrop-blur-sm"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[88vh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[20px] bg-surface shadow-[0_-8px_48px_rgba(0,0,0,0.18)]"
-        style={{ animation: 'vv-slide-up 0.32s var(--e-out-soft)' }}
-      >
-        <div className="flex justify-center pb-1 pt-2.5">
-          <div className="h-1 w-10 rounded-full bg-border-2" />
-        </div>
-        <div className="overflow-y-auto">
-          <div className="relative">
-            <div className="aspect-[4/3] w-full overflow-hidden bg-[#f0ebe3]">
-              {peca.foto_principal_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={peca.foto_principal_url}
-                  alt={peca.nome}
-                  className="h-full w-full object-cover object-center"
-                />
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Fechar"
-              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-ink backdrop-blur transition hover:bg-white"
-            >
-              <X size={15} />
-            </button>
-          </div>
-          <div className="flex flex-col gap-4 p-5 pb-7 sm:p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
-                <div className="font-serif text-[22px] font-semibold leading-snug text-ink">
-                  {peca.nome}
-                </div>
-                {peca.tamanho ? (
-                  <div className="mt-1 font-sans text-[13px] text-ink-3">
-                    Disponível nos tamanhos:{' '}
-                    <strong className="font-medium text-ink-2">{peca.tamanho}</strong>
-                  </div>
-                ) : null}
-              </div>
-              {exibirPreco && peca.preco_centavos != null ? (
-                <div className="font-serif text-[22px] font-semibold text-ink">
-                  {formatPreco(peca.preco_centavos)}
-                </div>
-              ) : null}
-            </div>
-            <div
-              className="flex items-center gap-3 rounded-2xl border border-accent-dark/15 p-4"
-              style={{
-                background: 'linear-gradient(135deg, #f2e8d8, #f8f0e4)',
-              }}
-            >
-              <div className="flex-1">
-                <div className="font-serif text-[15px] font-semibold text-accent-dark">
-                  ✦ Cabine Virtual
-                </div>
-                <div className="mt-0.5 font-sans text-xs leading-relaxed text-accent-dark/80">
-                  Experimente esta peça em você antes de comprar
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => onCabine(peca)}
-                className="rounded-lg bg-accent px-4 py-2.5 font-sans text-[13px] font-semibold text-white transition hover:bg-accent-dark"
-              >
-                Experimentar
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}

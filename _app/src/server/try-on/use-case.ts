@@ -131,14 +131,12 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     loja.provador_fundo_tipo === 'personalizado' && loja.provador_fundo_storage_path
       ? buildLojaAssetPublicUrl(loja.provador_fundo_storage_path)
       : null
-  const providerBackground = provadorFundoUrl
-    ? {
-        mode: 'custom' as const,
-        backgroundImage: provadorFundoUrl,
-      }
-    : {
-        mode: 'white' as const,
-      }
+  const providerBackground: { mode: 'white' | 'custom' | 'customer'; backgroundImage?: string } =
+    loja.provador_fundo_tipo === 'cliente'
+      ? { mode: 'customer' }
+      : provadorFundoUrl
+        ? { mode: 'custom', backgroundImage: provadorFundoUrl }
+        : { mode: 'white' }
 
   logger.info('Try-on: fundo parametrizado da loja', {
     backgroundMode: providerBackground.mode,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Camera,
   Check,
@@ -22,6 +22,7 @@ import {
   IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB,
 } from '@/lib/images/upload'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
+import { IconHanger } from '@/components/brand/icon-hanger'
 
 type Step = 'upload' | 'confirm' | 'processing' | 'result' | 'error'
 
@@ -52,7 +53,6 @@ const ACCEPT =
 export function TryOnModal({
   open,
   onClose,
-  onTryAnother,
   pecaId,
   pecaNome,
   pecaTamanho = null,
@@ -65,8 +65,6 @@ export function TryOnModal({
 }: {
   open: boolean
   onClose: () => void
-  /** Levar de volta para a grade de peças quando o usuário clica "Experimentar outra peça". */
-  onTryAnother?: () => void
   pecaId: string
   pecaNome: string
   pecaTamanho?: string | null
@@ -83,20 +81,18 @@ export function TryOnModal({
   const [progress, setProgress] = useState(0)
   const [msgIdx, setMsgIdx] = useState(0)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
-  const [generationId, setGenerationId] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [rating, setRating] = useState<'sim' | 'nao' | null>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
 
-  const handleTryAnother = useCallback(() => {
-    if (onTryAnother) {
-      onTryAnother()
-      return
-    }
-    onClose()
-  }, [onTryAnother, onClose])
+  function handleRetry() {
+    setStep('upload')
+    setResultUrl(null)
+    setRating(null)
+  }
 
   async function handleDownload() {
     if (!resultUrl) return
@@ -154,9 +150,9 @@ export function TryOnModal({
       setCustomerPhoto(null)
       setProgress(0)
       setResultUrl(null)
-      setGenerationId(null)
       setErrorMsg(null)
       setUploadError(null)
+      setRating(null)
     }, 250)
     return () => window.clearTimeout(timer)
   }, [open, customerPhoto])
@@ -216,7 +212,6 @@ export function TryOnModal({
 
       setProgress(100)
       setResultUrl(data.data.result_url)
-      setGenerationId(data.data.generation_id ?? null)
       window.setTimeout(() => setStep('result'), 250)
     } catch (error) {
       window.clearInterval(interval)
@@ -344,18 +339,15 @@ export function TryOnModal({
                 {downloading ? 'Baixando…' : 'Baixar'}
               </button>
               <button
-                onClick={handleTryAnother}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-4 py-3 font-sans text-[13.5px] text-white/70 transition hover:bg-white/10 hover:text-white"
+                onClick={handleRetry}
+                disabled={!rating}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-4 py-3 font-sans text-[13.5px] text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Outra peça
+                Tentar novamente
               </button>
             </div>
 
-            <FeedbackBlock generationId={generationId} />
-
-            <div className="text-center font-sans text-[11px] text-white/35">
-              Imagem 1080×1920 · simulação visual · a prévia expira em 24h
-            </div>
+            <ResultRating rating={rating} onRate={setRating} />
           </div>
         </div>
       </div>
@@ -382,7 +374,8 @@ export function TryOnModal({
 
         <div className="flex items-start justify-between gap-3.5 px-5 pb-1.5 pt-2 sm:px-6">
           <div className="min-w-0 flex-1">
-            <div className="font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-ink-3">
+            <div className="flex items-center gap-1 font-sans text-[9.5px] font-semibold uppercase tracking-[0.18em] text-ink-3">
+              <IconHanger size={11} strokeWidth={1.8} />
               Cabine Virtual
             </div>
             <div className="mt-1 truncate font-serif text-[21px] font-normal leading-tight tracking-tight text-ink">
@@ -743,13 +736,6 @@ function UploadPreview({
         {/* object-contain ⇒ foto inteira visível em qualquer proporção */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={value.previewUrl} alt="Sua foto" className="block h-full w-full object-contain" />
-        {/* Badge canônico 9:16 1080×1920 — discreto, top-left */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute left-2 top-2 rounded-md bg-white/70 px-1.5 py-[3px] font-mono text-[9px] tracking-wider text-[#9a9189]"
-        >
-          9:16 · 1080×1920
-        </span>
         <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/45 via-transparent to-transparent p-3.5 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
           <div className="flex gap-1.5">
             <button
@@ -1026,100 +1012,38 @@ function ErrorStep({
   )
 }
 
-/**
- * Feedback opcional, minimalista e dispensável sobre a prévia.
- * Sem termos técnicos, sem "IA". Não bloqueia nem interrompe o fluxo —
- * o cliente pode simplesmente ignorar.
- */
-function FeedbackBlock({ generationId }: { generationId: string | null }) {
-  const [positive, setPositive] = useState<boolean | null>(null)
-  const [comment, setComment] = useState('')
-  const [sentThanks, setSentThanks] = useState(false)
-
-  if (!generationId) return null
-
-  function send(p: boolean, withComment: boolean) {
-    try {
-      void fetch('/api/try-on/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          generation_id: generationId,
-          positive: p,
-          comment: withComment && comment.trim() ? comment.trim() : undefined,
-        }),
-        keepalive: true,
-        cache: 'no-store',
-      }).catch(() => {})
-    } catch {
-      /* feedback é opcional — silenciar */
-    }
-  }
-
-  if (sentThanks) {
-    return (
-      <div className="text-center font-sans text-[11.5px] text-white/45">
-        Obrigado pelo retorno ✓
-      </div>
-    )
-  }
-
+function ResultRating({
+  rating,
+  onRate,
+}: {
+  rating: 'sim' | 'nao' | null
+  onRate: (v: 'sim' | 'nao') => void
+}) {
   return (
-    <div className="flex flex-col items-center gap-2.5">
-      {positive === null ? (
-        <div className="flex items-center gap-3">
-          <span className="font-sans text-[12.5px] text-white/55">O resultado ficou bom?</span>
-          <button
-            type="button"
-            onClick={() => {
-              setPositive(true)
-              send(true, false)
-            }}
-            className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
-          >
-            Sim
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setPositive(false)
-              send(false, false)
-            }}
-            className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
-          >
-            Não
-          </button>
-        </div>
-      ) : (
-        <div className="flex w-full max-w-[360px] flex-col items-center gap-2">
-          <input
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="O que poderia melhorar? (opcional)"
-            maxLength={1000}
-            className="w-full rounded-full border border-white/15 bg-white/5 px-4 py-2 text-center font-sans text-[12.5px] text-white/85 outline-none transition placeholder:text-white/30 focus:border-white/30"
-          />
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setSentThanks(true)}
-              className="font-sans text-[11.5px] text-white/40 transition hover:text-white/70"
-            >
-              Pular
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                send(positive, true)
-                setSentThanks(true)
-              }}
-              className="rounded-full bg-white/90 px-4 py-1.5 font-sans text-[12px] font-medium text-ink transition hover:bg-white"
-            >
-              Enviar
-            </button>
-          </div>
-        </div>
-      )}
+    <div className="flex items-center justify-center gap-3">
+      <span className="font-sans text-[12.5px] text-white/55">O resultado ficou bom?</span>
+      <button
+        type="button"
+        onClick={() => onRate('sim')}
+        className={`rounded-full border px-3.5 py-1 font-sans text-[12.5px] transition ${
+          rating === 'sim'
+            ? 'border-white/60 bg-white/20 text-white'
+            : 'border-white/20 text-white/85 hover:bg-white/10'
+        }`}
+      >
+        Sim
+      </button>
+      <button
+        type="button"
+        onClick={() => onRate('nao')}
+        className={`rounded-full border px-3.5 py-1 font-sans text-[12.5px] transition ${
+          rating === 'nao'
+            ? 'border-white/60 bg-white/20 text-white'
+            : 'border-white/20 text-white/85 hover:bg-white/10'
+        }`}
+      >
+        Não
+      </button>
     </div>
   )
 }

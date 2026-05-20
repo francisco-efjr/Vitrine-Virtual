@@ -11,10 +11,10 @@ import {
   centavosToPrecoString,
   precoStringToCentavos,
 } from '@/lib/validators/peca'
+import { sortSizes } from '@/lib/sizes'
 import type { PecaRow } from '@/types/database'
 
-// Tamanhos-padrão conforme o design
-const TAMANHOS_PADRAO = ['PP', 'P', 'M', 'G', 'GG', '36', '38', '40', '42', '44', 'Único']
+const TAMANHOS_PADRAO = sortSizes(['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', '36', '38', '40', '42', '44', 'Único'])
 
 const CUSTOM_CATEGORIA_VALUE = '__custom__'
 
@@ -23,11 +23,13 @@ export function PecaFormModal({
   peca,
   onClose,
   onSaved,
+  categoriasExtra = [],
 }: {
   open: boolean
   peca: PecaRow | null
   onClose: () => void
   onSaved: () => void
+  categoriasExtra?: string[]
 }) {
   const [nome, setNome] = useState('')
   const [preco, setPreco] = useState('')
@@ -61,10 +63,11 @@ export function PecaFormModal({
       setTamanhoCustom('')
     }
 
-    // Categoria — se está nas pré-definidas, marca; se é custom, vai no input.
+    // Categoria — se está nas pré-definidas ou em categoriasExtra, marca; se é nova, vai no input.
     if (peca?.categoria_id) {
       const isPredef = CATEGORIAS.some((c) => c.id === peca.categoria_id)
-      if (isPredef) {
+      const isKnownExtra = categoriasExtra.includes(peca.categoria_id)
+      if (isPredef || isKnownExtra) {
         setCategoriaSel(peca.categoria_id)
         setCategoriaCustom('')
       } else {
@@ -98,10 +101,10 @@ export function PecaFormModal({
   }
 
   function buildTamanhoString(): string | null {
-    const all = [
+    const all = sortSizes([
       ...tamanhosSel,
       ...tamanhoCustom.split(',').map((t) => t.trim()).filter(Boolean),
-    ]
+    ])
     return all.length > 0 ? all.join(', ') : null
   }
 
@@ -230,6 +233,15 @@ export function PecaFormModal({
                   {c.label}
                 </option>
               ))}
+              {categoriasExtra.length > 0 ? (
+                <optgroup label="Suas categorias">
+                  {categoriasExtra.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
               <option value={CUSTOM_CATEGORIA_VALUE}>+ Adicionar categoria personalizada</option>
             </select>
             <span
@@ -240,15 +252,22 @@ export function PecaFormModal({
             </span>
           </div>
           {categoriaSel === CUSTOM_CATEGORIA_VALUE ? (
-            <input
-              type="text"
-              value={categoriaCustom}
-              onChange={(e) => setCategoriaCustom(e.target.value)}
-              placeholder="Nome da categoria…"
-              disabled={saving}
-              maxLength={60}
-              className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-3 focus:border-accent"
-            />
+            <>
+              <input
+                type="text"
+                value={categoriaCustom}
+                onChange={(e) => setCategoriaCustom(e.target.value)}
+                placeholder="Nome da categoria…"
+                disabled={saving}
+                maxLength={60}
+                className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-3 focus:border-accent"
+              />
+              {categoriaCustom.trim() ? (
+                <p className="mt-1 font-sans text-[11px] text-ink-3">
+                  Esta categoria fica salva para as próximas peças.
+                </p>
+              ) : null}
+            </>
           ) : null}
         </div>
 
@@ -280,7 +299,7 @@ export function PecaFormModal({
           </div>
           {tamanhosSel.length > 0 && (
             <p className="mt-2 text-[11.5px] text-ink-3">
-              Selecionados: {tamanhosSel.join(', ')}
+              Selecionados: {sortSizes(tamanhosSel).join(', ')}
             </p>
           )}
           {/* Campo livre para tamanhos não listados */}
