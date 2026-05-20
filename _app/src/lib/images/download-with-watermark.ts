@@ -66,27 +66,77 @@ export async function downloadSimulacaoComMarca({
     ctx.textAlign = 'start'
   }
 
-  await new Promise<void>((resolve, reject) => {
+  const blob = await canvasToBlob(canvas, 'image/jpeg', 0.92)
+  const filename = `vitrine-${slugify(filenameSeed ?? pecaNome ?? 'simulacao')}.jpg`
+
+  // Mobile (iOS/Android): tenta Web Share API com arquivo. iOS Safari abre o
+  // Share Sheet com "Salvar imagem" → vai direto pra Fotos. Android Chrome
+  // funciona igual. Para desktop ou navegadores sem suporte, cai no download
+  // tradicional (link <a download>).
+  const file = new File([blob], filename, { type: 'image/jpeg' })
+  const shareData: ShareData = {
+    files: [file],
+    title: pecaNome ? `Cabine: ${pecaNome}` : 'Cabine Vitrine Virtual',
+    text: 'Sua simulação da Cabine.',
+  }
+
+  if (canShareFile(shareData)) {
+    try {
+      await navigator.share(shareData)
+      return
+    } catch (err) {
+      // AbortError = usuário cancelou o share sheet — não cai em fallback.
+      if (err instanceof Error && err.name === 'AbortError') return
+      // Qualquer outro erro → segue pro fallback de download direto.
+    }
+  }
+
+  // Fallback desktop: link <a download>.
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality: number,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => {
-        if (!blob) {
+      (b) => {
+        if (!b) {
           reject(new Error('Não foi possível compor o JPEG de download.'))
           return
         }
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `vitrine-${slugify(filenameSeed ?? pecaNome ?? 'simulacao')}.jpg`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-        resolve()
+        resolve(b)
       },
-      'image/jpeg',
-      0.92,
+      type,
+      quality,
     )
   })
+}
+
+/**
+ * `navigator.canShare({ files })` é a forma correta de checar se o browser
+ * aceita o payload com arquivo. iOS Safari 15+, Android Chrome ~89+.
+ * Em browsers antigos ou desktop sem share sheet, retorna false e a função
+ * pai cai no download tradicional.
+ */
+function canShareFile(data: ShareData): boolean {
+  if (typeof navigator === 'undefined') return false
+  if (typeof navigator.share !== 'function') return false
+  if (typeof navigator.canShare !== 'function') return false
+  try {
+    return navigator.canShare(data)
+  } catch {
+    return false
+  }
 }
 
 function loadImageFromUrl(url: string): Promise<HTMLImageElement> {

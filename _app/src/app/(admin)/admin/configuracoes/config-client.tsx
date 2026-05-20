@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, ImageIcon, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { Toggle } from '@/components/ui/toggle'
 import { Reveal } from '@/components/motion'
 import { preparePreviewableImage } from '@/lib/images/client-standardize'
@@ -500,6 +501,7 @@ export function ConfigClient({
 
         <div className="mt-9 flex items-center gap-3">
           <Button variant="dark" onClick={save} disabled={saving}>
+            {saving ? <Spinner size={14} className="text-white" /> : null}
             {saving ? 'Salvando…' : 'Salvar'}
           </Button>
           {saved ? (
