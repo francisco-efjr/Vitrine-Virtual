@@ -2,10 +2,26 @@ import 'server-only'
 import { logger } from '@/lib/logger'
 import { hashIp } from '@/lib/security/ip-hash'
 import { createServiceClient } from '@/lib/supabase/service'
+import { runAcceptanceChecks, type AcceptanceResult } from '@/lib/try-on/acceptance'
+import type { SafetyRating } from '@/lib/try-on/types'
 import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
-import { generateTryOn } from '@/lib/try-on/orchestrator'
 import { buildTryOnProviderInput } from '@/lib/try-on/payload'
+import {
+  combineGateResults,
+  evaluateCustomerPhoto,
+  evaluateGarmentPhoto,
+  type CustomerPhotoSignals,
+  type GarmentPhotoSignals,
+  type RejectionReason,
+} from '@/lib/try-on/quality-gate'
 import { checkTryOnRateLimit } from '@/lib/try-on/rate-limit'
+import {
+  chooseTier,
+  runTier,
+  type TierRouteContext,
+  type TryOnPromptVariables,
+  type TryOnTier,
+} from '@/lib/try-on/tiers'
 import { verifyTurnstileToken } from '@/lib/try-on/turnstile'
 import { resolveGoogleModel } from '@/lib/try-on/model-selection'
 import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
@@ -19,6 +35,7 @@ export type TryOnError =
   | { kind: 'rate_limit'; reason: 'hour' | 'day' | 'week'; resetAt?: number }
   | { kind: 'quota_exceeded'; used: number; limit: number }
   | { kind: 'peca_unavailable' }
+  | { kind: 'gate_rejected'; reason: RejectionReason }
   | { kind: 'provider_failed'; message: string }
 
 export interface TryOnSuccess {
@@ -41,6 +58,10 @@ export interface RunTryOnInput {
   ip: string
   sessionId?: string
   garmentImageUrlOverride?: string | null
+  /** Signals do quality gate computados no cliente (research §5). Opcional —
+   * quando ausente, a geração roda como antes (compat. com clientes antigos). */
+  customerSignals?: CustomerPhotoSignals | null
+  garmentSignals?: GarmentPhotoSignals | null
 }
 
 /**
@@ -127,6 +148,65 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     return { ok: false, error: { kind: 'peca_unavailable' } }
   }
 
+  // ─── Quality gate (research §5) ────────────────────────────────────────
+  //
+  // Roda antes do Gemini para evitar gastar com fotos ruins. Hoje o gate
+  // confia nos signals que o cliente envia (MediaPipe no navegador). Quando
+  // os signals estão ausentes (cliente antigo) seguimos o fluxo legado —
+  // não quebrar a vitrine em produção é prioridade sobre cobertura.
+  //
+  // TODO (acceptance): adicionar double-check server-side com sharp +
+  // detector leve para signals críticos (resolução, NSFW). O gate puro JS
+  // já bloqueia ~80% dos rejeitos visíveis sem custo extra.
+  let gateVerdict: 'proceed' | 'proceed_with_warning' | 'reject' | null = null
+  let gateReason: RejectionReason | null = null
+  let gateSignalsForLog: Record<string, unknown> | null = null
+
+  if (input.customerSignals) {
+    const customerResult = evaluateCustomerPhoto(input.customerSignals, {
+      garmentCategory: 'auto',
+    })
+    const garmentResult = input.garmentSignals
+      ? evaluateGarmentPhoto(input.garmentSignals)
+      : null
+    const combined = garmentResult
+      ? combineGateResults(customerResult, garmentResult)
+      : customerResult
+
+    gateVerdict = combined.verdict
+    gateReason = combined.reason ?? null
+    gateSignalsForLog = {
+      customer: input.customerSignals,
+      garment: input.garmentSignals ?? null,
+      warnings: combined.warnings,
+    }
+
+    if (combined.verdict === 'reject' && combined.reason) {
+      // Log da rejeição (best-effort) — sem gastar Gemini, sem salvar foto.
+      await recordGeneration({
+        lojaId: loja.id,
+        pecaId: peca.id,
+        sessionId: input.sessionId ?? null,
+        ipHash,
+        aiImageModel: (loja.ai_image_model ?? null) as AiImageModel | null,
+        status: 'error',
+        errorCode: `gate_${combined.reason}`,
+        gateVerdict,
+        gateReason: combined.reason,
+        gateSignals: gateSignalsForLog,
+      })
+
+      logger.info('Try-on: gate rejeitou antes do provider', {
+        reason: combined.reason,
+        warnings: combined.warnings,
+      })
+      return {
+        ok: false,
+        error: { kind: 'gate_rejected', reason: combined.reason },
+      }
+    }
+  }
+
   const provadorFundoUrl =
     loja.provador_fundo_tipo === 'personalizado' && loja.provador_fundo_storage_path
       ? buildLojaAssetPublicUrl(loja.provador_fundo_storage_path)
@@ -155,8 +235,58 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     googleModelOverride,
   })
 
+  // ─── Tier dispatch (research §4) ──────────────────────────────────────
+  //
+  // Hoje só Tier C está habilitado. chooseTier escolhe o ideal e
+  // resolveEnabledTier (interno) faz fallback pra Tier C — gravamos os
+  // dois pra rastrear o gap "ideal-vs-real" (dashboard de pitch de orçamento).
+  const customerPhotoType = input.customerSignals?.detectedType ?? 'full_body'
+  const garmentPhotoType = input.garmentSignals?.detectedPhotoType ?? 'auto'
+  const tierBackgroundMode: TierRouteContext['backgroundMode'] =
+    providerBackground.mode === 'custom' ? 'store_background' : 'white'
+
+  const routeCtx: TierRouteContext = {
+    customerPhotoType,
+    garmentCategory: 'auto',
+    backgroundMode: tierBackgroundMode,
+    quality: 'quality',
+  }
+  const tierChosen: TryOnTier = chooseTier(routeCtx)
+
+  const variables: TryOnPromptVariables = {
+    customerPhotoType,
+    garmentPhotoType,
+    garmentCategory: 'auto',
+    backgroundMode: tierBackgroundMode,
+    quality: 'quality',
+    outputStyle: 'premium_studio',
+    promptVariantId: 'v1.0-master+variants+negative',
+    safetyLevel: 'conservative',
+  }
+
   try {
-    const result = await generateTryOn(providerInput)
+    const result = await runTier(tierChosen, { provider: providerInput, variables })
+    const tierEffective = result.tier
+
+    // Acceptance checks (research §14) — best-effort, NUNCA bloqueia o cliente.
+    // Hoje só logamos (sem retry pago). Os números servem pra dashboard de
+    // qualidade — quando ArcFace e Tier A chegarem, plumbamos retry.
+    const acceptance = await runAcceptancePostGen({
+      customerPhotoDataUrl: input.customerPhoto,
+      resultUrl: result.resultUrl,
+      garmentUrl,
+      safetyRatings: result.safetyRatings,
+    })
+    if (acceptance) {
+      logger.info('Try-on acceptance result', {
+        pass: acceptance.pass,
+        checks: acceptance.checks.map((c) => ({
+          name: c.name,
+          pass: c.pass,
+          checked: c.checked,
+        })),
+      })
+    }
 
     await supabase.from('try_on_uses').insert({
       loja_id: loja.id,
@@ -181,16 +311,23 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       providerRequestId: result.requestId,
       modelResolved: result.modelUsed ?? googleModelOverride,
       finalPrompt: result.finalPrompt ?? null,
-      generationParams: result.generationParams ?? null,
+      generationParams: mergeAcceptanceIntoParams(result.generationParams ?? null, acceptance),
       resultBucket: result.resultBucket ?? null,
       resultPath: result.resultPath ?? null,
       durationMs: result.durationMs,
       customerPhotoDataUrl: input.customerPhoto,
       productImagePath: garmentStoragePath,
+      gateVerdict,
+      gateReason,
+      gateSignals: gateSignalsForLog,
+      tierChosen,
+      tierEffective,
     })
 
     logger.info('Try-on bem-sucedido', {
       provider: result.provider,
+      tier_chosen: tierChosen,
+      tier_effective: tierEffective,
       duration_ms: result.durationMs,
       total_ms: Date.now() - t0,
     })
@@ -227,9 +364,88 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       durationMs: Date.now() - t0,
       customerPhotoDataUrl: input.customerPhoto,
       productImagePath: garmentStoragePath,
+      gateVerdict,
+      gateReason,
+      gateSignals: gateSignalsForLog,
+      tierChosen,
+      tierEffective: null,
     })
 
     logger.warn('Try-on falhou', { message })
     return { ok: false, error: { kind: 'provider_failed', message } }
+  }
+}
+
+// ─── Acceptance helpers ─────────────────────────────────────────────────
+
+/** Decodifica `data:<mime>;base64,...` em Buffer. Retorna null se inválido. */
+function bufferFromDataUrl(dataUrl: string): Buffer | null {
+  const match = /^data:([^;]+);base64,(.+)$/s.exec(dataUrl)
+  if (!match) return null
+  try {
+    return Buffer.from(match[2]!, 'base64')
+  } catch {
+    return null
+  }
+}
+
+async function fetchAsBuffer(url: string): Promise<Buffer | null> {
+  try {
+    const res = await fetch(url, { cache: 'no-store' })
+    if (!res.ok) return null
+    const arr = await res.arrayBuffer()
+    return Buffer.from(arr)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Roda os acceptance checks pós-geração em modo log-only.
+ * Retorna null em qualquer erro — NUNCA quebra o fluxo principal.
+ *
+ * Fetcha resultUrl + garmentUrl em paralelo. Se algum falhar, o check que
+ * depende dele degrada para `checked: false` (não bloqueia).
+ */
+async function runAcceptancePostGen(args: {
+  customerPhotoDataUrl: string
+  resultUrl: string
+  garmentUrl: string
+  safetyRatings?: SafetyRating[]
+}): Promise<AcceptanceResult | null> {
+  try {
+    const customerBuf = bufferFromDataUrl(args.customerPhotoDataUrl)
+    const [resultBuf, garmentBuf] = await Promise.all([
+      fetchAsBuffer(args.resultUrl),
+      fetchAsBuffer(args.garmentUrl),
+    ])
+    if (!customerBuf || !resultBuf) return null
+    return await runAcceptanceChecks({
+      customerImageBuffer: customerBuf,
+      garmentImageBuffer: garmentBuf ?? Buffer.alloc(0),
+      resultImageBuffer: resultBuf,
+      safetyRatings: args.safetyRatings,
+    })
+  } catch (err) {
+    logger.warn('Try-on acceptance: ignorando exceção', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return null
+  }
+}
+
+/** Encaixa o resultado do acceptance dentro de `generation_params` (JSONB). */
+function mergeAcceptanceIntoParams(
+  existing: Record<string, unknown> | null,
+  acceptance: AcceptanceResult | null,
+): Record<string, unknown> | null {
+  if (!acceptance) return existing
+  return {
+    ...(existing ?? {}),
+    acceptance: {
+      pass: acceptance.pass,
+      shouldRetry: acceptance.shouldRetry,
+      checks: acceptance.checks,
+    },
   }
 }

@@ -24,6 +24,17 @@ export interface TryOnProviderInput {
   }
 }
 
+export interface SafetyRating {
+  /** ex.: HARM_CATEGORY_SEXUALLY_EXPLICIT, HARM_CATEGORY_DANGEROUS_CONTENT. */
+  category: string
+  /** ex.: NEGLIGIBLE | LOW | MEDIUM | HIGH. */
+  probability: 'NEGLIGIBLE' | 'LOW' | 'MEDIUM' | 'HIGH' | string
+  /** Score 0..1 quando o provider devolve. */
+  probabilityScore?: number
+  /** Flag de bloqueio explícito do provider. */
+  blocked?: boolean
+}
+
 export interface TryOnProviderResult {
   /** URL temporária do resultado (TTL definido pelo provider). */
   resultUrl: string
@@ -43,6 +54,9 @@ export interface TryOnProviderResult {
   resultBucket?: string
   /** Caminho do resultado no bucket. */
   resultPath?: string
+  /** Safety ratings retornados pelo provider quando disponíveis (research §14
+   *  nsfwClean). Hoje só o Google preenche. */
+  safetyRatings?: SafetyRating[]
 }
 
 export interface TryOnProvider {

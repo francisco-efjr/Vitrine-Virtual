@@ -121,7 +121,11 @@ export interface Database {
           feedback_at: string | null
           feedback_comentario: string | null
           feedback_positivo: boolean | null
+          feedback_reason: string | null
           final_prompt: string | null
+          gate_reason: string | null
+          gate_signals: Json | null
+          gate_verdict: 'proceed' | 'proceed_with_warning' | 'reject' | null
           generation_params: Json | null
           id: string
           ip_hash: string | null
@@ -135,6 +139,8 @@ export interface Database {
           result_path: string | null
           session_id: string | null
           status: 'success' | 'error' | 'fallback'
+          tier_chosen: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+          tier_effective: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
           user_id: string | null
         }
         Insert: {
@@ -146,7 +152,11 @@ export interface Database {
           feedback_at?: string | null
           feedback_comentario?: string | null
           feedback_positivo?: boolean | null
+          feedback_reason?: string | null
           final_prompt?: string | null
+          gate_reason?: string | null
+          gate_signals?: Json | null
+          gate_verdict?: 'proceed' | 'proceed_with_warning' | 'reject' | null
           generation_params?: Json | null
           id?: string
           ip_hash?: string | null
@@ -160,6 +170,8 @@ export interface Database {
           result_path?: string | null
           session_id?: string | null
           status?: 'success' | 'error' | 'fallback'
+          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
           user_id?: string | null
         }
         Update: {
@@ -171,7 +183,11 @@ export interface Database {
           feedback_at?: string | null
           feedback_comentario?: string | null
           feedback_positivo?: boolean | null
+          feedback_reason?: string | null
           final_prompt?: string | null
+          gate_reason?: string | null
+          gate_signals?: Json | null
+          gate_verdict?: 'proceed' | 'proceed_with_warning' | 'reject' | null
           generation_params?: Json | null
           id?: string
           ip_hash?: string | null
@@ -185,6 +201,8 @@ export interface Database {
           result_path?: string | null
           session_id?: string | null
           status?: 'success' | 'error' | 'fallback'
+          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
           user_id?: string | null
         }
         Relationships: []
