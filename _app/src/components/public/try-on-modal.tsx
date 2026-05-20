@@ -21,6 +21,10 @@ import {
   IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_DIMENSION,
   IMAGE_TRY_ON_CUSTOMER_STANDARD_MAX_SIZE_MB,
 } from '@/lib/images/upload'
+import { computeCustomerSignals } from '@/lib/try-on/quality-gate/client-signals'
+import { REJECTION_MESSAGES } from '@/lib/try-on/quality-gate/rejection-messages'
+import type { CustomerPhotoSignals } from '@/lib/try-on/quality-gate/types'
+import { FEEDBACK_REASONS, type FeedbackReason } from '@/lib/try-on/feedback/types'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 
 type Step = 'upload' | 'confirm' | 'processing' | 'result' | 'error'
@@ -28,6 +32,8 @@ type Step = 'upload' | 'confirm' | 'processing' | 'result' | 'error'
 type SelectedPhoto = {
   file: File
   previewUrl: string
+  /** Signals computados via MediaPipe ao escolher a foto. */
+  signals?: CustomerPhotoSignals
 }
 
 const STEP_INDEX: Record<Exclude<Step, 'error'>, number> = {
@@ -172,6 +178,18 @@ export function TryOnModal({
       })
       cleanupSelection(customerPhoto)
       setCustomerPhoto(prepared)
+
+      // Quality gate cliente (research §5): MediaPipe + métricas simples.
+      // Best-effort — se falhar, deixa o servidor decidir.
+      void computeCustomerSignals(prepared.file)
+        .then((signals) => {
+          setCustomerPhoto((current) =>
+            current && current.file === prepared.file ? { ...current, signals } : current,
+          )
+        })
+        .catch(() => {
+          /* sem signals → o servidor segue o fluxo legado */
+        })
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE)
     }
@@ -196,6 +214,9 @@ export function TryOnModal({
       if (garmentImageUrl) {
         formData.set('garment_url_override', garmentImageUrl)
       }
+      if (customerPhoto.signals) {
+        formData.set('customer_signals', JSON.stringify(customerPhoto.signals))
+      }
 
       const res = await fetch('/api/try-on', {
         method: 'POST',
@@ -209,6 +230,15 @@ export function TryOnModal({
       window.clearInterval(interval)
 
       if (!res.ok || !data?.ok) {
+        // Quality gate rejeitou: usar a copy PT-BR localizada (research §7).
+        const code = typeof data?.error?.code === 'string' ? data.error.code : ''
+        if (code.startsWith('GATE_')) {
+          const reasonKey = code.slice('GATE_'.length).toLowerCase() as keyof typeof REJECTION_MESSAGES
+          const message = REJECTION_MESSAGES[reasonKey]?.ptBr ?? data?.error?.message
+          setErrorMsg(message ?? 'Não conseguimos usar esta foto. Envie outra.')
+          setStep('error')
+          return
+        }
         setErrorMsg(data?.error?.message ?? 'Não foi possível gerar a visualização agora.')
         setStep('error')
         return
@@ -1030,15 +1060,23 @@ function ErrorStep({
  * Feedback opcional, minimalista e dispensável sobre a prévia.
  * Sem termos técnicos, sem "IA". Não bloqueia nem interrompe o fluxo —
  * o cliente pode simplesmente ignorar.
+ *
+ * Em "Sim": registra positivo e some.
+ * Em "Não": mostra 6 motivos estruturados (research §9.2). Em "Outro",
+ * abre um campo livre opcional. PII-screening é responsabilidade upstream.
  */
 function FeedbackBlock({ generationId }: { generationId: string | null }) {
   const [positive, setPositive] = useState<boolean | null>(null)
+  const [reason, setReason] = useState<FeedbackReason | null>(null)
   const [comment, setComment] = useState('')
   const [sentThanks, setSentThanks] = useState(false)
 
   if (!generationId) return null
 
-  function send(p: boolean, withComment: boolean) {
+  function send(
+    p: boolean,
+    payload: { reason?: FeedbackReason | null; comment?: string | null } = {},
+  ) {
     try {
       void fetch('/api/try-on/feedback', {
         method: 'POST',
@@ -1046,7 +1084,8 @@ function FeedbackBlock({ generationId }: { generationId: string | null }) {
         body: JSON.stringify({
           generation_id: generationId,
           positive: p,
-          comment: withComment && comment.trim() ? comment.trim() : undefined,
+          reason: payload.reason ?? undefined,
+          comment: payload.comment?.trim() ? payload.comment.trim() : undefined,
         }),
         keepalive: true,
         cache: 'no-store',
@@ -1064,62 +1103,101 @@ function FeedbackBlock({ generationId }: { generationId: string | null }) {
     )
   }
 
-  return (
-    <div className="flex flex-col items-center gap-2.5">
-      {positive === null ? (
-        <div className="flex items-center gap-3">
-          <span className="font-sans text-[12.5px] text-white/55">O resultado ficou bom?</span>
-          <button
-            type="button"
-            onClick={() => {
-              setPositive(true)
-              send(true, false)
-            }}
-            className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
-          >
-            Sim
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setPositive(false)
-              send(false, false)
-            }}
-            className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
-          >
-            Não
-          </button>
-        </div>
-      ) : (
-        <div className="flex w-full max-w-[360px] flex-col items-center gap-2">
-          <input
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="O que poderia melhorar? (opcional)"
-            maxLength={1000}
-            className="w-full rounded-full border border-white/15 bg-white/5 px-4 py-2 text-center font-sans text-[12.5px] text-white/85 outline-none transition placeholder:text-white/30 focus:border-white/30"
-          />
-          <div className="flex items-center gap-3">
+  if (positive === null) {
+    return (
+      <div className="flex items-center justify-center gap-3">
+        <span className="font-sans text-[12.5px] text-white/55">O resultado ficou bom?</span>
+        <button
+          type="button"
+          onClick={() => {
+            setPositive(true)
+            send(true)
+            setSentThanks(true)
+          }}
+          className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
+        >
+          Sim
+        </button>
+        <button
+          type="button"
+          onClick={() => setPositive(false)}
+          className="rounded-full border border-white/20 px-3.5 py-1 font-sans text-[12.5px] text-white/85 transition hover:bg-white/10"
+        >
+          Não
+        </button>
+      </div>
+    )
+  }
+
+  // positive === false → mostra os 6 motivos
+  if (reason === null) {
+    return (
+      <div className="flex w-full max-w-[420px] flex-col items-center gap-2">
+        <span className="font-sans text-[12.5px] text-white/55">O que não ficou bom?</span>
+        <div className="flex flex-wrap justify-center gap-1.5">
+          {FEEDBACK_REASONS.map((opt) => (
             <button
-              type="button"
-              onClick={() => setSentThanks(true)}
-              className="font-sans text-[11.5px] text-white/40 transition hover:text-white/70"
-            >
-              Pular
-            </button>
-            <button
+              key={opt.key}
               type="button"
               onClick={() => {
-                send(positive, true)
-                setSentThanks(true)
+                setReason(opt.key)
+                if (opt.key !== 'other') {
+                  send(false, { reason: opt.key })
+                  setSentThanks(true)
+                }
               }}
-              className="rounded-full bg-white/90 px-4 py-1.5 font-sans text-[12px] font-medium text-ink transition hover:bg-white"
+              className="rounded-full border border-white/15 px-3 py-1 font-sans text-[11.5px] text-white/80 transition hover:bg-white/10"
             >
-              Enviar
+              {opt.ptBr}
             </button>
-          </div>
+          ))}
         </div>
-      )}
+        <button
+          type="button"
+          onClick={() => {
+            send(false)
+            setSentThanks(true)
+          }}
+          className="font-sans text-[11px] text-white/35 transition hover:text-white/70"
+        >
+          Pular
+        </button>
+      </div>
+    )
+  }
+
+  // reason === 'other' → campo livre
+  return (
+    <div className="flex w-full max-w-[360px] flex-col items-center gap-2">
+      <input
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="O que poderia melhorar?"
+        maxLength={1000}
+        className="w-full rounded-full border border-white/15 bg-white/5 px-4 py-2 text-center font-sans text-[12.5px] text-white/85 outline-none transition placeholder:text-white/30 focus:border-white/30"
+      />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            send(false, { reason: 'other' })
+            setSentThanks(true)
+          }}
+          className="font-sans text-[11.5px] text-white/40 transition hover:text-white/70"
+        >
+          Pular
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            send(false, { reason: 'other', comment })
+            setSentThanks(true)
+          }}
+          className="rounded-full bg-white/90 px-4 py-1.5 font-sans text-[12px] font-medium text-ink transition hover:bg-white"
+        >
+          Enviar
+        </button>
+      </div>
     </div>
   )
 }
