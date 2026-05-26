@@ -23,6 +23,8 @@ describe('buildTryOnProviderInput', () => {
       },
       generation: {
         googleModelOverride: null,
+        promptOverride: null,
+        promptVariantId: null,
       },
     })
   })

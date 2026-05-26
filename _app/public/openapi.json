@@ -1,0 +1,931 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Vitrine Virtual API",
+    "version": "1.0.0",
+    "description": "API interna da Vitrine Virtual. Todos os endpoints exigem sessão autenticada via cookie (Supabase Auth), exceto `/api/try-on`, `/api/try-on/feedback` e `/api/track/contact`.\n\n**Roles:**\n- `lojista` — dono de uma loja cadastrada\n- `super_admin` — administrador global do sistema"
+  },
+  "servers": [
+    { "url": "http://localhost:3000", "description": "Local (dev)" }
+  ],
+  "tags": [
+    { "name": "Auth", "description": "Autenticação e sessão" },
+    { "name": "Loja", "description": "Dados e configurações da loja do lojista autenticado" },
+    { "name": "Peças", "description": "CRUD de peças de roupa da loja" },
+    { "name": "Fotos", "description": "Upload e gerenciamento de fotos das peças" },
+    { "name": "Dashboard", "description": "Métricas agregadas da loja" },
+    { "name": "Try-On", "description": "Provador virtual público (sem login)" },
+    { "name": "Tracking", "description": "Eventos de analytics (sem login)" },
+    { "name": "Super Admin — Lojas", "description": "Gestão de lojas (super_admin only)" },
+    { "name": "Super Admin — Settings", "description": "Configurações globais do sistema (super_admin only)" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sb-access-token",
+        "description": "Cookie de sessão do Supabase. Obtido via login no app."
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "example": "Não autorizado" },
+          "code": { "type": "string", "example": "UNAUTHORIZED" }
+        },
+        "required": ["error", "code"]
+      },
+      "PecaStatus": {
+        "type": "string",
+        "enum": ["disponivel", "vendida"]
+      },
+      "AiImageModel": {
+        "type": "string",
+        "enum": ["high", "medium"]
+      },
+      "ProvadorFundoTipo": {
+        "type": "string",
+        "enum": ["branco", "personalizado", "cliente"]
+      },
+      "Loja": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "owner_user_id": { "type": "string", "format": "uuid" },
+          "slug": { "type": "string", "example": "minha-loja" },
+          "nome": { "type": "string", "example": "Minha Loja" },
+          "tagline": { "type": "string", "nullable": true },
+          "instagram": { "type": "string", "nullable": true, "example": "minhaloja" },
+          "tiktok": { "type": "string", "nullable": true },
+          "whatsapp_e164": { "type": "string", "nullable": true, "example": "+5511999999999" },
+          "exibir_preco_publico": { "type": "boolean" },
+          "vitrine_publica_visivel": { "type": "boolean" },
+          "cota_try_on_mensal": { "type": "integer", "example": 200 },
+          "ai_image_model": { "$ref": "#/components/schemas/AiImageModel" },
+          "ativa": { "type": "boolean" },
+          "logo_storage_path": { "type": "string", "nullable": true },
+          "provador_fundo_tipo": { "$ref": "#/components/schemas/ProvadorFundoTipo" },
+          "provador_fundo_storage_path": { "type": "string", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "LojaCreateInput": {
+        "type": "object",
+        "required": ["nome", "slug", "email"],
+        "properties": {
+          "nome": { "type": "string", "maxLength": 80, "example": "Minha Loja" },
+          "slug": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 60,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "example": "minha-loja"
+          },
+          "email": { "type": "string", "format": "email", "example": "lojista@email.com" },
+          "cota_try_on_mensal": { "type": "integer", "minimum": 0, "maximum": 100000, "default": 200 },
+          "ai_image_model": { "$ref": "#/components/schemas/AiImageModel" }
+        }
+      },
+      "LojaUpdateInput": {
+        "type": "object",
+        "properties": {
+          "nome": { "type": "string", "maxLength": 80 },
+          "tagline": { "type": "string", "maxLength": 140, "nullable": true },
+          "instagram": { "type": "string", "maxLength": 50, "pattern": "^[a-zA-Z0-9._]*$" },
+          "tiktok": { "type": "string", "maxLength": 50, "pattern": "^[a-zA-Z0-9._]*$" },
+          "whatsapp_e164": { "type": "string", "example": "+5511999999999" },
+          "exibir_preco_publico": { "type": "boolean" },
+          "vitrine_publica_visivel": { "type": "boolean" },
+          "provador_fundo_tipo": { "$ref": "#/components/schemas/ProvadorFundoTipo" },
+          "provador_fundo_storage_path": { "type": "string", "nullable": true },
+          "ai_image_model": { "$ref": "#/components/schemas/AiImageModel" }
+        }
+      },
+      "Peca": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "loja_id": { "type": "string", "format": "uuid" },
+          "nome": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/PecaStatus" },
+          "preco_centavos": { "type": "integer", "nullable": true },
+          "tamanho": { "type": "string", "nullable": true },
+          "categoria_id": { "type": "string", "nullable": true },
+          "foto_principal_id": { "type": "string", "format": "uuid", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PecaCreateInput": {
+        "type": "object",
+        "required": ["nome"],
+        "properties": {
+          "nome": { "type": "string", "maxLength": 100, "example": "Vestido floral" },
+          "preco_centavos": { "type": "integer", "minimum": 0, "maximum": 100000000, "nullable": true },
+          "tamanho": { "type": "string", "maxLength": 60, "nullable": true },
+          "categoria_id": { "type": "string", "nullable": true },
+          "status": { "$ref": "#/components/schemas/PecaStatus" }
+        }
+      },
+      "PecaUpdateInput": {
+        "type": "object",
+        "description": "Campos parciais. Use `action: 'marcar_vendida'` ou `action: 'reabrir'` para mudar status.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["marcar_vendida", "reabrir"],
+            "description": "Ação especial. Se presente, demais campos são ignorados."
+          },
+          "nome": { "type": "string", "maxLength": 100 },
+          "preco_centavos": { "type": "integer", "nullable": true },
+          "tamanho": { "type": "string", "nullable": true },
+          "categoria_id": { "type": "string", "nullable": true },
+          "status": { "$ref": "#/components/schemas/PecaStatus" }
+        }
+      },
+      "FotoItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "storage_path": { "type": "string" },
+          "ordem": { "type": "integer" },
+          "signed_url": { "type": "string", "format": "uri", "nullable": true },
+          "is_principal": { "type": "boolean" }
+        }
+      },
+      "DashboardMetrics": {
+        "type": "object",
+        "properties": {
+          "pecas_disponiveis": { "type": "integer" },
+          "pecas_vendidas": { "type": "integer" },
+          "pecas_total": { "type": "integer" },
+          "valor_disponivel_centavos": { "type": "integer" },
+          "valor_vendido_centavos": { "type": "integer" },
+          "try_ons_mes": { "type": "integer" },
+          "cota_mensal": { "type": "integer" }
+        }
+      },
+      "TryOnResult": {
+        "type": "object",
+        "properties": {
+          "result_url": { "type": "string", "format": "uri" },
+          "expires_at": { "type": "string", "format": "date-time" },
+          "provider": { "type": "string", "example": "fashn" },
+          "generation_id": { "type": "string", "format": "uuid", "nullable": true }
+        }
+      },
+      "SuperAdminSettings": {
+        "type": "object",
+        "properties": {
+          "try_on_enabled": { "type": "boolean" },
+          "try_on_monthly_budget_usd": { "type": "number" },
+          "try_on_spent_usd": { "type": "number" },
+          "default_ai_image_model": { "$ref": "#/components/schemas/AiImageModel" }
+        }
+      }
+    }
+  },
+  "security": [{ "cookieAuth": [] }],
+  "paths": {
+    "/api/auth/sign-out": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Sign out",
+        "description": "Encerra a sessão do usuário e redireciona para `/login`.",
+        "responses": {
+          "302": { "description": "Redireciona para /login" }
+        }
+      }
+    },
+    "/api/dashboard": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Métricas da loja",
+        "description": "Retorna métricas agregadas da loja do lojista autenticado: contagens de peças, valores totais e uso do try-on no mês atual.",
+        "responses": {
+          "200": {
+            "description": "Métricas retornadas com sucesso",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DashboardMetrics" }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/loja": {
+      "get": {
+        "tags": ["Loja"],
+        "summary": "Dados da loja atual",
+        "description": "Retorna os dados da loja vinculada ao lojista autenticado.",
+        "responses": {
+          "200": {
+            "description": "Dados da loja",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loja" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Loja"],
+        "summary": "Atualizar configurações da loja",
+        "description": "Atualiza campos da loja (nome, tagline, redes sociais, configurações do provador etc.).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/LojaUpdateInput" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loja atualizada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loja" } } }
+          },
+          "400": {
+            "description": "Dados inválidos",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/loja/assets": {
+      "post": {
+        "tags": ["Loja"],
+        "summary": "Upload de asset da loja (logo ou fundo do provador)",
+        "description": "Envia imagem em base64 para o storage. `kind` determina se é `logo` ou `provador_fundo`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["kind", "filename", "contentType", "size", "data_url"],
+                "properties": {
+                  "kind": { "type": "string", "enum": ["logo", "provador_fundo"] },
+                  "filename": { "type": "string", "maxLength": 200 },
+                  "contentType": { "type": "string", "enum": ["image/jpeg", "image/png", "image/webp"] },
+                  "size": { "type": "integer", "description": "Tamanho em bytes (máx 10 MB)" },
+                  "data_url": { "type": "string", "description": "Data URL base64 da imagem" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Asset enviado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "storage_path": { "type": "string" },
+                    "public_url": { "type": "string", "format": "uri" },
+                    "loja": { "$ref": "#/components/schemas/Loja" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos ou imagem muito grande",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Loja"],
+        "summary": "Remover asset da loja",
+        "description": "Remove logo ou fundo do provador da loja. Passa `?kind=logo` ou `?kind=provador_fundo`.",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["logo", "provador_fundo"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Asset removido",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Loja" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/pecas": {
+      "get": {
+        "tags": ["Peças"],
+        "summary": "Listar peças da loja",
+        "description": "Retorna todas as peças da loja do lojista autenticado, com filtros opcionais.",
+        "parameters": [
+          {
+            "name": "somente_disponiveis",
+            "in": "query",
+            "schema": { "type": "boolean" },
+            "description": "Se `true`, filtra apenas peças disponíveis"
+          },
+          {
+            "name": "busca",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Texto para busca por nome"
+          },
+          {
+            "name": "ordem",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["recentes", "antigas"], "default": "recentes" },
+            "description": "Ordenação das peças"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de peças",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Peca" } }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Peças"],
+        "summary": "Criar peça",
+        "description": "Cria uma nova peça na loja do lojista autenticado.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PecaCreateInput" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Peça criada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Peca" } } }
+          },
+          "400": {
+            "description": "Dados inválidos",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/pecas/export": {
+      "get": {
+        "tags": ["Peças"],
+        "summary": "Exportar peças como CSV",
+        "description": "Retorna um arquivo CSV com todas as peças da loja. O nome do arquivo inclui o slug e a data atual.",
+        "responses": {
+          "200": {
+            "description": "Arquivo CSV",
+            "content": { "text/csv": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/pecas/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string", "format": "uuid" },
+          "description": "ID da peça"
+        }
+      ],
+      "get": {
+        "tags": ["Peças"],
+        "summary": "Buscar peça por ID",
+        "responses": {
+          "200": {
+            "description": "Dados da peça",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Peca" } } }
+          },
+          "404": {
+            "description": "Peça não encontrada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Peças"],
+        "summary": "Atualizar peça",
+        "description": "Atualiza campos da peça. Use `action: 'marcar_vendida'` para marcá-la como vendida ou `action: 'reabrir'` para reabrir.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PecaUpdateInput" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Peça atualizada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Peca" } } }
+          },
+          "400": {
+            "description": "Dados inválidos",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Peças"],
+        "summary": "Excluir peça",
+        "responses": {
+          "200": {
+            "description": "Peça excluída",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "deleted": { "type": "boolean", "example": true }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/pecas/{id}/fotos": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string", "format": "uuid" },
+          "description": "ID da peça"
+        }
+      ],
+      "get": {
+        "tags": ["Fotos"],
+        "summary": "Listar fotos da peça",
+        "description": "Retorna todas as fotos da peça com signed URLs válidas por 1 hora.",
+        "responses": {
+          "200": {
+            "description": "Lista de fotos",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/FotoItem" } }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Fotos"],
+        "summary": "Gerenciar fotos da peça",
+        "description": "Endpoint de ações múltiplas sobre fotos, discriminadas pelo campo `action`:\n\n- **`create_signed_upload`** — Gera uma URL pré-assinada para upload direto ao Storage.\n- **`confirm_upload`** — Confirma que o upload direto foi concluído e registra a foto no banco.\n- **`upload_base64`** — Envia a foto em base64 diretamente pelo servidor.\n- **`set_principal`** — Define qual foto é a principal da peça.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "title": "create_signed_upload",
+                    "type": "object",
+                    "required": ["action", "filename", "contentType", "size"],
+                    "properties": {
+                      "action": { "type": "string", "enum": ["create_signed_upload"] },
+                      "filename": { "type": "string" },
+                      "contentType": { "type": "string", "enum": ["image/jpeg", "image/png", "image/webp"] },
+                      "size": { "type": "integer", "description": "Tamanho em bytes" }
+                    }
+                  },
+                  {
+                    "title": "confirm_upload",
+                    "type": "object",
+                    "required": ["action", "storage_path", "ordem"],
+                    "properties": {
+                      "action": { "type": "string", "enum": ["confirm_upload"] },
+                      "storage_path": { "type": "string" },
+                      "ordem": { "type": "integer", "minimum": 0 }
+                    }
+                  },
+                  {
+                    "title": "upload_base64",
+                    "type": "object",
+                    "required": ["action", "filename", "contentType", "size", "data_url", "ordem"],
+                    "properties": {
+                      "action": { "type": "string", "enum": ["upload_base64"] },
+                      "filename": { "type": "string" },
+                      "contentType": { "type": "string", "enum": ["image/jpeg", "image/png", "image/webp"] },
+                      "size": { "type": "integer" },
+                      "data_url": { "type": "string", "description": "Data URL base64 da imagem" },
+                      "ordem": { "type": "integer", "minimum": 0 }
+                    }
+                  },
+                  {
+                    "title": "set_principal",
+                    "type": "object",
+                    "required": ["action", "foto_id"],
+                    "properties": {
+                      "action": { "type": "string", "enum": ["set_principal"] },
+                      "foto_id": { "type": "string", "format": "uuid" }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ação executada com sucesso"
+          },
+          "400": {
+            "description": "Payload inválido",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Fotos"],
+        "summary": "Excluir foto da peça",
+        "description": "Remove uma foto do Storage e do banco. O ID da foto é passado via query string.",
+        "parameters": [
+          {
+            "name": "foto_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "ID da foto a excluir"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Foto excluída",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "deleted": { "type": "boolean", "example": true }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "foto_id inválido",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          },
+          "401": {
+            "description": "Não autenticado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/try-on": {
+      "post": {
+        "tags": ["Try-On"],
+        "summary": "Executar provador virtual",
+        "description": "Processa a foto do cliente com a peça e retorna uma imagem gerada por IA.\n\n**Não requer login** — protegido por Turnstile (anti-bot), rate-limit e cota mensal da loja.\n\nAceita `multipart/form-data`. A foto do cliente é descartada da memória após a resposta (nunca persiste).",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["customerPhoto", "peca_id", "turnstile_token", "consent"],
+                "properties": {
+                  "customerPhoto": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Foto do cliente (jpeg/png/webp, máx 60 MB)"
+                  },
+                  "peca_id": { "type": "string", "format": "uuid" },
+                  "turnstile_token": { "type": "string", "description": "Token do Cloudflare Turnstile" },
+                  "consent": { "type": "string", "enum": ["true"], "description": "Consentimento obrigatório" },
+                  "session_id": { "type": "string", "description": "ID de sessão anônima (opcional)" },
+                  "garment_url_override": { "type": "string", "format": "uri", "description": "URL alternativa da peça (opcional)" },
+                  "customer_signals": { "type": "string", "description": "JSON serializado com sinais da foto do cliente (opcional)" },
+                  "garment_signals": { "type": "string", "description": "JSON serializado com sinais da peça (opcional)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resultado gerado com sucesso",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TryOnResult" } } }
+          },
+          "400": { "description": "Payload inválido ou foto ausente", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Falha no Turnstile (bot detectado)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "Peça não encontrada ou indisponível", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "413": { "description": "Foto muito grande (> 60 MB)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "415": { "description": "Formato de imagem não suportado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "422": { "description": "Foto rejeitada pelo quality-gate (ex: sem pessoa visível, imagem escura)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "429": { "description": "Rate-limit ou cota mensal excedida", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "503": { "description": "Provador temporariamente desativado (kill-switch)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/try-on/feedback": {
+      "post": {
+        "tags": ["Try-On"],
+        "summary": "Enviar feedback do resultado do try-on",
+        "description": "Feedback opcional e anônimo sobre um resultado gerado. Nunca falha de forma ruidosa (best-effort).",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["generation_id", "positive"],
+                "properties": {
+                  "generation_id": { "type": "string", "format": "uuid" },
+                  "positive": { "type": "boolean" },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "face_didnt_look_like_me",
+                      "body_shape_changed",
+                      "clothing_looked_wrong",
+                      "image_not_realistic",
+                      "background_looked_bad",
+                      "other"
+                    ]
+                  },
+                  "comment": { "type": "string", "maxLength": 1000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Feedback registrado (ou não, de forma silenciosa)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "saved": { "type": "boolean" } }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/track/contact": {
+      "post": {
+        "tags": ["Tracking"],
+        "summary": "Registrar clique em canal de contato",
+        "description": "Chamado pelo front via `navigator.sendBeacon` quando o visitante clica em Instagram, TikTok ou WhatsApp na vitrine pública. Sempre responde `204 No Content` — erros são silenciados.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["loja_id", "channel"],
+                "properties": {
+                  "loja_id": { "type": "string", "format": "uuid" },
+                  "channel": { "type": "string", "enum": ["instagram", "tiktok", "whatsapp"] },
+                  "session_id": { "type": "string", "maxLength": 128 },
+                  "visitor_id": { "type": "string", "maxLength": 128 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Registrado (ou ignorado silenciosamente em caso de erro)" }
+        }
+      }
+    },
+    "/api/super-admin/lojas": {
+      "get": {
+        "tags": ["Super Admin — Lojas"],
+        "summary": "Listar todas as lojas",
+        "description": "Retorna todas as lojas cadastradas com estatísticas agregadas. **Requer role `super_admin`.**",
+        "responses": {
+          "200": {
+            "description": "Lista de lojas com stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "allOf": [
+                      { "$ref": "#/components/schemas/Loja" },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "pecas_total": { "type": "integer" },
+                          "pecas_disponiveis": { "type": "integer" },
+                          "try_ons_total": { "type": "integer" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Não autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Sem permissão de super_admin", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "post": {
+        "tags": ["Super Admin — Lojas"],
+        "summary": "Criar loja e enviar convite",
+        "description": "Cria uma nova loja, o usuário lojista correspondente no Supabase Auth e envia magic link de boas-vindas. **Requer role `super_admin`.**",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/LojaCreateInput" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loja criada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "loja": { "$ref": "#/components/schemas/Loja" },
+                    "invitationSent": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Dados inválidos, slug reservado ou e-mail já cadastrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Não autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Sem permissão de super_admin", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/super-admin/lojas/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string", "format": "uuid" },
+          "description": "ID da loja"
+        }
+      ],
+      "patch": {
+        "tags": ["Super Admin — Lojas"],
+        "summary": "Ativar/desativar loja ou alterar modelo de IA",
+        "description": "Atualiza `ativa` e/ou `ai_image_model` de uma loja específica. **Requer role `super_admin`.**",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ativa": { "type": "boolean" },
+                  "ai_image_model": { "$ref": "#/components/schemas/AiImageModel" }
+                },
+                "description": "Ao menos um dos campos deve estar presente."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Loja atualizada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "ativa": { "type": "boolean" },
+                    "ai_image_model": { "$ref": "#/components/schemas/AiImageModel" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Nenhum campo para atualizar", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "401": { "description": "Não autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Sem permissão de super_admin", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/super-admin/settings": {
+      "get": {
+        "tags": ["Super Admin — Settings"],
+        "summary": "Configurações globais do sistema",
+        "description": "Retorna o estado atual do kill-switch do try-on, orçamento mensal e modelo de IA padrão. **Requer role `super_admin`.**",
+        "responses": {
+          "200": {
+            "description": "Configurações atuais",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SuperAdminSettings" } } }
+          },
+          "401": { "description": "Não autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Sem permissão de super_admin", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "patch": {
+        "tags": ["Super Admin — Settings"],
+        "summary": "Atualizar configurações globais",
+        "description": "Altera o kill-switch do try-on, orçamento mensal em USD e/ou modelo de IA padrão para novas lojas. **Requer role `super_admin`.**",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "try_on_enabled": { "type": "boolean" },
+                  "try_on_monthly_budget_usd": { "type": "number", "minimum": 0 },
+                  "default_ai_image_model": { "$ref": "#/components/schemas/AiImageModel" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configurações atualizadas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "ok": { "type": "boolean", "example": true } }
+                }
+              }
+            }
+          },
+          "401": { "description": "Não autenticado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "403": { "description": "Sem permissão de super_admin", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  }
+}

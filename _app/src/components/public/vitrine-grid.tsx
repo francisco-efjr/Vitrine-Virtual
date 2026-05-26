@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, LayoutGrid, Maximize2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, LayoutGrid, Maximize2, Share2 } from 'lucide-react'
 import { Stagger } from '@/components/motion'
 import { CATEGORIAS, getCategoriaLabel } from '@/lib/categorias'
 import { formatPreco } from '@/lib/validators/peca'
@@ -51,7 +51,28 @@ export function VitrineGrid({
   const [viewMode, setViewMode] = useState<ViewMode>('grade')
   const [focusIdx, setFocusIdx] = useState(0)
   const [cabinePeca, setCabinePeca] = useState<Peca | null>(null)
+  // P1-06 (v6): copy-link discreto no card.
+  // O ícone só aparece em hover (desktop) ou foco (teclado/touch). Após
+  // clicar, o ícone vira "check" por ~1.5s para feedback de sucesso.
+  const [copiedPecaId, setCopiedPecaId] = useState<string | null>(null)
   const cabineDeepLinkDone = useRef(false)
+
+  async function copyPecaLink(pecaId: string, e: React.MouseEvent | React.KeyboardEvent) {
+    e.stopPropagation()
+    e.preventDefault()
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    const url = `${origin}/v/${slug}/peca/${pecaId}`
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedPecaId(pecaId)
+      window.setTimeout(() => {
+        setCopiedPecaId((current) => (current === pecaId ? null : current))
+      }, 1500)
+    } catch {
+      // Browser sem permissão / clipboard. Fallback silencioso — links
+      // continuam abertos via "Ver detalhes" no Foco view.
+    }
+  }
 
   // Deep-link "Ver experiência do cliente" (Admin → ?cabine=1):
   // abre a Cabine da primeira peça disponível para o admin pré-visualizar
@@ -152,22 +173,21 @@ export function VitrineGrid({
           step={50}
           key={`grid-${catFilter}`}
         >
-          {filtered.map((p) => (
+          {filtered.map((p) => {
+            const isCopied = copiedPecaId === p.peca_id
+            return (
             <button
               key={p.peca_id}
               type="button"
               onClick={() => setCabinePeca(p)}
-              className="vv-hover-lift group flex h-full flex-col overflow-hidden rounded-card bg-surface text-left shadow-card transition"
+              className="vv-hover-lift group relative flex h-full flex-col overflow-hidden rounded-card bg-surface text-left shadow-card transition"
             >
-              <div
-                className="relative aspect-[3/4] w-full overflow-hidden bg-[#f0ebe3]"
-                aria-hidden="true"
-              >
+              <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#f0ebe3]">
                 {p.foto_principal_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={p.foto_principal_url}
-                    alt={p.nome}
+                    alt=""
                     className="h-full w-full object-cover object-center transition-transform duration-500 ease-[cubic-bezier(0.22,0.61,0.36,1)] group-hover:scale-[1.04]"
                   />
                 ) : null}
@@ -177,6 +197,30 @@ export function VitrineGrid({
                 >
                   <IconHanger size={11} strokeWidth={1.8} />
                   Cabine
+                </span>
+                {/*
+                  P1-06 (v6): copy-link só em hover/focus.
+                  Antes ficava sempre visível, poluindo o card idle.
+                  Agora: opacity-0 → opacity-100 em group-hover ou foco
+                  (focus-within cobre o caso de teclado). role="button" em
+                  span evita nested-button (o card já é botão).
+                */}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label={isCopied ? 'Link copiado' : 'Copiar link da peça'}
+                  onClick={(e) => copyPecaLink(p.peca_id, e)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') copyPecaLink(p.peca_id, e)
+                  }}
+                  className="absolute right-2 top-2 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/92 text-ink opacity-0 shadow-card backdrop-blur transition focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent group-hover:opacity-100"
+                  style={{ animation: isCopied ? 'vv-pop 0.32s var(--e-out)' : undefined }}
+                >
+                  {isCopied ? (
+                    <Check size={13} strokeWidth={2.5} className="text-success" aria-hidden="true" />
+                  ) : (
+                    <Share2 size={13} aria-hidden="true" />
+                  )}
                 </span>
               </div>
               <div className="flex flex-1 flex-col p-3 sm:p-4">
@@ -192,12 +236,13 @@ export function VitrineGrid({
                       {formatPreco(p.preco_centavos)}
                     </span>
                   ) : (
-                    <span className="font-sans text-xs text-ink-3">Consulte o preço</span>
+                    <span className="font-sans text-xs text-ink-2">Consulte o preço</span>
                   )}
                 </div>
               </div>
             </button>
-          ))}
+            )
+          })}
         </Stagger>
       ) : (
         <FocoView

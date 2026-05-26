@@ -19,6 +19,7 @@ export function TryOnButton({
   garmentThumbUrl = null,
   cabineBackdropUrl = null,
   size = 'lg',
+  fullWidth = false,
 }: {
   pecaId: string
   pecaNome: string
@@ -34,6 +35,11 @@ export function TryOnButton({
    */
   cabineBackdropUrl?: string | null
   size?: 'sm' | 'md' | 'lg'
+  /**
+   * P1-05 (v6): permite o botão preencher a largura do container.
+   * Usado pelo sticky bottom CTA da product detail page (mobile).
+   */
+  fullWidth?: boolean
 }) {
   const [open, setOpen] = useState(false)
 
@@ -49,7 +55,9 @@ export function TryOnButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`inline-flex items-center justify-center gap-2 rounded-full bg-ink font-medium text-white shadow-sm transition duration-200 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:bg-[#2d2825] active:scale-[0.98] ${sizing}`}
+        className={`${
+          fullWidth ? 'flex w-full' : 'inline-flex'
+        } items-center justify-center gap-2 rounded-full bg-ink font-medium text-white shadow-sm transition duration-200 ease-[cubic-bezier(0.22,0.61,0.36,1)] hover:bg-[#2d2825] active:scale-[0.98] ${sizing}`}
       >
         <span className="text-accent" aria-hidden="true">
           <IconHanger size={size === 'lg' ? 15 : 13} strokeWidth={1.8} />

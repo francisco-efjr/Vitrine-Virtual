@@ -11,8 +11,16 @@ export function ok<T>(data: T, init?: ResponseInit) {
 }
 
 /** Resposta padrão para erro. */
-export function fail(message: string, code: string, status = 400) {
-  return NextResponse.json({ ok: false as const, error: { message, code } }, { status })
+export function fail(
+  message: string,
+  code: string,
+  status = 400,
+  headers?: Record<string, string>,
+) {
+  return NextResponse.json(
+    { ok: false as const, error: { message, code } },
+    { status, headers },
+  )
 }
 
 /** Wrapper que mapeia exceptions para resposta HTTP apropriada. */

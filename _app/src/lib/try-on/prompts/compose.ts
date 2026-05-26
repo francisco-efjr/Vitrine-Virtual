@@ -5,15 +5,16 @@ import type { BackgroundMode, TryOnPromptVariables } from '../tiers/types'
 
 /**
  * Maps the rich `BackgroundMode` ('white' | 'store_background' |
- * 'preserve_customer') used by the tier router down to the two modes the
- * existing master prompt understands ('white' | 'custom').
+ * 'preserve_customer') used by the tier router down to the background modes
+ * supported by the master prompt.
  *
- * 'preserve_customer' is treated as 'custom' for the prompt body — the
- * variant delta in `variants.ts` carries the actual "preserve original
- * background outside silhouette" instruction.
+ * No BACKGROUND_IMAGE is sent for 'preserve_customer'; the customer photo
+ * itself remains the background authority.
  */
 function legacyBackgroundMode(mode: BackgroundMode): VirtualTryOnBackgroundMode {
-  return mode === 'white' ? 'white' : 'custom'
+  if (mode === 'store_background') return 'custom'
+  if (mode === 'preserve_customer') return 'preserve_customer'
+  return 'white'
 }
 
 export interface ComposedPrompt {

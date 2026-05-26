@@ -46,8 +46,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
           </span>
         ) : null}
       </div>
+      {/* P0-03 (v6): helper passa de text-ink-3 (2.78:1) para text-ink-2 (5.8:1) para atender WCAG AA. */}
       {error || helper ? (
-        <span className={cn('text-xs', error ? 'text-danger' : 'text-ink-3')}>
+        <span className={cn('text-xs', error ? 'text-danger' : 'text-ink-2')}>
           {error || helper}
         </span>
       ) : null}
@@ -78,8 +79,9 @@ export const Textarea = React.forwardRef<
         )}
         {...props}
       />
+      {/* P0-03 (v6): helper passa de text-ink-3 (2.78:1) para text-ink-2 (5.8:1) para atender WCAG AA. */}
       {error || helper ? (
-        <span className={cn('text-xs', error ? 'text-danger' : 'text-ink-3')}>
+        <span className={cn('text-xs', error ? 'text-danger' : 'text-ink-2')}>
           {error || helper}
         </span>
       ) : null}

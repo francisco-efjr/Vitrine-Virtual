@@ -106,9 +106,9 @@ describe('openAiProvider.generate', () => {
 
     const requestBody = fetchMock.mock.calls[1]?.[1]?.body as FormData
     const images = requestBody.getAll('image[]') as File[]
-    // 2 images: customer-photo + garment (no more body/selfie split)
+    // 2 images: garment first, customer last.
     expect(images).toHaveLength(2)
-    expect(images.map((image) => image.name)).toEqual(['customer-photo.jpg', 'garment-image.jpg'])
+    expect(images.map((image) => image.name)).toEqual(['garment-image.jpg', 'customer-photo.jpg'])
     expect(requestBody.get('prompt')).toBeTruthy()
 
     expect(storageBucket.upload).toHaveBeenCalledWith(
@@ -179,9 +179,9 @@ describe('openAiProvider.generate', () => {
     const images = requestBody.getAll('image[]') as File[]
     expect(images).toHaveLength(3)
     expect(images.map((image) => image.name)).toEqual([
-      'customer-photo.jpg',
       'garment-image.jpg',
       'background-image.webp',
+      'customer-photo.jpg',
     ])
     expect(String(requestBody.get('prompt'))).toContain('BACKGROUND_IMAGE')
     expect(String(requestBody.get('prompt'))).not.toContain(

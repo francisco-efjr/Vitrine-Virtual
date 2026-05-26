@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ListChecks, Check, List, Plus, ExternalLink, Store } from 'lucide-react'
+import { ListChecks, Check, List, Plus, ExternalLink, Store, Upload } from 'lucide-react'
 import { IconHanger } from '@/components/brand/icon-hanger'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -35,6 +35,19 @@ export default async function DashboardPage() {
   const cotaPct = Math.min(100, Math.round((metrics.try_ons_mes / metrics.cota_mensal) * 100))
   const nomeCurto = session.profile.nome_completo?.split(' ')[0] ?? 'lojista'
 
+  // P0-02 (v6): empty state explícito.
+  //
+  // Antes, uma loja sem peças via 0/0/0 nos KPIs — visualmente indistinguível
+  // de um bug de query (que existia: ver Dashboard_Bug no design v6, em que
+  // contadores mostravam 0 mas "valor disponível" mostrava preço de UMA peça).
+  //
+  // Agora, quando metrics.pecas_total === 0, mostramos um banner de onboarding
+  // com CTA grande para cadastrar a primeira peça, e os KPIs viram cards
+  // "vazios" (— em ink-3), claramente diferentes de "0 numérico" — o que
+  // sinaliza "ainda não cadastrei nada" em vez de "tenho peças mas algo
+  // quebrou".
+  const isEmpty = metrics.pecas_total === 0
+
   return (
     <div className="max-w-[920px] p-4 sm:p-7 lg:p-9">
       <Reveal>
@@ -56,28 +69,65 @@ export default async function DashboardPage() {
           </div>
         </header>
         <p className="mb-6 font-sans text-[13.5px] text-ink-2">
-          Sua vitrine está ativa · Atualizado agora
+          {isEmpty
+            ? 'Nenhuma peça cadastrada ainda'
+            : 'Sua vitrine está ativa · Atualizado agora'}
         </p>
       </Reveal>
+
+      {isEmpty ? (
+        <Reveal>
+          <div
+            className="mb-6 flex flex-col items-start gap-5 rounded-[14px] border-[1.5px] border-dashed border-border-2 bg-surface p-7 sm:flex-row sm:items-center sm:gap-6 sm:p-8"
+            role="region"
+            aria-label="Sua vitrine está esperando você"
+          >
+            <div
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-surface-2"
+              aria-hidden="true"
+            >
+              <IconHanger size={28} className="text-accent" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-serif text-[20px] font-semibold leading-snug tracking-tight text-ink">
+                Sua vitrine está esperando você
+              </div>
+              <p className="mt-1 max-w-[420px] font-sans text-[13px] leading-relaxed text-ink-2">
+                Adicione sua primeira peça e a vitrine já fica pronta pra suas clientes provarem.
+              </p>
+            </div>
+            <Link
+              href="/admin/pecas"
+              className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 font-sans text-[14px] font-medium text-white transition hover:bg-accent-dark active:scale-[0.98]"
+            >
+              <Upload size={15} />
+              Adicionar primeira peça
+            </Link>
+          </div>
+        </Reveal>
+      ) : null}
 
       <Stagger className="mb-6 grid grid-cols-2 gap-3.5 lg:grid-cols-3" step={70}>
         <KpiCard
           label="Disponíveis"
           value={metrics.pecas_disponiveis}
-          sub="peças na vitrine"
+          sub={isEmpty ? 'Sem peças' : 'peças na vitrine'}
           icon={<ListChecks size={17} />}
+          empty={isEmpty}
         />
         <KpiCard
           label="Vendidas"
           value={metrics.pecas_vendidas}
-          sub="este mês"
+          sub={isEmpty ? undefined : 'este mês'}
           icon={<Check size={17} />}
+          empty={isEmpty}
         />
         <KpiCard
           label="Total"
           value={metrics.pecas_total}
-          sub="cadastradas"
+          sub={isEmpty ? undefined : 'cadastradas'}
           icon={<List size={17} />}
+          empty={isEmpty}
         />
       </Stagger>
 
@@ -117,16 +167,28 @@ export default async function DashboardPage() {
           <div className="mb-1 font-sans text-[10.5px] font-semibold uppercase tracking-[0.07em] text-ink-3">
             Valor disponível
           </div>
-          <div className="font-serif text-[24px] font-semibold tracking-tight text-ink">
-            {formatPreco(metrics.valor_disponivel_centavos) || '—'}
+          <div
+            className={
+              isEmpty
+                ? 'font-serif text-[24px] font-semibold tracking-tight text-ink-3'
+                : 'font-serif text-[24px] font-semibold tracking-tight text-ink'
+            }
+          >
+            {isEmpty ? '—' : formatPreco(metrics.valor_disponivel_centavos) || '—'}
           </div>
         </Card>
         <Card className="p-5">
           <div className="mb-1 font-sans text-[10.5px] font-semibold uppercase tracking-[0.07em] text-ink-3">
             Total vendido
           </div>
-          <div className="font-serif text-[24px] font-semibold tracking-tight text-accent-dark">
-            {formatPreco(metrics.valor_vendido_centavos) || '—'}
+          <div
+            className={
+              isEmpty
+                ? 'font-serif text-[24px] font-semibold tracking-tight text-ink-3'
+                : 'font-serif text-[24px] font-semibold tracking-tight text-accent-dark'
+            }
+          >
+            {isEmpty ? '—' : formatPreco(metrics.valor_vendido_centavos) || '—'}
           </div>
         </Card>
       </Stagger>
@@ -199,11 +261,18 @@ function KpiCard({
   value,
   sub,
   icon,
+  empty = false,
 }: {
   label: string
   value: number
   sub?: string
   icon: React.ReactNode
+  /**
+   * P0-02 (v6): quando true, o valor é renderizado como em-dash ("—") em
+   * ink-3, sinalizando "sem dado ainda" — visualmente distinto de "0",
+   * que sugeriria um número real.
+   */
+  empty?: boolean
 }) {
   return (
     <Card hoverable className="flex min-w-[130px] items-start justify-between p-5">
@@ -211,13 +280,24 @@ function KpiCard({
         <div className="mb-2 font-sans text-[10.5px] font-semibold uppercase tracking-[0.07em] text-ink-3">
           {label}
         </div>
-        <div className="font-serif text-[28px] font-semibold leading-none tracking-tight text-ink">
-          <CountUp value={value} />
+        <div
+          className={
+            empty
+              ? 'font-serif text-[28px] font-semibold leading-none tracking-tight text-ink-3'
+              : 'font-serif text-[28px] font-semibold leading-none tracking-tight text-ink'
+          }
+          aria-label={empty ? `${label}: sem dados ainda` : undefined}
+        >
+          {empty ? '—' : <CountUp value={value} />}
         </div>
         {sub ? <div className="mt-1.5 font-sans text-[11.5px] text-ink-3">{sub}</div> : null}
       </div>
       <div
-        className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent-light text-accent transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-rotate-3 hover:scale-[1.08]"
+        className={
+          empty
+            ? 'flex h-9 w-9 items-center justify-center rounded-[10px] bg-surface-2 text-ink-3 transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]'
+            : 'flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent-light text-accent transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-rotate-3 hover:scale-[1.08]'
+        }
       >
         {icon}
       </div>
