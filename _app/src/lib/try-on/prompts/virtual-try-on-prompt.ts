@@ -3,14 +3,14 @@ export const VIRTUAL_TRYON_PROMPT = `You are an elite AI fashion image director,
 TASK:
 Generate a high-end fashion editorial image by combining two input sources.
 The input images are provided in this semantic order:
-1. CUSTOMER_PHOTO
-2. GARMENT_IMAGE
+1. GARMENT_IMAGE
+2. CUSTOMER_PHOTO
 
-1. CUSTOMER_PHOTO:
-A user-provided photo of the customer. This is the PRIMARY and ONLY reference for the person. Use it as the definitive source for the customer's overall appearance, body proportions, shape, posture, silhouette, pose, height impression, shoulder width, torso length, waist, hips, arms, legs, full-body composition, face, and identity.
-
-2. GARMENT_IMAGE:
+1. GARMENT_IMAGE:
 A product/reference image of the exact store garment. Use this image to identify and apply the correct clothing item, including its category, design, structure, fit, color, pattern, fabric, texture, details, accessories, and styling direction.
+
+2. CUSTOMER_PHOTO:
+A user-provided photo of the customer. This is the PRIMARY and ONLY reference for the person. Use it as the definitive source for the customer's overall appearance, body proportions, shape, posture, silhouette, pose, height impression, shoulder width, torso length, waist, hips, arms, legs, full-body composition, face, and identity.
 
 MAIN OBJECTIVE:
 Create a realistic, premium-quality fashion image in which:
@@ -181,9 +181,8 @@ NEGATIVE INSTRUCTIONS:
 - No dark background.
 - No gray background.
 - No background that is anything other than pure white (#FFFFFF).
-- No text.
-- No logo.
-- No watermark.
+- No unrelated text outside the garment design.
+- No new logo, watermark, or brand overlay not present in the source images.
 - No UI elements.
 - No buttons.
 - No social-media screenshot appearance.
@@ -197,16 +196,16 @@ The final image must show:
 - the correct garment accurately derived from GARMENT_IMAGE,
 all combined into one seamless, realistic, premium high-fashion editorial image.`
 
-export type VirtualTryOnBackgroundMode = 'white' | 'custom'
+export type VirtualTryOnBackgroundMode = 'white' | 'custom' | 'preserve_customer'
 
 const WHITE_INPUT_ORDER = `The input images are provided in this semantic order:
-1. CUSTOMER_PHOTO
-2. GARMENT_IMAGE`
+1. GARMENT_IMAGE
+2. CUSTOMER_PHOTO`
 
 const CUSTOM_INPUT_ORDER = `The input images are provided in this semantic order:
-1. CUSTOMER_PHOTO
-2. GARMENT_IMAGE
-3. BACKGROUND_IMAGE`
+1. GARMENT_IMAGE
+2. BACKGROUND_IMAGE
+3. CUSTOMER_PHOTO`
 
 const WHITE_BACKGROUND_INSTRUCTIONS = `- BACKGROUND: Always use a pure white studio background (#FFFFFF). This is mandatory and non-negotiable. The background must be a clean, seamless, infinite white — standard for professional fashion studio photography. No gradients, no shadows on background, no textures, no patterns, no environments, no props, no editorial styling on the background.
 - The white background must be flat, uniform, and extend seamlessly behind and around the subject.
@@ -215,6 +214,10 @@ const WHITE_BACKGROUND_INSTRUCTIONS = `- BACKGROUND: Always use a pure white stu
 const CUSTOM_BACKGROUND_INSTRUCTIONS = `- BACKGROUND: Use BACKGROUND_IMAGE as the mandatory background reference for the final image. This is the store's configured Cabine background and must replace the default white studio background.
 - Preserve the visual identity, colors, lighting mood, materials, and spatial feel of BACKGROUND_IMAGE while keeping the customer and garment as the main subject.
 - Integrate the person naturally into BACKGROUND_IMAGE with correct perspective, scale, contact shadows, and depth. Do not generate a pure white background unless BACKGROUND_IMAGE itself is pure white.`
+
+const PRESERVE_CUSTOMER_BACKGROUND_INSTRUCTIONS = `- BACKGROUND: Preserve the original background from CUSTOMER_PHOTO outside the person's silhouette. This is mandatory when no BACKGROUND_IMAGE is provided and the store uses the customer's own photo background.
+- Edit only the person/garment area needed for the try-on, then harmonize silhouette edges, lighting direction, contact shadows, and color temperature so the result remains seamless.
+- Do not replace the original customer background with a white studio background or an invented environment.`
 
 const WHITE_NEGATIVE_BACKGROUND_INSTRUCTIONS = `- No colored background.
 - No gradient background.
@@ -230,18 +233,39 @@ const CUSTOM_NEGATIVE_BACKGROUND_INSTRUCTIONS = `- Do not ignore BACKGROUND_IMAG
 - Do not invent a different location or scene unrelated to BACKGROUND_IMAGE.
 - Do not let the background overpower the customer or garment.`
 
+const PRESERVE_CUSTOMER_NEGATIVE_BACKGROUND_INSTRUCTIONS = `- Do not replace the CUSTOMER_PHOTO background.
+- Do not generate a pure white studio background.
+- Do not invent a new room, street, studio, landscape, or environment.
+- Do not create visible cut-out edges around the person.`
+
 export function buildVirtualTryOnPrompt(backgroundMode: VirtualTryOnBackgroundMode): string {
   if (backgroundMode === 'white') return VIRTUAL_TRYON_PROMPT
 
+  if (backgroundMode === 'preserve_customer') {
+    return VIRTUAL_TRYON_PROMPT.replace(
+      WHITE_BACKGROUND_INSTRUCTIONS,
+      PRESERVE_CUSTOMER_BACKGROUND_INSTRUCTIONS,
+    )
+      .replace(
+        WHITE_NEGATIVE_BACKGROUND_INSTRUCTIONS,
+        PRESERVE_CUSTOMER_NEGATIVE_BACKGROUND_INSTRUCTIONS,
+      )
+      .replace(
+        `- the correct garment accurately derived from GARMENT_IMAGE,`,
+        `- the correct garment accurately derived from GARMENT_IMAGE,
+- the original customer-photo background preserved outside the person silhouette,`,
+      )
+  }
+
   return VIRTUAL_TRYON_PROMPT.replace(WHITE_INPUT_ORDER, CUSTOM_INPUT_ORDER)
     .replace(
-      `2. GARMENT_IMAGE:
-A product/reference image of the exact store garment. Use this image to identify and apply the correct clothing item, including its category, design, structure, fit, color, pattern, fabric, texture, details, accessories, and styling direction.`,
-      `2. GARMENT_IMAGE:
-A product/reference image of the exact store garment. Use this image to identify and apply the correct clothing item, including its category, design, structure, fit, color, pattern, fabric, texture, details, accessories, and styling direction.
+      `2. CUSTOMER_PHOTO:
+A user-provided photo of the customer. This is the PRIMARY and ONLY reference for the person. Use it as the definitive source for the customer's overall appearance, body proportions, shape, posture, silhouette, pose, height impression, shoulder width, torso length, waist, hips, arms, legs, full-body composition, face, and identity.`,
+      `2. BACKGROUND_IMAGE:
+The configured store background for the Cabine. Use this as the exact background reference when composing the final image.
 
-3. BACKGROUND_IMAGE:
-The configured store background for the Cabine. Use this as the exact background reference when composing the final image.`,
+3. CUSTOMER_PHOTO:
+A user-provided photo of the customer. This is the PRIMARY and ONLY reference for the person. Use it as the definitive source for the customer's overall appearance, body proportions, shape, posture, silhouette, pose, height impression, shoulder width, torso length, waist, hips, arms, legs, full-body composition, face, and identity.`,
     )
     .replace(WHITE_BACKGROUND_INSTRUCTIONS, CUSTOM_BACKGROUND_INSTRUCTIONS)
     .replace(WHITE_NEGATIVE_BACKGROUND_INSTRUCTIONS, CUSTOM_NEGATIVE_BACKGROUND_INSTRUCTIONS)
