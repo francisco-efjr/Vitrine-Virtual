@@ -34,11 +34,17 @@ The garment must be re-fitted to the body and pose of the customer.`
 export function garmentInputDelta(type: GarmentPhotoType): string {
   if (type === 'flat-lay') return GARMENT_FLATLAY_DELTA
   if (type === 'model') return GARMENT_ON_MODEL_DELTA
-  // 'auto' — let the model decide; emit a neutral guard.
+  // 'auto' — we don't know if the garment is flat-lay or on a model, so emit
+  // the strongest guard that works for both. (Weaker neutral wording produced
+  // collage hallucinations when the garment turned out to be on-model.)
   return `GARMENT INPUT NOTE
-The garment image may be either a flat-lay product photo or worn by another
-person. If another person is present, transfer ONLY the garment — never the
-other person's face, body, accessories, or background.`
+The garment image may be a flat-lay product photo OR worn by another model.
+If ANY person is visible in the garment image, transfer ONLY the garment to
+the customer. Never transfer that other person's face, body, pose, hairstyle,
+skin tone, makeup, accessories, jewelry, shoes, or background into the output.
+The final image must contain exactly ONE person — the customer from
+CUSTOMER_PHOTO. Do NOT produce a diptych, collage, side-by-side, or
+before-and-after layout with two people.`
 }
 
 // ─── Customer-input variants (Section 13.3 – 13.6) ──────────────────────────

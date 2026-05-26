@@ -33,6 +33,9 @@ vi.mock('../image-composition', () => ({
     original: { width: 864, height: 1184, format: 'jpeg', sizeBytes: buf.byteLength },
     output: { width: 864, height: 1184, format: 'jpeg', sizeBytes: buf.byteLength },
   })),
+  // Default: no person in garment, no collage in result. Tests can override.
+  detectGarmentHasPerson: vi.fn(async () => false),
+  detectCollageInResult: vi.fn(async () => ({ isCollage: false })),
 }))
 
 // Sharp is used to resize images; mock it so tests don't need real image buffers.
@@ -161,10 +164,12 @@ describe('googleAiProvider.generate', () => {
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
     const parts = requestBody.contents[0].parts
-    // 5 parts: prompt text, CUSTOMER_PHOTO label, customer image, GARMENT_IMAGE label, garment image
-    expect(parts).toHaveLength(5)
-    expect(parts[1]?.text).toContain('CUSTOMER_PHOTO')
-    expect(parts[3]?.text).toContain('GARMENT_IMAGE')
+    // 6 parts: prompt, GARMENT label, GARMENT image, CUSTOMER label, CUSTOMER image, FINAL CONSTRAINT
+    expect(parts).toHaveLength(6)
+    expect(parts[1]?.text).toContain('GARMENT_IMAGE')
+    expect(parts[3]?.text).toContain('CUSTOMER_PHOTO')
+    expect(parts[5]?.text).toContain('FINAL CONSTRAINT')
+    expect(parts[5]?.text).toContain('exactly ONE person')
     // Gemini 2.5 Flash Image accepts explicit aspect ratio but not imageSize.
     expect(requestBody.generationConfig.imageConfig).toEqual({
       aspectRatio: '3:4',
@@ -184,6 +189,14 @@ describe('googleAiProvider.generate', () => {
     expect(storageBucket.createSignedUrl).toHaveBeenCalledOnce()
     expect(result.resultUrl).toBe('https://cdn.example.com/result.jpg')
     expect(result.requestId).toBeTruthy()
+    expect(result.finalPrompt).toContain('1. GARMENT_IMAGE')
+    expect(result.generationParams).toEqual(
+      expect.objectContaining({
+        backgroundMode: 'white',
+        promptSource: 'default',
+        promptVariantId: null,
+      }),
+    )
     expect(normalizeTryOnResultComposition).toHaveBeenCalledOnce()
   })
 
@@ -259,17 +272,158 @@ describe('googleAiProvider.generate', () => {
 
     const requestBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body))
     const parts = requestBody.contents[0].parts
-    expect(parts).toHaveLength(7)
+    // 8 parts now: prompt + GARMENT(2) + BACKGROUND(2) + CUSTOMER(2) + FINAL CONSTRAINT
+    expect(parts).toHaveLength(8)
     expect(parts[0]?.text).toContain('BACKGROUND_IMAGE')
     expect(parts[0]?.text).not.toContain('Always use a pure white studio background')
-    expect(parts[5]?.text).toContain('BACKGROUND_IMAGE')
-    expect(parts[6]?.inlineData).toEqual(
+    expect(parts[1]?.text).toContain('GARMENT_IMAGE')
+    expect(parts[3]?.text).toContain('BACKGROUND_IMAGE')
+    expect(parts[4]?.inlineData).toEqual(
       expect.objectContaining({
         mimeType: 'image/jpeg',
         data: expect.any(String),
       }),
     )
+    expect(parts[5]?.text).toContain('CUSTOMER_PHOTO')
+    expect(parts[7]?.text).toContain('FINAL CONSTRAINT')
     expect(normalizeTryOnResultComposition).not.toHaveBeenCalled()
+  })
+
+  it('preserva o fundo da foto do cliente sem enviar BACKGROUND_IMAGE', async () => {
+    process.env.GOOGLE_AI_API_KEY = 'google-test-key'
+    process.env.GOOGLE_AI_MODEL = 'gemini-2.5-flash-image'
+    _resetEnvCache()
+
+    const customerBackgroundInput: TryOnProviderInput = {
+      ...SINGLE_PHOTO_INPUT,
+      background: {
+        mode: 'customer',
+      },
+    }
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([1, 2, 3, 4]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/jpeg' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/jpeg',
+                      data: Buffer.from('generated-image').toString('base64'),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      )
+
+    storageBucket.upload.mockResolvedValue({ error: null })
+    storageBucket.download.mockResolvedValue({
+      data: {
+        arrayBuffer: async () => new Uint8Array([5, 6, 7, 8]).buffer,
+      },
+      error: null,
+    })
+    storageBucket.createSignedUrl.mockResolvedValue({
+      data: { signedUrl: 'https://cdn.example.com/result.jpg' },
+      error: null,
+    })
+
+    const result = await googleAiProvider.generate(customerBackgroundInput)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
+    const parts = requestBody.contents[0].parts
+    // 6 parts: prompt + GARMENT(2) + CUSTOMER(2) + FINAL CONSTRAINT
+    expect(parts).toHaveLength(6)
+    expect(parts[0]?.text).toContain('Preserve the original background from CUSTOMER_PHOTO')
+    expect(parts[0]?.text).not.toContain('2. BACKGROUND_IMAGE')
+    expect(parts[0]?.text).not.toContain(
+      'Use BACKGROUND_IMAGE as the mandatory background reference',
+    )
+    expect(parts[5]?.text).toContain('FINAL CONSTRAINT')
+    expect(result.generationParams).toEqual(
+      expect.objectContaining({
+        backgroundMode: 'preserve_customer',
+      }),
+    )
+    expect(normalizeTryOnResultComposition).not.toHaveBeenCalled()
+  })
+
+  it('usa promptOverride composto pelo use-case quando fornecido', async () => {
+    process.env.GOOGLE_AI_API_KEY = 'google-test-key'
+    process.env.GOOGLE_AI_MODEL = 'gemini-2.5-flash-image'
+    _resetEnvCache()
+
+    const inputWithPromptOverride: TryOnProviderInput = {
+      ...SINGLE_PHOTO_INPUT,
+      generation: {
+        promptOverride: 'CUSTOM COMPOSED TRY-ON PROMPT',
+        promptVariantId: 'v-test',
+      },
+    }
+
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([1, 2, 3, 4]), {
+          status: 200,
+          headers: { 'Content-Type': 'image/jpeg' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'image/jpeg',
+                      data: Buffer.from('generated-image').toString('base64'),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      )
+
+    storageBucket.upload.mockResolvedValue({ error: null })
+    storageBucket.download.mockResolvedValue({
+      data: {
+        arrayBuffer: async () => new Uint8Array([5, 6, 7, 8]).buffer,
+      },
+      error: null,
+    })
+    storageBucket.createSignedUrl.mockResolvedValue({
+      data: { signedUrl: 'https://cdn.example.com/result.jpg' },
+      error: null,
+    })
+
+    const result = await googleAiProvider.generate(inputWithPromptOverride)
+
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))
+    expect(requestBody.contents[0].parts[0]?.text).toBe('CUSTOM COMPOSED TRY-ON PROMPT')
+    expect(result.finalPrompt).toBe('CUSTOM COMPOSED TRY-ON PROMPT')
+    expect(result.generationParams).toEqual(
+      expect.objectContaining({
+        promptSource: 'override',
+        promptVariantId: 'v-test',
+      }),
+    )
   })
 
   it('pula Imagen configurado como primário e usa fallback Gemini compatível', async () => {
