@@ -5,11 +5,15 @@ export function buildTryOnProviderInput({
   productImage,
   background,
   googleModelOverride,
+  promptOverride,
+  promptVariantId,
 }: {
   customerPhoto: string
   productImage: string
   background?: TryOnProviderInput['background']
   googleModelOverride?: string | null
+  promptOverride?: string | null
+  promptVariantId?: string | null
 }): TryOnProviderInput {
   return {
     customer: {
@@ -26,6 +30,8 @@ export function buildTryOnProviderInput({
     },
     generation: {
       googleModelOverride: googleModelOverride ?? null,
+      promptOverride: promptOverride ?? null,
+      promptVariantId: promptVariantId ?? null,
     },
   }
 }

@@ -26,6 +26,10 @@ export interface TryOnProviderInput {
   generation?: {
     /** Modelo Gemini técnico resolvido a partir do ai_image_model da loja. */
     googleModelOverride?: string | null
+    /** Prompt final ja composto pela camada de use-case, quando disponivel. */
+    promptOverride?: string | null
+    /** Id versionado do prompt para auditoria/A-B test. */
+    promptVariantId?: string | null
   }
 }
 

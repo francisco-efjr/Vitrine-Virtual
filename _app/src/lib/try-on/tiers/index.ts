@@ -42,6 +42,14 @@ export interface TierRouteContext {
     | 'mirror'
     | 'selfie'
     | 'partial'
+  /**
+   * Detected on the garment image (auto-detected server-side when unknown).
+   * When 'model', the garment image shows another person modeling the item,
+   * which triggers a stronger routing preference for Tier A (FASHN) when
+   * available — FASHN's dedicated VTON pipeline handles on-model garments
+   * better than Gemini's multi-image fusion.
+   */
+  garmentPhotoType?: 'flat-lay' | 'model' | 'auto'
   garmentCategory:
     | 'tops'
     | 'bottoms'
@@ -61,16 +69,26 @@ export interface TierRouteContext {
  *
  * Routing rules (research section 4):
  *   - Hard pin overrides everything when the pinned tier is enabled.
- *   - Default → Tier A (premium two-pass) when available.
- *   - quality === 'fast' AND backgroundMode === 'preserve_customer' → Tier B.
+ *   - garmentPhotoType === 'model' → Tier A (FASHN) when available, because
+ *     Gemini's multi-image fusion can produce a collage when both inputs
+ *     contain a person. FASHN is purpose-built for on-model garment transfer.
+ *     Falls back to Tier C when FASHN is not enabled (router does the
+ *     fallback in `resolveEnabledTier`).
  *   - Identity-sensitive cases (selfie, partial, mirror) → Tier C (Gemini-led
  *     identity preservation is its strength).
+ *   - quality === 'fast' AND backgroundMode === 'preserve_customer' → Tier B.
+ *   - Default → Tier A (premium two-pass) when available.
  *   - If a "premium" tier is requested but disabled, fall back to Tier C.
  */
 export function chooseTier(ctx: TierRouteContext): TryOnTier {
   if (ctx.storeModelPreference && ctx.storeModelPreference !== 'auto') {
     return ctx.storeModelPreference
   }
+
+  // On-model garment: prefer FASHN. When FASHN is disabled, resolveEnabledTier
+  // routes back to Tier C — same as today, but with the stronger 'auto' /
+  // 'model' garment delta + collage post-check kicking in at the provider.
+  if (ctx.garmentPhotoType === 'model') return 'tier_a_premium'
 
   const identitySensitive =
     ctx.customerPhotoType === 'selfie' ||

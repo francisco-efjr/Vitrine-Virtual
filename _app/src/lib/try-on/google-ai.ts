@@ -10,8 +10,16 @@ import {
   type TryOnProviderInput,
   type TryOnProviderResult,
 } from './types'
-import { buildVirtualTryOnPrompt } from './prompts/virtual-try-on-prompt'
-import { inspectImageBuffer, normalizeTryOnResultComposition } from './image-composition'
+import {
+  buildVirtualTryOnPrompt,
+  type VirtualTryOnBackgroundMode,
+} from './prompts/virtual-try-on-prompt'
+import {
+  detectCollageInResult,
+  detectGarmentHasPerson,
+  inspectImageBuffer,
+  normalizeTryOnResultComposition,
+} from './image-composition'
 
 interface GeminiInlineData {
   mimeType?: string
@@ -205,21 +213,25 @@ export const googleAiProvider: TryOnProvider = {
       fetchImageAsInlineData(input.product.productImage),
       customBackgroundUrl ? fetchImageAsInlineData(customBackgroundUrl) : Promise.resolve(null),
     ])
-    const effectiveBackgroundMode = backgroundInlineData ? 'custom' : 'white'
+    const effectiveBackgroundMode: VirtualTryOnBackgroundMode = backgroundInlineData
+      ? 'custom'
+      : input.background.mode === 'customer'
+        ? 'preserve_customer'
+        : 'white'
 
     logger.info('Google image API inputs prepared', {
       inputs: [
-        {
-          name: 'CUSTOMER_PHOTO',
-          mimeType: customer.mimeType,
-          original: customer.original,
-          sent: customer.sent,
-        },
         {
           name: 'GARMENT_IMAGE',
           mimeType: garmentInlineData.mimeType,
           original: garmentInlineData.original,
           sent: garmentInlineData.sent,
+        },
+        {
+          name: 'CUSTOMER_PHOTO',
+          mimeType: customer.mimeType,
+          original: customer.original,
+          sent: customer.sent,
         },
       ],
       background: backgroundInlineData
@@ -230,11 +242,13 @@ export const googleAiProvider: TryOnProvider = {
             sent: backgroundInlineData.sent,
           }
         : {
-            mode: 'white',
+            mode: effectiveBackgroundMode,
           },
     })
 
-    const prompt = buildVirtualTryOnPrompt(effectiveBackgroundMode)
+    const promptOverride = input.generation?.promptOverride?.trim()
+    const prompt = promptOverride || buildVirtualTryOnPrompt(effectiveBackgroundMode)
+    const promptVariantId = input.generation?.promptVariantId?.trim()
     const backgroundParts = backgroundInlineData
       ? [
           {
@@ -249,20 +263,50 @@ export const googleAiProvider: TryOnProvider = {
         ]
       : []
 
+    // Detect if the garment photo shows another person (on-model). When it
+    // does, Gemini's "multi-image fusion" can produce a side-by-side collage
+    // of both people instead of a try-on. We adjust the prompt accordingly.
+    const garmentHasPerson = await detectGarmentHasPerson(garmentInlineData.data)
+    const garmentOnModelNote = garmentHasPerson
+      ? {
+          text: 'NOTE: The image above shows another model wearing the garment. Treat it strictly as a clothing reference. Do NOT carry over that model\'s face, body, pose, hairstyle, skin tone, makeup, accessories, jewelry, shoes, or background into the output.',
+        }
+      : null
+
+    const garmentParts = garmentOnModelNote
+      ? [
+          {
+            text: 'GARMENT_IMAGE: exact product reference. Preserve garment design, color, texture, scale, and styling.',
+          },
+          { inlineData: { mimeType: garmentInlineData.mimeType, data: garmentInlineData.data } },
+          garmentOnModelNote,
+        ]
+      : [
+          {
+            text: 'GARMENT_IMAGE: exact product reference. Preserve garment design, color, texture, scale, and styling.',
+          },
+          { inlineData: { mimeType: garmentInlineData.mimeType, data: garmentInlineData.data } },
+        ]
+
+    // FINAL CONSTRAINT placed adjacent to the customer image. Gemini weights
+    // text closest to the relevant inlineData heavily, so the anti-collage
+    // rule is repeated here even though the master prompt already mentions it.
+    const finalConstraint = {
+      text: 'FINAL CONSTRAINT: The output MUST contain exactly ONE person — the customer from CUSTOMER_PHOTO above. The person (if any) in GARMENT_IMAGE is a clothing reference only and MUST NOT appear in the output. Do NOT produce a diptych, collage, side-by-side composition, before-and-after layout, or any image containing two or more people.',
+    }
+
     const contents = [
       {
         role: 'user',
         parts: [
           { text: prompt },
+          ...garmentParts,
+          ...backgroundParts,
           {
             text: 'CUSTOMER_PHOTO: the sole reference for the person. Preserve their body, pose, proportions, face, and identity exactly as shown.',
           },
           { inlineData: { mimeType: customer.mimeType, data: customer.base64 } },
-          {
-            text: 'GARMENT_IMAGE: exact product reference. Preserve garment design, color, texture, scale, and styling.',
-          },
-          { inlineData: { mimeType: garmentInlineData.mimeType, data: garmentInlineData.data } },
-          ...backgroundParts,
+          finalConstraint,
         ],
       },
     ]
@@ -363,6 +407,24 @@ export const googleAiProvider: TryOnProvider = {
       const rawResultMime = imagePart.inlineData.mimeType ?? 'image/png'
       const rawResultBuffer = Buffer.from(rawResultBase64, 'base64')
       const rawResultDimensions = await inspectImageBuffer(rawResultBuffer)
+
+      // Post-check: catch the side-by-side collage hallucination before
+      // uploading. When detected we throw a retriable error so the orchestrator
+      // can try the next provider — better than serving the customer a diptych.
+      const collage = await detectCollageInResult(rawResultBuffer)
+      if (collage.isCollage) {
+        logger.warn('Nano Banana: colagem detectada no resultado, forçando fallback', {
+          model,
+          reason: collage.reason,
+          details: collage.details,
+        })
+        lastError = new TryOnProviderError(
+          `Nano Banana produziu colagem (${collage.reason ?? 'unknown'})`,
+          'google',
+          true,
+        )
+        continue
+      }
 
       // Normalize output to JPEG.
       const resultBuffer =
@@ -466,6 +528,8 @@ export const googleAiProvider: TryOnProvider = {
           aspectRatio: responseImageConfig.aspectRatio,
           imageSize: responseImageConfig.imageSize ?? null,
           backgroundMode: effectiveBackgroundMode,
+          promptSource: promptOverride ? 'override' : 'default',
+          promptVariantId: promptVariantId ?? null,
         },
         resultBucket: 'try-on-results',
         resultPath: storagePath,

@@ -1,11 +1,14 @@
 import 'server-only'
 import { logger } from '@/lib/logger'
 import { hashIp } from '@/lib/security/ip-hash'
+import { isAllowedResultUrl } from '@/lib/security/url-allowlist'
 import { createServiceClient } from '@/lib/supabase/service'
 import { runAcceptanceChecks, type AcceptanceResult } from '@/lib/try-on/acceptance'
 import type { SafetyRating } from '@/lib/try-on/types'
 import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
 import { buildTryOnProviderInput } from '@/lib/try-on/payload'
+import { detectGarmentHasPerson } from '@/lib/try-on/image-composition'
+import { composeFinalPrompt } from '@/lib/try-on/prompts/compose'
 import {
   combineGateResults,
   evaluateCustomerPhoto,
@@ -174,9 +177,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     const customerResult = evaluateCustomerPhoto(input.customerSignals, {
       garmentCategory: 'auto',
     })
-    const garmentResult = input.garmentSignals
-      ? evaluateGarmentPhoto(input.garmentSignals)
-      : null
+    const garmentResult = input.garmentSignals ? evaluateGarmentPhoto(input.garmentSignals) : null
     const combined = garmentResult
       ? combineGateResults(customerResult, garmentResult)
       : customerResult
@@ -247,20 +248,36 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   const aiImageModel = (loja.ai_image_model ?? null) as AiImageModel | null
   const googleModelOverride = resolveGoogleModel(aiImageModel)
 
-  const providerInput = buildTryOnProviderInput({
-    customerPhoto: input.customerPhoto,
-    productImage: garmentUrl,
-    background: providerBackground,
-    googleModelOverride,
-  })
-
   // ─── Tier dispatch (research §4) ──────────────────────────────────────
   //
   // Hoje só Tier C está habilitado. chooseTier escolhe o ideal e
   // resolveEnabledTier (interno) faz fallback pra Tier C — gravamos os
   // dois pra rastrear o gap "ideal-vs-real" (dashboard de pitch de orçamento).
   const customerPhotoType = input.customerSignals?.detectedType ?? 'full_body'
-  const garmentPhotoType = input.garmentSignals?.detectedPhotoType ?? 'auto'
+
+  // Server-side garment classifier: detect whether the store's product photo
+  // shows another person modeling the garment (vs. flat-lay). Used both for
+  // tier routing (on-model → Tier A/FASHN when funded) and for logging.
+  //
+  // The client-side `garmentSignals.detectedPhotoType` is reserved for the
+  // admin's upload form; the public try-on flow doesn't have it because the
+  // garment comes straight from store storage.
+  let garmentPhotoType: 'flat-lay' | 'model' | 'auto' =
+    input.garmentSignals?.detectedPhotoType ?? 'auto'
+  if (garmentPhotoType === 'auto') {
+    try {
+      const garmentBuf = await fetch(garmentUrl, { cache: 'no-store' })
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .then((buf) => (buf ? Buffer.from(buf) : null))
+      if (garmentBuf) {
+        garmentPhotoType = (await detectGarmentHasPerson(garmentBuf)) ? 'model' : 'flat-lay'
+      }
+    } catch {
+      // Best-effort — falls back to 'auto' which still gets the strengthened
+      // 'auto' delta in the prompt composer.
+    }
+  }
+
   const tierBackgroundMode: TierRouteContext['backgroundMode'] =
     providerBackground.mode === 'custom'
       ? 'store_background'
@@ -270,6 +287,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
 
   const routeCtx: TierRouteContext = {
     customerPhotoType,
+    garmentPhotoType,
     garmentCategory: 'auto',
     backgroundMode: tierBackgroundMode,
     quality: 'quality',
@@ -280,12 +298,24 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     customerPhotoType,
     garmentPhotoType,
     garmentCategory: 'auto',
+    garmentDescription: peca.nome,
     backgroundMode: tierBackgroundMode,
+    storeBackgroundReference: provadorFundoUrl ?? undefined,
     quality: 'quality',
     outputStyle: 'premium_studio',
-    promptVariantId: 'v1.0-master+variants+negative',
+    promptVariantId: 'v1.1-garment-first+variants+negative',
     safetyLevel: 'conservative',
   }
+  const composedPrompt = composeFinalPrompt(variables)
+
+  const providerInput = buildTryOnProviderInput({
+    customerPhoto: input.customerPhoto,
+    productImage: garmentUrl,
+    background: providerBackground,
+    googleModelOverride,
+    promptOverride: composedPrompt.prompt,
+    promptVariantId: composedPrompt.promptVariantId,
+  })
 
   try {
     const result = await runTier(tierChosen, { provider: providerInput, variables })
@@ -412,7 +442,21 @@ function bufferFromDataUrl(dataUrl: string): Buffer | null {
   }
 }
 
+/**
+ * Faz fetch server-side de uma URL de imagem com validação SSRF.
+ *
+ * Só faz fetch se a URL pertence ao allowlist de domínios confiáveis
+ * (providers de IA + Supabase Storage). URLs fora do allowlist são
+ * silenciosamente ignoradas (retornam null) sem fazer nenhuma request.
+ */
 async function fetchAsBuffer(url: string): Promise<Buffer | null> {
+  // Defesa contra SSRF: nunca faça fetch de URLs externas sem validar domínio.
+  if (!isAllowedResultUrl(url)) {
+    logger.warn('fetchAsBuffer: URL fora do allowlist bloqueada', {
+      host: (() => { try { return new URL(url).hostname } catch { return 'invalid' } })(),
+    })
+    return null
+  }
   try {
     const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) return null
