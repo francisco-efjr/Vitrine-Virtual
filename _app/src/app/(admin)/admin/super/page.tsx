@@ -11,6 +11,7 @@ import {
   isTryOnEnabled,
 } from '@/lib/try-on/kill-switch'
 import { ContactAnalytics } from '@/components/admin/contact-analytics'
+import { QualityDashboard } from '@/components/admin/quality-dashboard'
 import { SuperAdminClient } from './super-client'
 
 export const dynamic = 'force-dynamic'
@@ -83,6 +84,8 @@ export default async function SuperAdminPage() {
         <ContactAnalytics
           lojas={lojas.map((l) => ({ id: l.id, nome: l.nome, contatos: l.contatos }))}
         />
+
+        <QualityDashboard />
 
         <SuperAdminClient
           initialLojas={lojas}

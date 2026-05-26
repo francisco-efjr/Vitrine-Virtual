@@ -355,7 +355,54 @@ export interface Database {
         Relationships: []
       }
     }
-    Views: { [_ in never]: never }
+    Views: {
+      try_on_quality_summary: {
+        Row: {
+          provider: string
+          model_resolved: string
+          tier_effective: string
+          total: number
+          with_feedback: number
+          positive: number
+          negative: number
+          approval_rate_pct: number | null
+          avg_duration_s: number | null
+          errors: number
+          first_seen: string | null
+          last_seen: string | null
+        }
+        Relationships: []
+      }
+      try_on_feedback_reasons: {
+        Row: {
+          reason: string
+          count: number
+          pct_of_negative: number | null
+        }
+        Relationships: []
+      }
+      try_on_gate_effectiveness: {
+        Row: {
+          gate_verdict: string
+          total_with_feedback: number
+          positive: number
+          negative: number
+          approval_rate_pct: number | null
+        }
+        Relationships: []
+      }
+      try_on_acceptance_vs_feedback: {
+        Row: {
+          check_name: string
+          passed: boolean
+          total: number
+          user_positive: number
+          user_negative: number
+          approval_rate_pct: number | null
+        }
+        Relationships: []
+      }
+    }
     Functions: {
       current_user_loja_id: { Args: never; Returns: string }
       get_peca_publica: {

@@ -101,6 +101,7 @@ export async function runAcceptanceChecks(
   const checks: AcceptanceCheck[] = []
 
   checks.push(await minResolution(input))
+  checks.push(await resultSharpness(input))
   checks.push(await subjectCount(input))
   checks.push(await anatomySanity(input))
   checks.push(await identitySimilarity(input))
@@ -146,13 +147,82 @@ async function minResolution(input: AcceptanceInput): Promise<AcceptanceCheck> {
   }
 }
 
+/**
+ * Detecta gerações colapsadas (completamente borradas ou cor única).
+ *
+ * Usa variância da Laplaciana (mesmo algoritmo do client-side em
+ * client-signals.ts) no resultado. Threshold muito conservador: só
+ * rejeita imagens verdadeiramente sem textura, onde o modelo gerou
+ * uma borrão ou cor sólida. Não é um substituto pra detecção de anatomia.
+ */
+async function resultSharpness(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  try {
+    const meta = await sharp(input.resultImageBuffer).metadata()
+    const W = meta.width ?? 0
+    const H = meta.height ?? 0
+    if (W === 0 || H === 0) return { name: 'resultSharpness', pass: true, checked: false }
+
+    const shortSide = Math.min(W, H)
+    const scale = shortSide > 1024 ? 1024 / shortSide : 1
+    const sW = Math.max(1, Math.round(W * scale))
+    const sH = Math.max(1, Math.round(H * scale))
+
+    const { data } = await sharp(input.resultImageBuffer)
+      .resize(sW, sH, { fit: 'cover', kernel: 'lanczos3' })
+      .greyscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+
+    // Variância da Laplaciana 3×3: mesmo kernel do client-side.
+    let lapSum = 0
+    let lapSumSq = 0
+    let count = 0
+    for (let y = 1; y < sH - 1; y++) {
+      for (let x = 1; x < sW - 1; x++) {
+        const idx = y * sW + x
+        const v =
+          -4 * (data[idx] ?? 0) +
+          (data[idx - 1] ?? 0) +
+          (data[idx + 1] ?? 0) +
+          (data[idx - sW] ?? 0) +
+          (data[idx + sW] ?? 0)
+        lapSum += v
+        lapSumSq += v * v
+        count += 1
+      }
+    }
+    const mean = lapSum / count
+    const variance = lapSumSq / count - mean * mean
+
+    // Threshold conservador: só rejeita gerações verdadeiramente colapsadas.
+    // Fotos reais: 100–500+. Boas gerações de IA: 60–300+. Colapso: < 25.
+    const COLLAPSE_THRESHOLD = 25
+    return {
+      name: 'resultSharpness',
+      pass: variance >= COLLAPSE_THRESHOLD,
+      checked: true,
+      details: {
+        variance: Math.round(variance),
+        threshold: COLLAPSE_THRESHOLD,
+        widthPx: sW,
+        heightPx: sH,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: resultSharpness falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return { name: 'resultSharpness', pass: true, checked: false }
+  }
+}
+
 async function subjectCount(_input: AcceptanceInput): Promise<AcceptanceCheck> {
-  // TODO: server-side person detection (yolov8n or MediaPipe via tfjs-node).
+  // TODO: server-side person detection (yolov8n ou MediaPipe via tfjs-node).
   return { name: 'subjectCount', pass: true, checked: false }
 }
 
 async function anatomySanity(_input: AcceptanceInput): Promise<AcceptanceCheck> {
-  // TODO: MediaPipe Pose + Hands. Reject extra limbs / extra hands.
+  // TODO: MediaPipe Pose + Hands. Rejeitar membros extras / mãos extras.
   return { name: 'anatomySanity', pass: true, checked: false }
 }
 
