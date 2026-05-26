@@ -99,7 +99,7 @@ export function DefinirSenhaForm({
                   {' '}para <strong>{inviteForLojaNome}</strong>
                 </>
               ) : null}
-              {' '}na vitrine.app. Defina sua senha para começar.
+              {' '}na Vitrine Virtual. Defina sua senha para começar.
             </div>
           </div>
         </div>

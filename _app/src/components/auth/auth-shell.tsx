@@ -22,7 +22,7 @@ export function AuthShell({
           <VVLogo size={32} />
         </div>
         <Card className={cn('p-8 sm:p-9', className)}>{children}</Card>
-        <div className="mt-5 text-center text-[11px] text-ink-3">vitrine.app · Versão 1.0</div>
+        <div className="mt-5 text-center text-[11px] text-ink-3">Vitrine Virtual · Versão 1.0</div>
       </div>
     </div>
   )
