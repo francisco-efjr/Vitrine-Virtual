@@ -9,6 +9,7 @@ import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
 import { buildTryOnProviderInput } from '@/lib/try-on/payload'
 import { detectGarmentHasPerson } from '@/lib/try-on/image-composition'
 import { composeFinalPrompt } from '@/lib/try-on/prompts/compose'
+import { validateCustomerPhotoWithAi } from '@/lib/try-on/validators/customer-photo-ai'
 import {
   combineGateResults,
   evaluateCustomerPhoto,
@@ -229,6 +230,66 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     }
   }
 
+  // ─── AI server-side validation (request v6) ───────────────────────────
+  //
+  // Validação server-side por Gemini Vision (com fallback pros client signals
+  // se Gemini falhar). Bloqueia HARD quando o AI confirma foto inválida
+  // (sem rosto, várias pessoas, corpo cortado, blur).
+  //
+  // Diferente do quality gate acima (que é soft-by-default), este é
+  // hard-by-design — o usuário pediu explicitamente: "preciso que o sistema
+  // realmente valide se o upload do cliente é válido… caso contrário,
+  // retornar a mensagem para o usuário". Qualidade > performance.
+  //
+  // Erro de infra do Gemini Vision = passa permissivo. Nunca rejeitamos
+  // só por rate-limit/network — UX > paranoia.
+  const customerPhotoBuf = bufferFromDataUrl(input.customerPhoto)
+  const customerPhotoMime = mimeFromDataUrl(input.customerPhoto) ?? 'image/jpeg'
+  if (customerPhotoBuf) {
+    const aiValidation = await validateCustomerPhotoWithAi(
+      customerPhotoBuf,
+      customerPhotoMime,
+      input.customerSignals ?? null,
+    )
+
+    if (!aiValidation.valid && aiValidation.reason) {
+      await recordGeneration({
+        lojaId: loja.id,
+        pecaId: peca.id,
+        sessionId: input.sessionId ?? null,
+        ipHash,
+        aiImageModel: (loja.ai_image_model ?? null) as AiImageModel | null,
+        status: 'error',
+        errorCode: `ai_gate_${aiValidation.reason}`,
+        gateVerdict: 'reject',
+        gateReason: aiValidation.reason,
+        gateSignals: {
+          ai_validation: {
+            source: aiValidation.source,
+            reason: aiValidation.reason,
+            detail: aiValidation.detail ?? null,
+            raw: aiValidation.raw ?? null,
+          },
+          client_signals: input.customerSignals ?? null,
+        },
+      })
+
+      logger.info('Try-on: AI gate hard-block antes do provider', {
+        source: aiValidation.source,
+        reason: aiValidation.reason,
+        detail: aiValidation.detail,
+      })
+      return {
+        ok: false,
+        error: { kind: 'gate_rejected', reason: aiValidation.reason },
+      }
+    }
+
+    logger.info('Try-on: AI validation aprovou foto do cliente', {
+      source: aiValidation.source,
+    })
+  }
+
   const provadorFundoUrl =
     loja.provador_fundo_tipo === 'personalizado' && loja.provador_fundo_storage_path
       ? buildLojaAssetPublicUrl(loja.provador_fundo_storage_path)
@@ -440,6 +501,12 @@ function bufferFromDataUrl(dataUrl: string): Buffer | null {
   } catch {
     return null
   }
+}
+
+/** Extrai o mime de `data:<mime>;base64,...`. Retorna null se inválido. */
+function mimeFromDataUrl(dataUrl: string): string | null {
+  const match = /^data:([^;]+);base64,/s.exec(dataUrl)
+  return match?.[1] ?? null
 }
 
 /**
