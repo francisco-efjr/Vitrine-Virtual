@@ -2,7 +2,10 @@ import 'server-only'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getServerEnv } from '@/lib/env'
 import { logger } from '@/lib/logger'
-import { buildVirtualTryOnPrompt } from './prompts/virtual-try-on-prompt'
+import {
+  buildVirtualTryOnPrompt,
+  type VirtualTryOnBackgroundMode,
+} from './prompts/virtual-try-on-prompt'
 import {
   TryOnProviderError,
   type TryOnProvider,
@@ -62,6 +65,13 @@ export const openAiProvider: TryOnProvider = {
       fetchImageAsset(input.product.productImage),
       customBackgroundUrl ? fetchImageAsset(customBackgroundUrl) : Promise.resolve(null),
     ])
+    const effectiveBackgroundMode: VirtualTryOnBackgroundMode = backgroundImage
+      ? 'custom'
+      : input.background.mode === 'customer'
+        ? 'preserve_customer'
+        : 'white'
+    const promptOverride = input.generation?.promptOverride?.trim()
+    const prompt = promptOverride || buildVirtualTryOnPrompt(effectiveBackgroundMode)
 
     // -------------------------------------------------------------------------
     // 2. Montar FormData com as duas imagens
@@ -69,23 +79,13 @@ export const openAiProvider: TryOnProvider = {
     // -------------------------------------------------------------------------
     const formData = new FormData()
     formData.append('model', model)
-    formData.append('prompt', buildVirtualTryOnPrompt(backgroundImage ? 'custom' : 'white'))
+    formData.append('prompt', prompt)
     formData.append('n', '1')
     // 'auto' deixa o modelo escolher o tamanho ideal — mais compatível
     formData.append('size', 'auto')
     formData.append('quality', 'medium')
 
-    // CUSTOMER_PHOTO: sole reference for the person's body, pose, and face.
-    const customerBuffer = Buffer.from(
-      extractBase64FromDataUrl(input.references.customerReferenceImage),
-      'base64',
-    )
-    const customerMime = extractMimeFromDataUrl(input.references.customerReferenceImage)
-    const customerExt = mimeToExt(customerMime)
-    const customerBlob = new Blob([new Uint8Array(customerBuffer)], { type: customerMime })
-    formData.append('image[]', customerBlob, `customer-photo.${customerExt}`)
-
-    // GARMENT_IMAGE: exact product reference.
+    // GARMENT_IMAGE first: exact product reference.
     const garmentBlob = new Blob([new Uint8Array(garmentImage.buffer)], {
       type: garmentImage.mimeType,
     })
@@ -98,13 +98,23 @@ export const openAiProvider: TryOnProvider = {
       formData.append('image[]', backgroundBlob, `background-image.${backgroundImage.ext}`)
     }
 
+    // CUSTOMER_PHOTO last: sole reference for the person's body, pose, and face.
+    const customerBuffer = Buffer.from(
+      extractBase64FromDataUrl(input.references.customerReferenceImage),
+      'base64',
+    )
+    const customerMime = extractMimeFromDataUrl(input.references.customerReferenceImage)
+    const customerExt = mimeToExt(customerMime)
+    const customerBlob = new Blob([new Uint8Array(customerBuffer)], { type: customerMime })
+    formData.append('image[]', customerBlob, `customer-photo.${customerExt}`)
+
     // -------------------------------------------------------------------------
     // 3. Chamar a API de edição de imagem
     // -------------------------------------------------------------------------
     logger.info('OpenAI try-on: enviando request', {
       model,
       customerMime,
-      backgroundMode: backgroundImage ? 'custom' : 'white',
+      backgroundMode: effectiveBackgroundMode,
     })
 
     const response = await fetch('https://api.openai.com/v1/images/edits', {
@@ -207,6 +217,15 @@ export const openAiProvider: TryOnProvider = {
       requestId,
       durationMs,
       expiresAt: new Date(Date.now() + TTL * 1000).toISOString(),
+      finalPrompt: prompt,
+      generationParams: {
+        model,
+        quality: 'medium',
+        size: 'auto',
+        backgroundMode: effectiveBackgroundMode,
+        promptSource: promptOverride ? 'override' : 'default',
+        promptVariantId: input.generation?.promptVariantId ?? null,
+      },
     }
   },
 }

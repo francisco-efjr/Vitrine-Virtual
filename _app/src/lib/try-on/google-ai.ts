@@ -20,6 +20,7 @@ import {
   inspectImageBuffer,
   normalizeTryOnResultComposition,
 } from './image-composition'
+import { generateGhostMannequin } from './preprocessors/ghost-mannequin'
 
 interface GeminiInlineData {
   mimeType?: string
@@ -267,25 +268,54 @@ export const googleAiProvider: TryOnProvider = {
     // does, Gemini's "multi-image fusion" can produce a side-by-side collage
     // of both people instead of a try-on. We adjust the prompt accordingly.
     const garmentHasPerson = await detectGarmentHasPerson(garmentInlineData.data)
-    const garmentOnModelNote = garmentHasPerson
-      ? {
-          text: 'NOTE: The image above shows another model wearing the garment. Treat it strictly as a clothing reference. Do NOT carry over that model\'s face, body, pose, hairstyle, skin tone, makeup, accessories, jewelry, shoes, or background into the output.',
-        }
-      : null
+
+    // Ghost-mannequin preprocessing (request v6): when the garment is shown
+    // on a model, generate a "garment-only" ghost-mannequin version via
+    // Gemini and use THAT as the garment image. Removes the ambiguity at
+    // the source — far stronger than relying only on prompt notes.
+    let activeGarmentMime = garmentInlineData.mimeType
+    let activeGarmentData = garmentInlineData.data
+    let usedGhostMannequin = false
+    if (garmentHasPerson) {
+      const ghost = await generateGhostMannequin(garmentInlineData.data, garmentInlineData.mimeType)
+      if (ghost.ok && ghost.buffer && ghost.mimeType) {
+        activeGarmentMime = ghost.mimeType
+        activeGarmentData = ghost.buffer.toString('base64')
+        usedGhostMannequin = true
+        logger.info('Google image API: usando ghost-mannequin como GARMENT_IMAGE', {
+          originalMime: garmentInlineData.mimeType,
+          ghostMime: ghost.mimeType,
+          ghostBytes: ghost.buffer.byteLength,
+        })
+      } else {
+        logger.warn('Ghost-mannequin falhou — caindo pro garment original com on-model note', {
+          detail: ghost.detail,
+        })
+      }
+    }
+
+    // Only attach the on-model warning text if the ghost-mannequin step
+    // didn't succeed. If it did, the garment image is already "person-less".
+    const garmentOnModelNote =
+      garmentHasPerson && !usedGhostMannequin
+        ? {
+            text: 'NOTE: The image above shows another model wearing the garment. Treat it strictly as a clothing reference. Do NOT carry over that model\'s face, body, pose, hairstyle, skin tone, makeup, accessories, jewelry, shoes, or background into the output.',
+          }
+        : null
 
     const garmentParts = garmentOnModelNote
       ? [
           {
             text: 'GARMENT_IMAGE: exact product reference. Preserve garment design, color, texture, scale, and styling.',
           },
-          { inlineData: { mimeType: garmentInlineData.mimeType, data: garmentInlineData.data } },
+          { inlineData: { mimeType: activeGarmentMime, data: activeGarmentData } },
           garmentOnModelNote,
         ]
       : [
           {
             text: 'GARMENT_IMAGE: exact product reference. Preserve garment design, color, texture, scale, and styling.',
           },
-          { inlineData: { mimeType: garmentInlineData.mimeType, data: garmentInlineData.data } },
+          { inlineData: { mimeType: activeGarmentMime, data: activeGarmentData } },
         ]
 
     // FINAL CONSTRAINT placed adjacent to the customer image. Gemini weights

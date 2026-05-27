@@ -5,6 +5,7 @@ import {
   validateImageUploadMeta,
 } from '@/lib/images/upload'
 import { extractClientIp } from '@/lib/security/ip-hash'
+import { isAllowedGarmentUrl } from '@/lib/security/url-allowlist'
 import { runTryOn } from '@/server/try-on/use-case'
 import { mapProviderFailure } from '@/server/try-on/provider-errors'
 import { fail, ok } from '@/lib/api/response'
@@ -54,7 +55,17 @@ const fieldSchema = z.object({
   turnstile_token: z.string().min(1),
   consent: z.literal('true'),
   session_id: z.string().optional(),
-  garment_url_override: z.string().url().optional(),
+  /**
+   * Override de URL da peça para testes/desenvolvimento.
+   * SSRF prevention: validado contra allowlist de domínios confiáveis.
+   * Qualquer URL fora do allowlist (incluindo IPs internos, localhost,
+   * metadata endpoints de cloud) é rejeitada com 400.
+   */
+  garment_url_override: z
+    .string()
+    .url('URL inválida')
+    .refine(isAllowedGarmentUrl, { message: 'URL de peça não permitida' })
+    .optional(),
   customer_signals: z.string().optional(),
   garment_signals: z.string().optional(),
 })
@@ -135,14 +146,24 @@ export async function POST(req: NextRequest) {
         return fail('Provador temporariamente indisponível', 'KILL_SWITCH_OFF', 503)
       case 'turnstile_failed':
         return fail('Verificação de segurança falhou', 'TURNSTILE_FAILED', 403)
-      case 'rate_limit':
+      case 'rate_limit': {
+        // RFC 6585 §4: 429 deve incluir Retry-After.
+        // resetAt vem do Upstash em ms — convertemos para segundos.
+        const retryAfterSecs = result.error.resetAt
+          ? Math.max(1, Math.ceil((result.error.resetAt - Date.now()) / 1000))
+          : 60
         return fail(
           'Muitas tentativas. Tente novamente mais tarde.',
           `RATE_LIMIT_${result.error.reason.toUpperCase()}`,
           429,
+          { 'Retry-After': String(retryAfterSecs) },
         )
+      }
       case 'quota_exceeded':
-        return fail('O provador desta loja atingiu o limite mensal', 'QUOTA_EXCEEDED', 429)
+        // Cota mensal — orienta a aguardar até o próximo mês (aproximado em horas).
+        return fail('O provador desta loja atingiu o limite mensal', 'QUOTA_EXCEEDED', 429, {
+          'Retry-After': '3600',
+        })
       case 'peca_unavailable':
         return fail('Peça indisponível', 'PECA_UNAVAILABLE', 404)
       case 'gate_rejected': {

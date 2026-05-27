@@ -2,11 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
+  ArrowRight,
   Camera,
   Check,
+  ChevronRight,
   Download,
   Image as ImageIcon,
   Info,
+  Lock,
   MessageCircle,
   RefreshCcw,
   ThumbsDown,
@@ -737,29 +740,61 @@ function UploadStep({
         ) : null}
 
         {!mirrorPhoto ? (
-          <div className="grid grid-cols-2 gap-2">
+          /*
+            P1-07 (v6): selfie é primary.
+            Em ~80% das sessões de cabine, o caminho feliz é "tirar foto
+            agora" — então ele recebe o accent dourado, ícone destacado e
+            seta indicativa. Galeria continua como caminho secundário.
+
+            Stack vertical (não grid 2-col) porque em larguras 320–360px o
+            grid apertava nos labels duplos e quebrava no PWA fullscreen.
+            Mínima altura 52px > 44px do WCAG 2.5.5 (target size).
+          */
+          <div className="flex flex-col gap-2">
             <button
               type="button"
               onClick={onCamera}
-              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2.5 text-[12.5px] font-medium text-ink transition hover:border-accent"
+              className="inline-flex min-h-[52px] w-full items-center gap-3 rounded-[12px] bg-accent px-4 py-3 text-left text-[14px] font-medium text-white transition hover:bg-accent-dark active:scale-[0.99]"
             >
-              <Camera size={14} />
-              Câmera
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white/20"
+                aria-hidden="true"
+              >
+                <Camera size={18} />
+              </span>
+              <span className="flex-1">
+                <span className="block font-medium">Tirar foto agora</span>
+                <span className="block text-[11.5px] opacity-85">Câmera frontal</span>
+              </span>
+              <ChevronRight size={16} aria-hidden="true" />
             </button>
             <button
               type="button"
               onClick={onGallery}
-              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2.5 text-[12.5px] font-medium text-ink transition hover:border-accent"
+              className="inline-flex min-h-[52px] w-full items-center gap-3 rounded-[12px] border border-border bg-surface px-4 py-3 text-left text-[14px] text-ink transition hover:border-ink"
             >
-              <ImageIcon size={14} />
-              Galeria
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-surface-2"
+                aria-hidden="true"
+              >
+                <ImageIcon size={18} className="text-ink-2" />
+              </span>
+              <span className="flex-1">
+                <span className="block font-medium">Escolher da galeria</span>
+                <span className="block text-[11.5px] text-ink-2">Use uma foto já tirada</span>
+              </span>
+              <ChevronRight size={16} className="text-ink-2" aria-hidden="true" />
             </button>
           </div>
         ) : null}
       </div>
 
       {showFaceWarn ? (
-        <FaceWarning onReupload={onReupload} onContinue={agreed ? onContinueAnyway : undefined} />
+        <FaceWarning
+          onReupload={onReupload}
+          onContinueAnyway={onContinueAnyway}
+          agreedLgpd={agreed}
+        />
       ) : null}
 
       <button
@@ -815,22 +850,46 @@ function UploadStep({
  * Visual: cartão warm amber + ícone de info + título serif + corpo sans
  * + 2 botões pill (ghost = outra foto, dark = continuar). Reveal animado.
  */
+/**
+ * P0-01 (v6 design fix): disabled state inequívoco.
+ *
+ * Antes: botão "Continuar mesmo assim" parecia ativo (só opacity-50);
+ *        instrução de consent vinha como italic 50px abaixo do CTA.
+ *
+ * Depois: consent embutido logo acima do botão (toggle pill clicável);
+ *         estado bloqueado usa dashed border + ícone de cadeado + label
+ *         "Marque o consentimento acima"; ação primária visual passa a
+ *         ser "Enviar outra foto" (accent), que é a saída que queremos.
+ */
 function FaceWarning({
-  onContinue,
+  agreedLgpd,
+  onContinueAnyway,
   onReupload,
 }: {
-  /** Quando undefined, o usuário ainda precisa marcar consentimento. */
-  onContinue?: () => void
+  /** LGPD consent (controle externo, checkbox principal do modal). */
+  agreedLgpd: boolean
+  onContinueAnyway: () => void
   onReupload: () => void
 }) {
+  // Consentimento específico de "qualidade reduzida" — só vale dentro do
+  // warning. O CTA gated requer ambos: quality ack (interno) + LGPD (externo).
+  const [qualityAck, setQualityAck] = useState(false)
+  const canContinue = qualityAck && agreedLgpd
+  const lockedLabel = !qualityAck
+    ? 'Marque o consentimento acima'
+    : 'Marque a política de privacidade abaixo'
+  const consented = qualityAck
+  const onConsentToggle = () => setQualityAck((v) => !v)
   return (
     <div
-      className="flex flex-col gap-3.5 rounded-[14px] border px-4 py-4"
+      className="flex flex-col gap-3 rounded-[14px] border px-4 py-4"
       style={{
         borderColor: '#e7d8a955',
         background: 'linear-gradient(180deg, #fdf6e7 0%, #faf0d8 100%)',
         animation: 'vv-reveal-up 0.45s var(--e-out) both',
       }}
+      role="alert"
+      aria-live="polite"
     >
       <div className="flex items-start gap-3">
         <div
@@ -844,37 +903,74 @@ function FaceWarning({
             Não conseguimos identificar bem o rosto
           </div>
           <p className="mt-1 font-sans text-[12.5px] leading-relaxed text-ink-2">
-            Você pode continuar com esta foto mesmo assim — só lembre que, nesse caso, o resultado
-            pode não representar você com tanta fidelidade. Ou, se preferir, envie outra imagem
-            mais nítida.
+            Tente uma foto com mais luz e o rosto visível.
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+
+      {/* Consent inline — vive colado ao botão que ele destrava. */}
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={consented}
+        onClick={onConsentToggle}
+        className="flex w-full items-start gap-2.5 rounded-[10px] border px-3 py-2.5 text-left transition"
+        style={{
+          borderColor: consented ? '#b8956a' : '#e6dfd6',
+          background: consented ? '#f2e8d8' : '#ffffff',
+        }}
+      >
+        <span
+          className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] transition"
+          style={{
+            border: `1.5px solid ${consented ? '#b8956a' : '#d4cbc0'}`,
+            background: consented ? '#b8956a' : '#ffffff',
+          }}
+          aria-hidden="true"
+        >
+          {consented ? <Check size={11} strokeWidth={3} className="text-white" /> : null}
+        </span>
+        <span className="font-sans text-[12px] leading-snug text-ink-2">
+          Entendo que a foto pode gerar um resultado de qualidade reduzida.
+        </span>
+      </button>
+
+      <div className="flex flex-col gap-2">
+        {/* Gated CTA: visualmente travado até quality ack + LGPD marcados. */}
+        <button
+          type="button"
+          onClick={onContinueAnyway}
+          disabled={!canContinue}
+          aria-disabled={!canContinue}
+          className="inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 font-sans text-[13px] font-medium transition disabled:cursor-not-allowed"
+          style={
+            canContinue
+              ? {
+                  background: '#1e1a17',
+                  color: '#ffffff',
+                  border: '1px solid #1e1a17',
+                }
+              : {
+                  background: 'transparent',
+                  color: '#b0a59d',
+                  border: '1.5px dashed #d4cbc0',
+                }
+          }
+        >
+          {!canContinue ? <Lock size={12} aria-hidden="true" /> : null}
+          {canContinue ? 'Continuar mesmo assim' : lockedLabel}
+        </button>
+
+        {/* Saída recomendada: "Enviar outra foto" agora carrega o accent. */}
         <button
           type="button"
           onClick={onReupload}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2.5 font-sans text-[13px] font-medium text-ink-2 transition hover:bg-surface-2"
-          style={{ flexBasis: '130px' }}
+          className="inline-flex items-center justify-center gap-1.5 rounded-full bg-accent px-4 py-2.5 font-sans text-[13px] font-medium text-white transition hover:bg-accent-dark"
         >
           <RefreshCcw size={13} />
           Enviar outra foto
         </button>
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={!onContinue}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-ink px-4 py-2.5 font-sans text-[13px] font-medium text-white transition hover:bg-[#2d2825] disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ flexBasis: '150px' }}
-        >
-          Continuar mesmo assim
-        </button>
       </div>
-      {!onContinue ? (
-        <p className="-mt-1 text-center font-sans text-[11px] italic text-ink-3">
-          Marque o consentimento abaixo para continuar.
-        </p>
-      ) : null}
     </div>
   )
 }

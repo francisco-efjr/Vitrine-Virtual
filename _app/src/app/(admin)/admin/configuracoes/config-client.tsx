@@ -261,7 +261,7 @@ export function ConfigClient({
                   </Button>
                 ) : null}
               </div>
-              <p className="font-sans text-[11px] text-ink-3">PNG, JPG ou WebP · até 10 MB</p>
+              <p className="font-sans text-[11px] text-ink-2">PNG, JPG ou WebP · até 10 MB</p>
               {logoErr ? <p className="font-sans text-xs text-danger">{logoErr}</p> : null}
             </div>
           </div>
@@ -321,7 +321,9 @@ export function ConfigClient({
                 <div className="font-sans text-[13.5px] font-medium text-ink">
                   Vitrine visível para clientes
                 </div>
-                <div className="mt-0.5 font-sans text-xs text-ink-3">
+                {/* P0-03 (v6): description sobe para ink-2 (5.8:1) — texto
+                    explicativo de toggle não é decorativo, precisa AA. */}
+                <div className="mt-0.5 font-sans text-xs text-ink-2">
                   Quando desativada, ninguém consegue abrir sua vitrine pública.
                 </div>
               </div>
@@ -336,7 +338,7 @@ export function ConfigClient({
                 <div className="font-sans text-[13.5px] font-medium text-ink">
                   Mostrar preços
                 </div>
-                <div className="mt-0.5 font-sans text-xs text-ink-3">
+                <div className="mt-0.5 font-sans text-xs text-ink-2">
                   Clientes verão o preço das peças publicamente.
                 </div>
               </div>
@@ -354,7 +356,7 @@ export function ConfigClient({
         {/* ── Provador (Cabine) ── */}
         <Reveal delay={160}>
           <SectionLabel>Provador virtual</SectionLabel>
-          <p className="mb-3.5 font-sans text-xs text-ink-3">
+          <p className="mb-3.5 font-sans text-xs text-ink-2">
             Escolha o fundo padrão das experimentações da Cabine.
           </p>
           <div className="mb-3 flex flex-wrap items-start gap-2.5">

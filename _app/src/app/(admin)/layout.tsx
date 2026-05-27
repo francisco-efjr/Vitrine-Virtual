@@ -8,6 +8,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await getSession()
   if (!session) redirect('/login?next=/admin')
 
+  // P0-04 (v6): super-admin sem loja → /admin/super.
+  //
+  // Antes, super-admin que abrisse /admin caía no painel de lojista que
+  // crashava porque não havia `session.loja`. A tela quebrada padrão do Next
+  // ("Application error: a server-side exception has occurred") era confundida
+  // com bug. A correção de origem é redirecionar antes de carregar qualquer
+  // painel de lojista. O error.tsx do grupo trata o caso residual.
+  if (session.isSuperAdmin && !session.loja) {
+    redirect('/admin/super')
+  }
+
   // Lojista ainda sem loja (caso raro pós-convite) → manda para definir senha / espera
   if (!session.loja && !session.isSuperAdmin) {
     return (
