@@ -5,7 +5,8 @@
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/download-models.mjs && next build",
+    "models:download": "node scripts/download-models.mjs",
     "start": "next start",
     "lint": "next lint --max-warnings=0",
     "typecheck": "tsc --noEmit",
@@ -25,7 +26,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "sharp",
-      "esbuild"
+      "esbuild",
+      "onnxruntime-node"
     ]
   },
   "dependencies": {
@@ -38,6 +40,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.454.0",
     "next": "14.2.16",
+    "onnxruntime-node": "^1.26.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sharp": "^0.33.5",

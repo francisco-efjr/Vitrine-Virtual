@@ -5,6 +5,7 @@ import { ACCEPTANCE_THRESHOLDS } from '../quality-gate/thresholds'
 import type { SafetyRating } from '../types'
 import { computeGarmentColorFidelity } from './color-check'
 import { computeIdentitySimilarity } from './identity-check'
+import { countPersons } from './subject-count'
 
 /**
  * Threshold do dHash proxy. Diferente do `identitySimilarityMin` (0.55) que
@@ -216,9 +217,40 @@ async function resultSharpness(input: AcceptanceInput): Promise<AcceptanceCheck>
   }
 }
 
-async function subjectCount(_input: AcceptanceInput): Promise<AcceptanceCheck> {
-  // TODO: server-side person detection (yolov8n ou MediaPipe via tfjs-node).
-  return { name: 'subjectCount', pass: true, checked: false }
+async function subjectCount(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  try {
+    const res = await countPersons(input.resultImageBuffer)
+    if (res.method === 'unavailable') {
+      return {
+        name: 'subjectCount',
+        pass: true,
+        checked: false,
+        details: { reason: res.reason ?? 'unavailable' },
+      }
+    }
+    // Caminho feliz: exatamente 1 pessoa. 0 também é falha (modelo gerou
+    // cenário sem corpo) mas tratamos com mesmo verdict.
+    return {
+      name: 'subjectCount',
+      pass: res.count === 1,
+      checked: true,
+      details: {
+        count: res.count,
+        confidences: res.confidences,
+        method: res.method,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: subjectCount falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'subjectCount',
+      pass: true, // erro de medição não bloqueia
+      checked: false,
+      details: { error: 'detection_failed' },
+    }
+  }
 }
 
 async function anatomySanity(_input: AcceptanceInput): Promise<AcceptanceCheck> {
