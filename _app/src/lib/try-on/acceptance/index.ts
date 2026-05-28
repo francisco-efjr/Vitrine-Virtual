@@ -7,6 +7,7 @@ import { checkAnatomy } from './anatomy-sanity'
 import { computeGarmentColorFidelity } from './color-check'
 import { detectGarmentText, editDistance } from './garment-text'
 import { computeIdentitySimilarity } from './identity-check'
+import { checkPoseConsistency } from './pose-consistency'
 import { countPersons } from './subject-count'
 
 /**
@@ -115,6 +116,7 @@ export async function runAcceptanceChecks(
   checks.push(await resultSharpness(input))
   checks.push(await subjectCount(input))
   checks.push(await anatomySanity(input))
+  checks.push(await poseConsistency(input))
   checks.push(await identitySimilarity(input))
   checks.push(await garmentColorFidelity(input))
   checks.push(await garmentTextFidelity(input))
@@ -141,6 +143,11 @@ export async function runAcceptanceChecks(
   if (failedNames.has('identitySimilarity')) {
     retryHints.push(
       'STRICT: preserve the customer face from the customer photo. Do NOT change facial features, hair, or skin tone.',
+    )
+  }
+  if (failedNames.has('poseConsistency')) {
+    retryHints.push(
+      'STRICT: keep the customer in the SAME pose as in the customer photo. Do NOT change posture, stance, or body orientation.',
     )
   }
   const shouldRetry = retryHints.length > 0
@@ -473,6 +480,42 @@ async function garmentTextFidelity(input: AcceptanceInput): Promise<AcceptanceCh
       pass: true,
       checked: false,
       details: { error: 'ocr_failed' },
+    }
+  }
+}
+
+async function poseConsistency(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  try {
+    const res = await checkPoseConsistency(input.customerImageBuffer, input.resultImageBuffer)
+    if (res.method === 'unavailable') {
+      return {
+        name: 'poseConsistency',
+        pass: true,
+        checked: false,
+        details: { reason: res.reason ?? 'unavailable' },
+      }
+    }
+    return {
+      name: 'poseConsistency',
+      pass: res.pass,
+      checked: true,
+      details: {
+        method: res.method,
+        meanNormalizedDistance: res.meanNormalizedDistance
+          ? Number(res.meanNormalizedDistance.toFixed(4))
+          : null,
+        comparedKeypoints: res.comparedKeypoints,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: poseConsistency falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'poseConsistency',
+      pass: true,
+      checked: false,
+      details: { error: 'detection_failed' },
     }
   }
 }
