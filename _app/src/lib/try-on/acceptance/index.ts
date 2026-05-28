@@ -5,6 +5,7 @@ import { ACCEPTANCE_THRESHOLDS } from '../quality-gate/thresholds'
 import type { SafetyRating } from '../types'
 import { checkAnatomy } from './anatomy-sanity'
 import { computeGarmentColorFidelity } from './color-check'
+import { detectGarmentText, editDistance } from './garment-text'
 import { computeIdentitySimilarity } from './identity-check'
 import { countPersons } from './subject-count'
 
@@ -96,7 +97,8 @@ export interface AcceptanceInput {
   garmentImageBuffer: Buffer
   /** Bytes of the generated try-on result. */
   resultImageBuffer: Buffer
-  /** Optional text that was OCR'd on the garment input (from the gate). */
+  /** OCR text of the garment input. Quando provido (e.g. cache do best-of-N),
+   *  pula a chamada de OCR no input. */
   garmentOcrText?: string
   /** Safety ratings devolvidos pelo provider (Gemini hoje). */
   safetyRatings?: SafetyRating[]
@@ -379,9 +381,75 @@ function roundLab(lab: { L: number; a: number; b: number }) {
   }
 }
 
-async function garmentTextFidelity(_input: AcceptanceInput): Promise<AcceptanceCheck> {
-  // TODO: lightweight OCR (tesseract.js or PaddleOCR REST), compare.
-  return { name: 'garmentTextFidelity', pass: true, checked: false }
+async function garmentTextFidelity(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  try {
+    // 1. Detecta texto na peça (reuso de cache do best-of-N quando passado)
+    let garmentText = input.garmentOcrText
+    if (garmentText === undefined) {
+      if (input.garmentImageBuffer.byteLength === 0) {
+        return {
+          name: 'garmentTextFidelity',
+          pass: true,
+          checked: false,
+          details: { reason: 'no_garment_buffer' },
+        }
+      }
+      const g = await detectGarmentText(input.garmentImageBuffer)
+      if (g.source === 'unavailable') {
+        return {
+          name: 'garmentTextFidelity',
+          pass: true,
+          checked: false,
+          details: { reason: g.detail ?? 'ocr_unavailable' },
+        }
+      }
+      garmentText = g.text
+    }
+
+    // 2. Sem texto na peça: skip
+    if (!garmentText.trim()) {
+      return {
+        name: 'garmentTextFidelity',
+        pass: true,
+        checked: false,
+        details: { reason: 'no_text_on_garment' },
+      }
+    }
+
+    // 3. OCR no resultado e compara
+    const r = await detectGarmentText(input.resultImageBuffer)
+    if (r.source === 'unavailable') {
+      return {
+        name: 'garmentTextFidelity',
+        pass: true,
+        checked: false,
+        details: { reason: r.detail ?? 'result_ocr_unavailable' },
+      }
+    }
+    const distance = editDistance(garmentText, r.text)
+    const maxDist = ACCEPTANCE_THRESHOLDS.ocrEditDistanceMax
+    return {
+      name: 'garmentTextFidelity',
+      pass: distance <= maxDist,
+      checked: true,
+      details: {
+        garmentText: garmentText.slice(0, 80),
+        resultText: r.text.slice(0, 80),
+        editDistance: distance,
+        maxEditDistance: maxDist,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: garmentTextFidelity falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'garmentTextFidelity',
+      pass: true,
+      checked: false,
+      details: { error: 'ocr_failed' },
+    }
+  }
 }
 
 /**

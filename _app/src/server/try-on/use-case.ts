@@ -425,6 +425,8 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       resultUrl: result.resultUrl,
       garmentUrl,
       safetyRatings: result.safetyRatings,
+      // Reusa OCR do best-of-N (evita chamada dupla ao Gemini) quando disponível
+      garmentOcrText: bestOfN.garmentText,
     })
     if (acceptance) {
       logger.info('Try-on acceptance result', {
@@ -581,6 +583,7 @@ async function runAcceptancePostGen(args: {
   resultUrl: string
   garmentUrl: string
   safetyRatings?: SafetyRating[]
+  garmentOcrText?: string
 }): Promise<AcceptanceResult | null> {
   try {
     const customerBuf = bufferFromDataUrl(args.customerPhotoDataUrl)
@@ -594,6 +597,7 @@ async function runAcceptancePostGen(args: {
       garmentImageBuffer: garmentBuf ?? Buffer.alloc(0),
       resultImageBuffer: resultBuf,
       safetyRatings: args.safetyRatings,
+      garmentOcrText: args.garmentOcrText,
     })
   } catch (err) {
     logger.warn('Try-on acceptance: ignorando exceção', {
