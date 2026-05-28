@@ -3,6 +3,7 @@ import sharp from 'sharp'
 import { logger } from '@/lib/logger'
 import { ACCEPTANCE_THRESHOLDS } from '../quality-gate/thresholds'
 import type { SafetyRating } from '../types'
+import { checkAnatomy } from './anatomy-sanity'
 import { computeGarmentColorFidelity } from './color-check'
 import { computeIdentitySimilarity } from './identity-check'
 import { countPersons } from './subject-count'
@@ -253,9 +254,39 @@ async function subjectCount(input: AcceptanceInput): Promise<AcceptanceCheck> {
   }
 }
 
-async function anatomySanity(_input: AcceptanceInput): Promise<AcceptanceCheck> {
-  // TODO: MediaPipe Pose + Hands. Rejeitar membros extras / mãos extras.
-  return { name: 'anatomySanity', pass: true, checked: false }
+async function anatomySanity(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  try {
+    const res = await checkAnatomy(input.customerImageBuffer, input.resultImageBuffer)
+    if (res.method === 'unavailable') {
+      return {
+        name: 'anatomySanity',
+        pass: true,
+        checked: false,
+        details: { reason: res.reason ?? 'unavailable' },
+      }
+    }
+    return {
+      name: 'anatomySanity',
+      pass: res.pass,
+      checked: true,
+      details: {
+        method: res.method,
+        input: res.input,
+        output: res.output,
+        flags: res.flags,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: anatomySanity falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'anatomySanity',
+      pass: true,
+      checked: false,
+      details: { error: 'detection_failed' },
+    }
+  }
 }
 
 async function identitySimilarity(input: AcceptanceInput): Promise<AcceptanceCheck> {

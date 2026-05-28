@@ -14,14 +14,17 @@ então deploys de produção já saem com os modelos no bundle.
 
 ## Modelos atuais
 
-| Arquivo            | Usado por                          | Tamanho | Origem |
-|--------------------|------------------------------------|---------|--------|
-| `yolov8n.onnx`     | `acceptance/subject-count.ts`      | ~12MB   | `huggingface.co/Xenova/yolov8n` |
+| Arquivo               | Usado por                          | Tamanho | Origem |
+|-----------------------|------------------------------------|---------|--------|
+| `yolov8n.onnx`        | `acceptance/subject-count.ts`      | ~12MB   | `huggingface.co/Xenova/yolov8n` |
+| `yolov8n-pose.onnx`   | `acceptance/anatomy-sanity.ts`     | ~13MB   | `huggingface.co/Xenova/yolov8n-pose` |
 
 ## Overrides
 
-- `MODELS_YOLOV8N_URL` — URL alternativa para baixar yolov8n.onnx
-- `YOLOV8N_ONNX_PATH` — caminho absoluto para o .onnx (bypass do diretório padrão)
+- `MODELS_YOLOV8N_URL`        — URL alternativa para baixar yolov8n.onnx
+- `MODELS_YOLOV8N_POSE_URL`   — URL alternativa para baixar yolov8n-pose.onnx
+- `YOLOV8N_ONNX_PATH`         — caminho absoluto para o .onnx (bypass do diretório padrão)
+- `YOLOV8N_POSE_ONNX_PATH`    — caminho absoluto para o yolov8n-pose.onnx
 
 ## Graceful degradation
 

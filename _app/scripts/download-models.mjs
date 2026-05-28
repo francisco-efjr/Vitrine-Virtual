@@ -33,6 +33,14 @@ const MODELS = [
       'https://huggingface.co/Xenova/yolov8n/resolve/main/model.onnx',
     minBytes: 8 * 1024 * 1024, // sanidade: < 8MB é truncado/erro de mirror
   },
+  {
+    name: 'yolov8n-pose.onnx',
+    path: resolve(REPO_ROOT, 'models', 'yolov8n-pose.onnx'),
+    url:
+      process.env.MODELS_YOLOV8N_POSE_URL ??
+      'https://huggingface.co/Xenova/yolov8n-pose/resolve/main/model.onnx',
+    minBytes: 8 * 1024 * 1024,
+  },
 ]
 
 const force = process.argv.includes('--force')
