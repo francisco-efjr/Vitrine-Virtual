@@ -21,11 +21,11 @@ import {
 import { checkTryOnRateLimit } from '@/lib/try-on/rate-limit'
 import {
   chooseTier,
-  runTier,
   type TierRouteContext,
   type TryOnPromptVariables,
   type TryOnTier,
 } from '@/lib/try-on/tiers'
+import { runWithBestOfN } from '@/lib/try-on/best-of-n'
 import { verifyTurnstileToken } from '@/lib/try-on/turnstile'
 import { resolveGoogleModel } from '@/lib/try-on/model-selection'
 import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
@@ -323,16 +323,22 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   // The client-side `garmentSignals.detectedPhotoType` is reserved for the
   // admin's upload form; the public try-on flow doesn't have it because the
   // garment comes straight from store storage.
+  // Fetcha o buffer da peça uma vez — reusado pelo classifier de garmentPhotoType
+  // E pelo best-of-N OCR-gating (research §4.1 P0.4).
+  let garmentBuffer: Buffer | null = null
+  try {
+    garmentBuffer = await fetch(garmentUrl, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .then((buf) => (buf ? Buffer.from(buf) : null))
+  } catch {
+    // best-effort
+  }
+
   let garmentPhotoType: 'flat-lay' | 'model' | 'auto' =
     input.garmentSignals?.detectedPhotoType ?? 'auto'
-  if (garmentPhotoType === 'auto') {
+  if (garmentPhotoType === 'auto' && garmentBuffer) {
     try {
-      const garmentBuf = await fetch(garmentUrl, { cache: 'no-store' })
-        .then((r) => (r.ok ? r.arrayBuffer() : null))
-        .then((buf) => (buf ? Buffer.from(buf) : null))
-      if (garmentBuf) {
-        garmentPhotoType = (await detectGarmentHasPerson(garmentBuf)) ? 'model' : 'flat-lay'
-      }
+      garmentPhotoType = (await detectGarmentHasPerson(garmentBuffer)) ? 'model' : 'flat-lay'
     } catch {
       // Best-effort — falls back to 'auto' which still gets the strengthened
       // 'auto' delta in the prompt composer.
@@ -379,8 +385,21 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   })
 
   try {
-    const result = await runTier(tierChosen, { provider: providerInput, variables })
+    const bestOfN = await runWithBestOfN(
+      { provider: providerInput, variables },
+      {
+        tier: tierChosen,
+        garmentBuffer: garmentBuffer ?? Buffer.alloc(0),
+        garmentMimeType: 'image/jpeg',
+      },
+    )
+    const result = bestOfN.result
     const tierEffective = result.tier
+    logger.info('Try-on best-of-N gating', {
+      reason: bestOfN.reason,
+      samplesGenerated: bestOfN.samplesGenerated,
+      winnerScore: bestOfN.winnerScore ?? null,
+    })
 
     // Acceptance checks (research §14) — best-effort, NUNCA bloqueia o cliente.
     // Hoje só logamos (sem retry pago). Os números servem pra dashboard de
