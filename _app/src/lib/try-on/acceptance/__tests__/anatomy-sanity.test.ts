@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import sharp from 'sharp'
 import * as ort from 'onnxruntime-node'
 import {
@@ -10,9 +10,11 @@ import {
   parsePoseDetections,
   type PoseDetection,
 } from '../anatomy-sanity'
+import * as poseDetect from '../pose-detect'
 
 afterEach(() => {
   __resetAnatomyCacheForTests()
+  vi.restoreAllMocks()
 })
 
 /**
@@ -52,6 +54,8 @@ function visAll(value = 0.9): number[] {
   return Array(17).fill(value)
 }
 
+const IDENTITY_PRE = { scale: 1, padX: 0, padY: 0, origW: 640, origH: 640 }
+
 describe('parsePoseDetections', () => {
   it('extrai poses com confidence acima do mínimo', () => {
     const out = buildPoseOutput(
@@ -61,7 +65,7 @@ describe('parsePoseDetections', () => {
       ],
       10,
     )
-    const dets = parsePoseDetections(out, 10)
+    const dets = parsePoseDetections(out, 10, IDENTITY_PRE)
     expect(dets).toHaveLength(1)
     expect(dets[0]!.confidence).toBeCloseTo(0.9)
     expect(dets[0]!.keypoints).toHaveLength(17)
@@ -75,7 +79,7 @@ describe('parsePoseDetections', () => {
       [{ xc: 320, yc: 320, w: 100, h: 200, conf: 0.9, kptVis: vis }],
       1,
     )
-    const dets = parsePoseDetections(out, 1)
+    const dets = parsePoseDetections(out, 1, IDENTITY_PRE)
     expect(dets[0]!.keypoints[9]!.vis).toBeCloseTo(0.95)
     expect(dets[0]!.keypoints[10]!.vis).toBeCloseTo(0.85)
     expect(dets[0]!.keypoints[0]!.vis).toBeCloseTo(0)
@@ -184,32 +188,32 @@ describe('checkAnatomy (integration via mock session)', () => {
     expect(res.output?.visibleWrists).toBe(1)
   })
 
-  it('flag extra_arms quando resultado tem mais punhos que o input', async () => {
-    const NUM_ANCHORS = 100
-    const oneWrist = (() => {
-      const v = visAll(0)
-      v[9] = 0.9 // 1 wrist
-      return v
-    })()
-    const threeWrists = (() => {
-      const v = visAll(0)
-      v[9] = 0.9
-      v[10] = 0.9
-      // simulamos pessoa extra com NMS por bbox distinto na próxima pose
-      return v
-    })()
-    const inputOut = buildPoseOutput(
-      [{ xc: 320, yc: 320, w: 200, h: 400, conf: 0.9, kptVis: oneWrist }],
-      NUM_ANCHORS,
-    )
-    const resultOut = buildPoseOutput(
-      [
-        { xc: 200, yc: 320, w: 200, h: 400, conf: 0.9, kptVis: threeWrists },
-        { xc: 500, yc: 320, w: 200, h: 400, conf: 0.85, kptVis: threeWrists },
-      ],
-      NUM_ANCHORS,
-    )
-    __setAnatomySessionForTests(mockSessionFromOutputs([inputOut, resultOut]))
+  it('flag extra_arms/extra_person quando resultado tem mais limbs/pessoas que o input', async () => {
+    // Mock direto de detectPosesOnImage pra evitar dependência de ordem de
+    // preprocess em paralelo (sharp pode terminar fora de ordem).
+    const onePersonOneWrist: PoseDetection = {
+      bbox: [220, 120, 420, 520],
+      confidence: 0.9,
+      keypoints: (() => {
+        const v = visAll(0)
+        v[9] = 0.9
+        return v.map((vis) => ({ x: 0, y: 0, vis }))
+      })(),
+    }
+    const twoArmedPerson: PoseDetection = {
+      bbox: [100, 120, 300, 520],
+      confidence: 0.9,
+      keypoints: (() => {
+        const v = visAll(0)
+        v[9] = 0.9
+        v[10] = 0.9
+        return v.map((vis) => ({ x: 0, y: 0, vis }))
+      })(),
+    }
+    const spy = vi.spyOn(poseDetect, 'detectPosesOnImage')
+    spy.mockResolvedValueOnce([onePersonOneWrist]) // customer
+    spy.mockResolvedValueOnce([twoArmedPerson, twoArmedPerson]) // result: 2 pessoas, 4 punhos
+
     const img = await blankImage()
     const res = await checkAnatomy(img, img)
     expect(res.pass).toBe(false)

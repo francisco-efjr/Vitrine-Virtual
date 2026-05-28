@@ -9,12 +9,17 @@ import { computeIdentitySimilarity } from './identity-check'
 import { countPersons } from './subject-count'
 
 /**
- * Threshold do dHash proxy. Diferente do `identitySimilarityMin` (0.55) que
- * o research projetou pra ArcFace cosine. Quando a checagem ArcFace real
- * for implementada (TODO em identity-check.ts), removemos este e voltamos
- * pro threshold canônico.
+ * Thresholds por método de identity check. ArcFace cosine usa o threshold
+ * canônico do research (0.55); dHash proxy usa 0.78 (calibração local).
  */
 const IDENTITY_DHASH_PROXY_MIN = 0.78
+const IDENTITY_DHASH_FACE_CROP_MIN = 0.7
+
+function identityThresholdForMethod(method: string): number {
+  if (method === 'arcface_cosine') return ACCEPTANCE_THRESHOLDS.identitySimilarityMin
+  if (method === 'dhash_face_crop') return IDENTITY_DHASH_FACE_CROP_MIN
+  return IDENTITY_DHASH_PROXY_MIN
+}
 
 /**
  * Generation acceptance checks — research deliverable section 14.
@@ -295,19 +300,20 @@ async function identitySimilarity(input: AcceptanceInput): Promise<AcceptanceChe
       input.customerImageBuffer,
       input.resultImageBuffer,
     )
+    const threshold = identityThresholdForMethod(sim.method)
     return {
       name: 'identitySimilarity',
-      // dHash proxy: usa threshold local. ArcFace real virá depois (ver
-      // identity-check.ts TODO).
-      pass: sim.similarity >= IDENTITY_DHASH_PROXY_MIN,
+      pass: sim.similarity >= threshold,
       checked: true,
       details: {
         similarity: Number(sim.similarity.toFixed(4)),
         hammingDistance: sim.hammingDistance,
+        embeddingDim: sim.embeddingDim,
         method: sim.method,
-        proxyThreshold: IDENTITY_DHASH_PROXY_MIN,
-        // Mantemos o threshold canônico no log pra quando a substituição vier.
-        targetThresholdWhenArcface: ACCEPTANCE_THRESHOLDS.identitySimilarityMin,
+        faceCroppedByPose: sim.faceCroppedByPose,
+        threshold,
+        // Mantemos o threshold canônico no log pra dashboards de migração.
+        canonicalThreshold: ACCEPTANCE_THRESHOLDS.identitySimilarityMin,
       },
     }
   } catch (err) {

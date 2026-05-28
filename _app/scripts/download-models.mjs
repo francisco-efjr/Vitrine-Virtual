@@ -41,6 +41,16 @@ const MODELS = [
       'https://huggingface.co/Xenova/yolov8n-pose/resolve/main/model.onnx',
     minBytes: 8 * 1024 * 1024,
   },
+  {
+    name: 'arcface.onnx',
+    path: resolve(REPO_ROOT, 'models', 'arcface.onnx'),
+    // Default: MobileFaceNet treinado com ArcFace loss (~13MB). Embedding 512-d.
+    // Override via MODELS_ARCFACE_URL pra ResNet50 (~166MB, mais preciso).
+    url:
+      process.env.MODELS_ARCFACE_URL ??
+      'https://huggingface.co/onnx-community/arcface-mobilefacenet/resolve/main/model.onnx',
+    minBytes: 4 * 1024 * 1024,
+  },
 ]
 
 const force = process.argv.includes('--force')
