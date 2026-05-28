@@ -3,8 +3,13 @@ import { logger } from '@/lib/logger'
 import { hashIp } from '@/lib/security/ip-hash'
 import { isAllowedResultUrl } from '@/lib/security/url-allowlist'
 import { createServiceClient } from '@/lib/supabase/service'
-import { runAcceptanceChecks, type AcceptanceResult } from '@/lib/try-on/acceptance'
+import {
+  composeRetryPrompt,
+  runAcceptanceChecks,
+  type AcceptanceResult,
+} from '@/lib/try-on/acceptance'
 import { detectMirrorSelfie } from '@/lib/try-on/acceptance/mirror-selfie-detect'
+import { runTier } from '@/lib/try-on/tiers'
 import type { SafetyRating } from '@/lib/try-on/types'
 import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
 import { buildTryOnProviderInput } from '@/lib/try-on/payload'
@@ -409,8 +414,8 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
         garmentMimeType: 'image/jpeg',
       },
     )
-    const result = bestOfN.result
-    const tierEffective = result.tier
+    let result = bestOfN.result
+    let tierEffective = result.tier
     logger.info('Try-on best-of-N gating', {
       reason: bestOfN.reason,
       samplesGenerated: bestOfN.samplesGenerated,
@@ -418,9 +423,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     })
 
     // Acceptance checks (research §14) — best-effort, NUNCA bloqueia o cliente.
-    // Hoje só logamos (sem retry pago). Os números servem pra dashboard de
-    // qualidade — quando ArcFace e Tier A chegarem, plumbamos retry.
-    const acceptance = await runAcceptancePostGen({
+    let acceptance = await runAcceptancePostGen({
       customerPhotoDataUrl: input.customerPhoto,
       resultUrl: result.resultUrl,
       garmentUrl,
@@ -431,12 +434,76 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     if (acceptance) {
       logger.info('Try-on acceptance result', {
         pass: acceptance.pass,
+        shouldRetry: acceptance.shouldRetry,
         checks: acceptance.checks.map((c) => ({
           name: c.name,
           pass: c.pass,
           checked: c.checked,
         })),
       })
+    }
+
+    // ─── Retry inteligente (P1.7) ────────────────────────────────────────
+    //
+    // Quando o acceptance pede retry (cor/texto/identidade falharam) e a
+    // feature flag está ligada, gera uma segunda tentativa com prompt
+    // reforçado e fica com o melhor (mais checks passing). Limitado a 1
+    // retry pra não estourar orçamento.
+    let retryReason: 'not_attempted' | 'disabled' | 'no_hints' | 'retry_picked' | 'retry_rejected' =
+      'not_attempted'
+    if (acceptance?.shouldRetry) {
+      if (process.env.TRY_ON_RETRY_ENABLED !== 'true') {
+        retryReason = 'disabled'
+      } else if (acceptance.retryHints.length === 0) {
+        retryReason = 'no_hints'
+      } else {
+        const reinforced = composeRetryPrompt(composedPrompt.prompt, acceptance.retryHints)
+        logger.info('Try-on retry: regenerando com prompt reforçado', {
+          hints: acceptance.retryHints.length,
+        })
+        try {
+          const retryProviderInput = buildTryOnProviderInput({
+            customerPhoto: input.customerPhoto,
+            productImage: garmentUrl,
+            background: providerBackground,
+            googleModelOverride,
+            promptOverride: reinforced,
+            promptVariantId: `${composedPrompt.promptVariantId}+retry`,
+          })
+          const retryResult = await runTier(tierChosen, {
+            provider: retryProviderInput,
+            variables,
+          })
+          const retryAcceptance = await runAcceptancePostGen({
+            customerPhotoDataUrl: input.customerPhoto,
+            resultUrl: retryResult.resultUrl,
+            garmentUrl,
+            safetyRatings: retryResult.safetyRatings,
+            garmentOcrText: bestOfN.garmentText,
+          })
+          const originalScore = acceptance.checks.filter((c) => c.checked && c.pass).length
+          const retryScore =
+            retryAcceptance?.checks.filter((c) => c.checked && c.pass).length ?? 0
+          if (retryAcceptance && retryScore > originalScore) {
+            result = retryResult
+            tierEffective = retryResult.tier
+            acceptance = retryAcceptance
+            retryReason = 'retry_picked'
+          } else {
+            retryReason = 'retry_rejected'
+          }
+          logger.info('Try-on retry: resultado', {
+            retryReason,
+            originalScore,
+            retryScore,
+          })
+        } catch (err) {
+          logger.warn('Try-on retry: falhou — mantendo geração original', {
+            message: err instanceof Error ? err.message : String(err),
+          })
+          retryReason = 'retry_rejected'
+        }
+      }
     }
 
     await supabase.from('try_on_uses').insert({
@@ -462,7 +529,11 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       providerRequestId: result.requestId,
       modelResolved: result.modelUsed ?? googleModelOverride,
       finalPrompt: result.finalPrompt ?? null,
-      generationParams: mergeAcceptanceIntoParams(result.generationParams ?? null, acceptance),
+      generationParams: mergeAcceptanceIntoParams(
+        result.generationParams ?? null,
+        acceptance,
+        retryReason,
+      ),
       resultBucket: result.resultBucket ?? null,
       resultPath: result.resultPath ?? null,
       durationMs: result.durationMs,
@@ -611,14 +682,19 @@ async function runAcceptancePostGen(args: {
 function mergeAcceptanceIntoParams(
   existing: Record<string, unknown> | null,
   acceptance: AcceptanceResult | null,
+  retryReason?: string,
 ): Record<string, unknown> | null {
-  if (!acceptance) return existing
+  if (!acceptance) {
+    return retryReason ? { ...(existing ?? {}), retry: { reason: retryReason } } : existing
+  }
   return {
     ...(existing ?? {}),
     acceptance: {
       pass: acceptance.pass,
       shouldRetry: acceptance.shouldRetry,
+      retryHints: acceptance.retryHints,
       checks: acceptance.checks,
     },
+    ...(retryReason ? { retry: { reason: retryReason } } : {}),
   }
 }

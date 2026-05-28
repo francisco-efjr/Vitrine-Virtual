@@ -85,8 +85,10 @@ export interface AcceptanceCheck {
 
 export interface AcceptanceResult {
   pass: boolean
-  /** True iff the result MUST be retried before showing the customer. */
+  /** True iff o caller deveria tentar uma re-geração com prompt reforçado. */
   shouldRetry: boolean
+  /** Cláusulas de reforço a anexar ao prompt do retry. */
+  retryHints: string[]
   checks: AcceptanceCheck[]
 }
 
@@ -120,12 +122,35 @@ export async function runAcceptanceChecks(
 
   const failed = checks.filter((c) => c.checked && !c.pass)
   const pass = failed.length === 0
-  // Today: never auto-retry because we'd burn a second paid generation.
-  // When Tier A is wired, set `shouldRetry = true` for identity/color/text
-  // failures (those benefit from a retry with adjusted prompt).
-  const shouldRetry = false
 
-  return { pass, shouldRetry, checks }
+  // Retry hints — research §14 / P1.7. Apenas as falhas onde um prompt
+  // reforçado tem chance real de melhorar (cor, texto, identidade);
+  // anatomy/subject/sharpness são falhas do modelo, não do prompt.
+  const failedNames = new Set(failed.map((c) => c.name))
+  const retryHints: string[] = []
+  if (failedNames.has('garmentColorFidelity')) {
+    retryHints.push(
+      'STRICT: preserve the EXACT garment color from the product reference image. Match hue, saturation and value precisely.',
+    )
+  }
+  if (failedNames.has('garmentTextFidelity')) {
+    retryHints.push(
+      'STRICT: preserve the EXACT text, letters, and logo on the garment from the product reference image. Spelling, casing, and font weight must match.',
+    )
+  }
+  if (failedNames.has('identitySimilarity')) {
+    retryHints.push(
+      'STRICT: preserve the customer face from the customer photo. Do NOT change facial features, hair, or skin tone.',
+    )
+  }
+  const shouldRetry = retryHints.length > 0
+
+  return { pass, shouldRetry, retryHints, checks }
+}
+
+export function composeRetryPrompt(originalPrompt: string, retryHints: string[]): string {
+  if (retryHints.length === 0) return originalPrompt
+  return `${originalPrompt}\n\n--- RETRY REINFORCEMENT ---\n${retryHints.join('\n')}`
 }
 
 // ─── Stubs ───────────────────────────────────────────────────────────────
