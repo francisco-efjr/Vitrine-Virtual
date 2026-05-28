@@ -4,6 +4,7 @@ import { hashIp } from '@/lib/security/ip-hash'
 import { isAllowedResultUrl } from '@/lib/security/url-allowlist'
 import { createServiceClient } from '@/lib/supabase/service'
 import { runAcceptanceChecks, type AcceptanceResult } from '@/lib/try-on/acceptance'
+import { detectMirrorSelfie } from '@/lib/try-on/acceptance/mirror-selfie-detect'
 import type { SafetyRating } from '@/lib/try-on/types'
 import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
 import { buildTryOnProviderInput } from '@/lib/try-on/payload'
@@ -288,6 +289,21 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     logger.info('Try-on: AI validation aprovou foto do cliente', {
       source: aiValidation.source,
     })
+
+    // Mirror selfie detection (cenário C05). Não bloqueia — só loga + anexa
+    // ao gateSignals pra dashboard de calibração. UI notification fica como
+    // follow-up (precisa de campo `clientHints` no TryOnSuccess).
+    const mirrorRes = await detectMirrorSelfie(customerPhotoBuf)
+    if (mirrorRes.detected) {
+      logger.info('Try-on: mirror selfie detectado (warning)', {
+        phoneCount: mirrorRes.phoneCount,
+        closestPx: mirrorRes.closestPhoneToWristPx,
+      })
+    }
+    gateSignalsForLog = {
+      ...(gateSignalsForLog ?? {}),
+      mirror_selfie: mirrorRes,
+    }
   }
 
   const provadorFundoUrl =
