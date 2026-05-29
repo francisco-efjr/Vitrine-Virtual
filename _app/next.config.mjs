@@ -58,11 +58,20 @@ const ContentSecurityPolicy = `
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  // Inclui modelos ONNX no bundle do API route que roda os acceptance checks
-  // server-side (acceptance/subject-count.ts). Sem isso o Vercel não copia o
-  // .onnx para o ambiente da função e a inferência fica indisponível.
-  outputFileTracingIncludes: {
-    '/api/try-on': ['./models/**/*'],
+  experimental: {
+    // Inclui modelos ONNX no bundle do API route que roda os acceptance checks
+    // server-side (acceptance/subject-count.ts). Sem isso o Vercel não copia o
+    // .onnx para o ambiente da função e a inferência fica indisponível.
+    // Em Next 14 essa chave vive dentro de `experimental` — fora dela o Next
+    // ignora silenciosamente (era o caso até este commit, gerando o warning
+    // "Unrecognized key(s) in object: 'outputFileTracingIncludes'" no build).
+    outputFileTracingIncludes: {
+      '/api/try-on': ['./models/**/*'],
+    },
+    // onnxruntime-node carrega .node nativos via require() — não bundlar pelo
+    // webpack do Next; deixar como external no server bundle evita "Cannot
+    // find module .../onnxruntime_binding.node" durante "Collecting page data".
+    serverComponentsExternalPackages: ['onnxruntime-node', 'sharp'],
   },
   // Security headers (OWASP-aligned — veja comentários acima para decisões de CSP)
   async headers() {
