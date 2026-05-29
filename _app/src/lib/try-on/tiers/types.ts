@@ -38,6 +38,7 @@ export type GarmentCategory =
   | 'one-pieces'
   | 'outerwear'
   | 'swimwear'
+  | 'underwear'
   | 'accessories'
   | 'footwear'
   | 'auto'

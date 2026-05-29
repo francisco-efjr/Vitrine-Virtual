@@ -672,6 +672,11 @@ const STRICT_CATEGORIES = new Set([
 
 async function nsfwClean(input: AcceptanceInput): Promise<AcceptanceCheck> {
   const ratings = input.safetyRatings ?? []
+  // P2.17 — categorias sensíveis exigem threshold mais rigoroso (MEDIUM em
+  // qualquer categoria estrita já falha; LOW em sexual já flag).
+  const isSensitiveCategory =
+    input.garmentCategory === 'swimwear' || input.garmentCategory === 'underwear'
+
   if (!ratings.length) {
     return {
       name: 'nsfwClean',
@@ -697,6 +702,7 @@ async function nsfwClean(input: AcceptanceInput): Promise<AcceptanceCheck> {
   }
 
   // Falha em HIGH em qualquer categoria, ou MEDIUM em categorias estritas.
+  // Categorias sensíveis (swimwear/underwear): LOW em sexual já falha.
   for (const r of ratings) {
     const level = PROBABILITY_ORDER[r.probability] ?? 0
     if (level >= PROBABILITY_ORDER.HIGH!) {
@@ -720,6 +726,23 @@ async function nsfwClean(input: AcceptanceInput): Promise<AcceptanceCheck> {
           reason: 'medium_in_strict_category',
           category: r.category,
           probability: r.probability,
+        },
+      }
+    }
+    if (
+      isSensitiveCategory &&
+      STRICT_CATEGORIES.has(r.category) &&
+      level >= PROBABILITY_ORDER.LOW!
+    ) {
+      return {
+        name: 'nsfwClean',
+        pass: false,
+        checked: true,
+        details: {
+          reason: 'low_in_strict_for_sensitive_garment',
+          category: r.category,
+          probability: r.probability,
+          garmentCategory: input.garmentCategory,
         },
       }
     }

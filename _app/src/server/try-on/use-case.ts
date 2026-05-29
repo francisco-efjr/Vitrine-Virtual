@@ -50,6 +50,7 @@ export type TryOnError =
   | { kind: 'peca_unavailable' }
   | { kind: 'gate_rejected'; reason: RejectionReason }
   | { kind: 'parental_consent_required'; bracket: 'minor' | 'uncertain' }
+  | { kind: 'sensitive_garment_consent_required'; category: 'swimwear' | 'underwear' }
   | { kind: 'provider_failed'; message: string }
 
 export interface TryOnSuccess {
@@ -79,6 +80,9 @@ export interface RunTryOnInput {
   /** Cliente declarou ter consentimento parental (P2.16 / LGPD).
    *  Quando true, pula o age gate mesmo se a foto parece de menor. */
   parentalConsentDeclared?: boolean
+  /** Cliente declarou consentimento extra pra peças sensíveis (P2.17 —
+   *  swimwear/underwear). Sem isso, geração é bloqueada nessas categorias. */
+  sensitiveGarmentConsentDeclared?: boolean
 }
 
 /**
@@ -115,7 +119,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
 
   const { data: peca } = await supabase
     .from('pecas')
-    .select('id, nome, status, loja_id, foto_principal_id')
+    .select('id, nome, status, loja_id, foto_principal_id, categoria_id')
     .eq('id', input.pecaId)
     .maybeSingle()
 
@@ -315,6 +319,22 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     gateSignalsForLog = {
       ...(gateSignalsForLog ?? {}),
       mirror_selfie: mirrorRes,
+    }
+  }
+
+  // ─── Sensitive garment consent gate (P2.17) ─────────────────────────────
+  //
+  // Swimwear/underwear exigem consentimento extra do cliente antes da
+  // geração. Categoria é inferida de peca.categoria_id (string livre).
+  const sensitiveCategory = inferSensitiveGarmentCategory(peca.categoria_id)
+  if (sensitiveCategory && !input.sensitiveGarmentConsentDeclared) {
+    logger.info('Try-on: sensitive garment consent não declarado', {
+      category: sensitiveCategory,
+      categoria_id: peca.categoria_id,
+    })
+    return {
+      ok: false,
+      error: { kind: 'sensitive_garment_consent_required', category: sensitiveCategory },
     }
   }
 
@@ -703,6 +723,29 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     logger.warn('Try-on falhou', { message })
     return { ok: false, error: { kind: 'provider_failed', message } }
   }
+}
+
+// ─── Sensitive category helpers (P2.17) ────────────────────────────────
+
+/**
+ * Mapeia o `categoria_id` (string livre da lojista) pra detectar peças
+ * sensíveis (swimwear, underwear). Retorna null quando não há match.
+ */
+export function inferSensitiveGarmentCategory(
+  categoriaId: string | null | undefined,
+): 'swimwear' | 'underwear' | null {
+  if (!categoriaId) return null
+  // Normaliza acentos pra match consistente
+  const c = categoriaId
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+  const swimwearTerms = ['swim', 'biquini', 'bikini', 'sunga', 'maio', 'praia']
+  if (swimwearTerms.some((t) => c.includes(t))) return 'swimwear'
+  const underwearTerms = ['lingerie', 'underwear', 'calcinha', 'cueca', 'sutia', 'intima']
+  if (underwearTerms.some((t) => c.includes(t))) return 'underwear'
+  return null
 }
 
 // ─── Acceptance helpers ─────────────────────────────────────────────────

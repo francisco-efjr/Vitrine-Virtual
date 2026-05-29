@@ -25,6 +25,7 @@ export type GarmentCategory =
   | 'one-pieces'
   | 'outerwear'
   | 'swimwear'
+  | 'underwear'
   | 'accessories'
   | 'footwear'
   | 'auto'
@@ -85,6 +86,7 @@ export function regionForCategory(category: GarmentCategory): GarmentRegion {
       return 'lower-center'
     case 'one-pieces':
     case 'swimwear':
+    case 'underwear':
       return 'vertical-average'
     case 'accessories':
     case 'auto':

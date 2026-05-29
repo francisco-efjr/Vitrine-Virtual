@@ -182,6 +182,12 @@ export async function POST(req: NextRequest) {
           `PARENTAL_CONSENT_REQUIRED_${result.error.bracket.toUpperCase()}`,
           422,
         )
+      case 'sensitive_garment_consent_required':
+        return fail(
+          'Esta peça requer consentimento explícito para experimentação virtual. Marque a opção e tente novamente.',
+          `SENSITIVE_GARMENT_CONSENT_REQUIRED_${result.error.category.toUpperCase()}`,
+          422,
+        )
     }
     // Falha de tipagem se algum case ficou de fora
     return fail('Erro desconhecido', 'UNKNOWN_ERROR', 500)
