@@ -69,10 +69,12 @@ const MES = [
 export function CGHVitrinePage({
   loja,
   pecas,
+  totalPecas,
   whatsappUrl,
 }: {
   loja: Loja
   pecas: Peca[]
+  totalPecas?: number
   whatsappUrl: string | null
 }) {
   const heroPiece = pecas[0] ?? null
@@ -369,7 +371,9 @@ export function CGHVitrinePage({
           <GoldRule margin="28px 0 40px" opacity={0.3} />
 
           <CGHVitrineGrid
+            slug={loja.slug}
             pecas={pecas}
+            totalPecas={totalPecas}
             exibirPreco={loja.exibir_preco_publico}
             whatsappE164={loja.whatsapp_e164}
             cabineBackdropUrl={loja.cabine_backdrop_url}

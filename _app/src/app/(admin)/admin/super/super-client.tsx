@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Toggle } from '@/components/ui/toggle'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { Pagination } from '@/components/ui/pagination'
 import { Spinner } from '@/components/ui/spinner'
 import { LojaMark } from '@/components/brand/vv-logo'
 import { AIModelToggle } from '@/components/admin/ai-model-toggle'
@@ -28,11 +29,14 @@ const PUBLIC_HOST = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')
 
 export function SuperAdminClient({
   initialLojas,
+  pageInfo,
   initialKillEnabled,
   initialBudget,
   initialDefaultModel,
 }: {
   initialLojas: LojaWithStats[]
+  /** Quando presente, exibe paginação numérica abaixo da tabela de lojas. */
+  pageInfo?: { total: number; pageSize: number; currentPage: number }
   initialKillEnabled: boolean
   initialBudget: number
   initialDefaultModel: AiImageModel
@@ -253,6 +257,15 @@ export function SuperAdminClient({
           </div>
         ) : null}
       </Card>
+
+      {pageInfo ? (
+        <Pagination
+          total={pageInfo.total}
+          pageSize={pageInfo.pageSize}
+          currentPage={pageInfo.currentPage}
+          className="mb-6"
+        />
+      ) : null}
 
       {/* Controles do sistema */}
       <Card className="p-5 sm:p-6">

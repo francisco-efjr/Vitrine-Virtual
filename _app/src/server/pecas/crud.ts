@@ -15,30 +15,70 @@ export interface ListPecasOptions {
   somenteDisponiveis?: boolean
   busca?: string
   ordem?: 'recentes' | 'antigas'
+  /** Tamanho de página. Default 30. */
+  limit?: number
+  /** Offset (0-based). Default 0. */
+  offset?: number
 }
 
 export interface PecaListItem extends PecaRow {
   foto_principal_url: string | null
 }
 
+export interface PecaListPage {
+  items: PecaListItem[]
+  total: number
+  offset: number
+  limit: number
+}
+
+export const PECAS_ADMIN_PAGE_SIZE = 30
+
+/**
+ * Lista paginada das peças da loja.
+ *
+ * Retorna `{ items, total }` pra UI montar "X-Y de Z peças" + paginação
+ * numérica. O `total` faz um count separado (mais um round-trip mas barato:
+ * indexes em (loja_id, status) cobrem a query).
+ */
 export async function listOwnPecas(
   lojaId: string,
   opts: ListPecasOptions = {},
-): Promise<PecaListItem[]> {
+): Promise<PecaListPage> {
+  const limit = Math.max(1, Math.min(100, opts.limit ?? PECAS_ADMIN_PAGE_SIZE))
+  const offset = Math.max(0, opts.offset ?? 0)
   const supabase = createServerSupabase()
-  let query = supabase.from('pecas').select('*').eq('loja_id', lojaId)
-  if (opts.somenteDisponiveis) query = query.eq('status', 'disponivel')
-  if (opts.busca) query = query.ilike('nome', `%${opts.busca}%`)
-  query = query.order('created_at', { ascending: opts.ordem === 'antigas' })
 
-  const { data, error } = await query
+  // Count exact (sem head: true) pra UI calcular total de páginas
+  let countQuery = supabase
+    .from('pecas')
+    .select('id', { count: 'exact', head: true })
+    .eq('loja_id', lojaId)
+  if (opts.somenteDisponiveis) countQuery = countQuery.eq('status', 'disponivel')
+  if (opts.busca) countQuery = countQuery.ilike('nome', `%${opts.busca}%`)
+
+  let dataQuery = supabase.from('pecas').select('*').eq('loja_id', lojaId)
+  if (opts.somenteDisponiveis) dataQuery = dataQuery.eq('status', 'disponivel')
+  if (opts.busca) dataQuery = dataQuery.ilike('nome', `%${opts.busca}%`)
+  dataQuery = dataQuery
+    .order('created_at', { ascending: opts.ordem === 'antigas' })
+    .range(offset, offset + limit - 1)
+
+  const [{ count, error: countErr }, { data, error }] = await Promise.all([
+    countQuery,
+    dataQuery,
+  ])
   if (error) throw error
-  return await Promise.all(
+  if (countErr) throw countErr
+
+  const items = await Promise.all(
     (data ?? []).map(async (peca) => ({
       ...peca,
       foto_principal_url: await getPecaPreviewUrl(peca.id),
     })),
   )
+
+  return { items, total: count ?? items.length, offset, limit }
 }
 
 export async function getOwnPeca(lojaId: string, pecaId: string): Promise<PecaRow> {

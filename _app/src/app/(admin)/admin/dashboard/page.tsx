@@ -27,10 +27,11 @@ function saudacao() {
 
 export default async function DashboardPage() {
   const session = await requireLojista()
-  const [metrics, pecas] = await Promise.all([
+  const [metrics, pecasPage] = await Promise.all([
     getDashboardMetrics(session.loja.id, session.loja.cota_try_on_mensal),
-    listOwnPecas(session.loja.id, { ordem: 'recentes' }),
+    listOwnPecas(session.loja.id, { ordem: 'recentes', limit: 6 }),
   ])
+  const pecas = pecasPage.items
 
   const cotaPct = Math.min(100, Math.round((metrics.try_ons_mes / metrics.cota_mensal) * 100))
   const nomeCurto = session.profile.nome_completo?.split(' ')[0] ?? 'lojista'

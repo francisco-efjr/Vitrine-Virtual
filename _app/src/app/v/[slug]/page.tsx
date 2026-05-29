@@ -8,6 +8,11 @@ import { LojaMark, VVLogo } from '@/components/brand/vv-logo'
 import { CGHVitrinePage } from '@/components/themes/casa-gaby-harb/vitrine-page'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
+import {
+  loadPublicPecasPage,
+  VITRINE_PUBLIC_PAGE_SIZE,
+  type PublicPeca,
+} from '@/server/pecas/public'
 import type { VitrineTheme } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -27,65 +32,34 @@ interface VitrineData {
     hero_image_url: string | null
     vitrine_theme: VitrineTheme
   }
-  pecas: Array<{
-    peca_id: string
-    nome: string
-    tamanho: string | null
-    preco_centavos: number | null
-    foto_principal_path: string | null
-    foto_principal_url: string | null
-    categoria_id: string | null
-  }>
+  pecas: PublicPeca[]
+  /** Total geral de peças disponíveis — usado pelo botão "Carregar mais". */
+  totalPecas: number
 }
 
 async function loadVitrine(slug: string): Promise<VitrineData | null> {
   const supabase = createServerSupabase()
-  const [{ data: lojaArr }, { data: pecasArr }] = await Promise.all([
-    supabase.rpc('get_vitrine_publica', { p_slug: slug }),
-    supabase.rpc('get_pecas_publicas', { p_slug: slug }),
-  ])
+  const { data: lojaArr } = await supabase.rpc('get_vitrine_publica', {
+    p_slug: slug,
+  })
   const loja = lojaArr?.[0]
   if (!loja) return null
 
-  // Fundo personalizado da Cabine + categoria das peças não vêm do RPC público.
-  // Lemos via service client (são campos seguros: caminho + id de categoria).
+  // Primeira página de peças + fundo da Cabine em paralelo.
   const service = createServiceClient()
-  const [{ data: cabineCfg }, { data: pecasCats }] = await Promise.all([
+  const [page, { data: cabineCfg }] = await Promise.all([
+    loadPublicPecasPage(slug, loja.loja_id, 0, VITRINE_PUBLIC_PAGE_SIZE),
     service
       .from('lojas')
       .select('provador_fundo_storage_path, provador_fundo_tipo')
       .eq('slug', slug)
       .maybeSingle(),
-    service
-      .from('pecas')
-      .select('id, categoria_id')
-      .eq('loja_id', loja.loja_id)
-      .eq('status', 'disponivel'),
   ])
-  const catMap = new Map<string, string | null>()
-  for (const row of pecasCats ?? []) catMap.set(row.id, row.categoria_id)
 
   const cabineBackdropUrl =
     cabineCfg?.provador_fundo_tipo === 'personalizado'
       ? buildLojaAssetPublicUrl(cabineCfg?.provador_fundo_storage_path ?? null)
       : null
-
-  const pecas = await Promise.all(
-    (pecasArr ?? []).map(async (peca: VitrineData['pecas'][number]) => {
-      let fotoPrincipalUrl: string | null = null
-      if (peca.foto_principal_path) {
-        const { data } = await service.storage
-          .from('pecas-fotos')
-          .createSignedUrl(peca.foto_principal_path, 3600)
-        fotoPrincipalUrl = data?.signedUrl ?? null
-      }
-      return {
-        ...peca,
-        foto_principal_url: fotoPrincipalUrl,
-        categoria_id: catMap.get(peca.peca_id) ?? null,
-      }
-    }),
-  )
 
   return {
     loja: {
@@ -104,7 +78,8 @@ async function loadVitrine(slug: string): Promise<VitrineData | null> {
       ),
       vitrine_theme: (loja.vitrine_theme ?? 'default') as VitrineTheme,
     },
-    pecas,
+    pecas: page.pecas,
+    totalPecas: page.total,
   }
 }
 
@@ -133,7 +108,12 @@ export default async function VitrinePage({ params }: { params: { slug: string }
     return (
       <>
         <PublicLiveRefresh />
-        <CGHVitrinePage loja={data.loja} pecas={data.pecas} whatsappUrl={wa} />
+        <CGHVitrinePage
+          loja={data.loja}
+          pecas={data.pecas}
+          totalPecas={data.totalPecas}
+          whatsappUrl={wa}
+        />
       </>
     )
   }
@@ -197,6 +177,7 @@ export default async function VitrinePage({ params }: { params: { slug: string }
         <VitrineGrid
           slug={data.loja.slug}
           pecas={data.pecas}
+          totalPecas={data.totalPecas}
           exibirPreco={data.loja.exibir_preco_publico}
           whatsappE164={data.loja.whatsapp_e164}
           cabineBackdropUrl={data.loja.cabine_backdrop_url}

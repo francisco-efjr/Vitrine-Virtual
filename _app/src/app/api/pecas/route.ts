@@ -9,10 +9,14 @@ export async function GET(req: NextRequest) {
   return handleRoute(async () => {
     const session = await requireLojista()
     const url = new URL(req.url)
+    const offsetRaw = Number(url.searchParams.get('offset') ?? 0)
+    const limitRaw = Number(url.searchParams.get('limit') ?? 30)
     return await listOwnPecas(session.loja.id, {
       somenteDisponiveis: url.searchParams.get('somente_disponiveis') === 'true',
       busca: url.searchParams.get('busca') ?? undefined,
       ordem: (url.searchParams.get('ordem') as 'recentes' | 'antigas' | null) ?? 'recentes',
+      offset: Number.isFinite(offsetRaw) ? offsetRaw : 0,
+      limit: Number.isFinite(limitRaw) ? limitRaw : 30,
     })
   })
 }

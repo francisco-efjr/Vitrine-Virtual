@@ -13,19 +13,42 @@ export interface LojaWithStats extends LojaRow {
   contatos: ContactClickStats
 }
 
-/**
- * Lista todas as lojas com estatísticas agregadas.
- * Use no painel super-admin. Caller deve ter passado por requireSuperAdmin().
- */
-export async function listLojasWithStats(): Promise<LojaWithStats[]> {
-  const supabase = createServiceClient()
+export interface LojasPage {
+  items: LojaWithStats[]
+  total: number
+  offset: number
+  limit: number
+}
 
-  const { data: lojas, error } = await supabase
-    .from('lojas')
-    .select('*')
-    .order('created_at', { ascending: false })
+export const SUPER_ADMIN_PAGE_SIZE = 20
+
+/**
+ * Lista lojas com estatísticas agregadas — paginado.
+ *
+ * Use no painel super-admin. Caller deve ter passado por requireSuperAdmin().
+ * Retorna `{ items, total }` pra UI montar paginação numérica.
+ */
+export async function listLojasWithStats(
+  opts: { offset?: number; limit?: number } = {},
+): Promise<LojasPage> {
+  const supabase = createServiceClient()
+  const limit = Math.max(1, Math.min(100, opts.limit ?? SUPER_ADMIN_PAGE_SIZE))
+  const offset = Math.max(0, opts.offset ?? 0)
+
+  const [
+    { count, error: countErr },
+    { data: lojas, error },
+  ] = await Promise.all([
+    supabase.from('lojas').select('id', { count: 'exact', head: true }),
+    supabase
+      .from('lojas')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1),
+  ])
   if (error) throw error
-  if (!lojas?.length) return []
+  if (countErr) throw countErr
+  if (!lojas?.length) return { items: [], total: count ?? 0, offset, limit }
 
   // Stats em paralelo
   const ids = lojas.map((l) => l.id)
@@ -61,13 +84,15 @@ export async function listLojasWithStats(): Promise<LojaWithStats[]> {
 
   const contatosMap = await getContactClickStatsByLoja(ids, 30)
 
-  return lojas.map((l) => ({
+  const items = lojas.map((l) => ({
     ...l,
     pecas_count: pecasMap.get(l.id)?.total ?? 0,
     vendidas_count: pecasMap.get(l.id)?.vendidas ?? 0,
     try_ons_mes: tryOnMap.get(l.id) ?? 0,
     contatos: contatosMap.get(l.id) ?? { instagram: 0, tiktok: 0, whatsapp: 0 },
   }))
+
+  return { items, total: count ?? items.length, offset, limit }
 }
 
 // BUG-010: mutações setLojaAtiva / setLojaAiModel movidas para ./update.ts

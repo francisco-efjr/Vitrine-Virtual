@@ -23,6 +23,8 @@ interface Peca {
 interface VitrineGridProps {
   slug: string
   pecas: Peca[]
+  /** Total geral de peças disponíveis — usado pelo botão "Carregar mais". */
+  totalPecas?: number
   exibirPreco: boolean
   whatsappE164: string | null
   cabineBackdropUrl: string | null
@@ -42,7 +44,8 @@ type ViewMode = 'grade' | 'foco'
  */
 export function VitrineGrid({
   slug,
-  pecas,
+  pecas: initialPecas,
+  totalPecas,
   exibirPreco,
   whatsappE164,
   cabineBackdropUrl,
@@ -51,6 +54,31 @@ export function VitrineGrid({
   const [viewMode, setViewMode] = useState<ViewMode>('grade')
   const [focusIdx, setFocusIdx] = useState(0)
   const [cabinePeca, setCabinePeca] = useState<Peca | null>(null)
+  // Paginação client-side: o SSR vem com a 1ª página; "Carregar mais"
+  // pede /api/v/{slug}/pecas?offset=N e acumula no state.
+  const [pecas, setPecas] = useState<Peca[]>(initialPecas)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreErr, setLoadMoreErr] = useState<string | null>(null)
+  const total = totalPecas ?? pecas.length
+  const hasMore = pecas.length < total
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    setLoadMoreErr(null)
+    try {
+      const r = await fetch(`/api/v/${slug}/pecas?offset=${pecas.length}`)
+      const data = await r.json()
+      if (!r.ok || !data?.ok) {
+        throw new Error(data?.error?.message ?? `HTTP ${r.status}`)
+      }
+      setPecas((prev) => [...prev, ...(data.data.pecas ?? [])])
+    } catch (e) {
+      setLoadMoreErr(e instanceof Error ? e.message : 'Falha ao carregar mais peças')
+    } finally {
+      setLoadingMore(false)
+    }
+  }
   // P1-06 (v6): copy-link discreto no card.
   // O ícone só aparece em hover (desktop) ou foco (teclado/touch). Após
   // clicar, o ícone vira "check" por ~1.5s para feedback de sucesso.
@@ -254,6 +282,27 @@ export function VitrineGrid({
           slug={slug}
         />
       )}
+
+      {/* Carregar mais — só aparece em modo grade e quando existem páginas
+          adicionais pra essa loja. Em modo foco não faz sentido (navegação
+          é por seta), e em filtro de categoria também não — o filtro é
+          aplicado sobre o que já está carregado (fix futuro: paginar
+          server-side por categoria, hoje categoria filtra in-memory). */}
+      {viewMode === 'grade' && catFilter === 'todas' && hasMore ? (
+        <div className="mt-8 flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="rounded-full border border-border bg-surface px-6 py-2.5 font-sans text-[13px] font-medium text-ink transition hover:border-ink disabled:opacity-50"
+          >
+            {loadingMore ? 'Carregando…' : `Carregar mais (${total - pecas.length})`}
+          </button>
+          {loadMoreErr ? (
+            <span className="font-sans text-[11.5px] text-danger">{loadMoreErr}</span>
+          ) : null}
+        </div>
+      ) : null}
 
       {cabinePeca ? (
         <TryOnModal

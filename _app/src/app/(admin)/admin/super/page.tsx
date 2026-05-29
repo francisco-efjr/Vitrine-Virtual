@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 import { CountUp } from '@/components/motion'
 import { VVLogo } from '@/components/brand/vv-logo'
 import { requireSuperAdmin } from '@/server/auth/session'
-import { listLojasWithStats } from '@/server/lojas/list'
+import { listLojasWithStats, SUPER_ADMIN_PAGE_SIZE } from '@/server/lojas/list'
 import {
   getDefaultAiImageModel,
   getTryOnBudget,
@@ -17,15 +17,23 @@ import { SuperAdminClient } from './super-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SuperAdminPage() {
+export default async function SuperAdminPage({
+  searchParams,
+}: {
+  searchParams: { page?: string }
+}) {
   const session = await requireSuperAdmin()
-  const [lojas, killEnabled, budget, defaultAiModel] = await Promise.all([
-    listLojasWithStats(),
+  const page = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
+  const offset = (page - 1) * SUPER_ADMIN_PAGE_SIZE
+  const [lojasPage, killEnabled, budget, defaultAiModel] = await Promise.all([
+    listLojasWithStats({ offset, limit: SUPER_ADMIN_PAGE_SIZE }),
     isTryOnEnabled(),
     getTryOnBudget(),
     getDefaultAiImageModel(),
   ])
-
+  // KPIs no header agregam só a página atual — pra agregação geral, futuro
+  // RPC `super_admin_kpis()` resolve sem trazer 50+ lojas pro Node.
+  const lojas = lojasPage.items
   const totalPecas = lojas.reduce((a, l) => a + l.pecas_count, 0)
   const totalVendidas = lojas.reduce((a, l) => a + l.vendidas_count, 0)
   const totalTryOns = lojas.reduce((a, l) => a + l.try_ons_mes, 0)
@@ -92,6 +100,11 @@ export default async function SuperAdminPage() {
 
         <SuperAdminClient
           initialLojas={lojas}
+          pageInfo={{
+            total: lojasPage.total,
+            pageSize: lojasPage.limit,
+            currentPage: page,
+          }}
           initialKillEnabled={killEnabled}
           initialBudget={budget.budgetUsd}
           initialDefaultModel={defaultAiModel}

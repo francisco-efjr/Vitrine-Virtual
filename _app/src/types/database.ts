@@ -422,7 +422,7 @@ export interface Database {
         }[]
       }
       get_pecas_publicas: {
-        Args: { p_slug: string }
+        Args: { p_slug: string; p_limit?: number; p_offset?: number }
         Returns: {
           created_at: string
           foto_principal_path: string
@@ -431,6 +431,7 @@ export interface Database {
           peca_id: string
           preco_centavos: number
           tamanho: string
+          total_count: number
         }[]
       }
       get_vitrine_publica: {

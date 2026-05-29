@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
+import { Pagination } from '@/components/ui/pagination'
 import { Stagger } from '@/components/motion'
 import { CATEGORIAS, getCategoriaLabel } from '@/lib/categorias'
 import { PecaFormModal } from './peca-form-modal'
@@ -24,11 +25,14 @@ function parseTamanhos(tamanho: string | null): string[] {
 
 export function PecasListClient({
   initialPecas,
+  pageInfo,
   title,
   showAll,
   children,
 }: {
   initialPecas: PecaListItem[]
+  /** Quando presente, exibe paginação numérica server-side (?page=N). */
+  pageInfo?: { total: number; pageSize: number; currentPage: number }
   title: string
   showAll: boolean
   children?: React.ReactNode
@@ -499,6 +503,17 @@ export function PecasListClient({
           </div>
         )}
       </Modal>
+
+      {/* Paginação server-side (?page=N). Só aparece quando o caller passa
+          pageInfo — busca/filtros client-side seguem operando sobre a
+          página atual. Para busca global, mude pra paginação por query. */}
+      {pageInfo && !search ? (
+        <Pagination
+          total={pageInfo.total}
+          pageSize={pageInfo.pageSize}
+          currentPage={pageInfo.currentPage}
+        />
+      ) : null}
 
       <Modal
         open={!!deleteId}
