@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger'
 import { ACCEPTANCE_THRESHOLDS } from '../quality-gate/thresholds'
 import type { SafetyRating } from '../types'
 import { checkAnatomy } from './anatomy-sanity'
-import { computeGarmentColorFidelity } from './color-check'
+import { computeGarmentColorFidelity, type GarmentCategory } from './color-check'
 import { detectGarmentText, editDistance } from './garment-text'
 import { computeIdentitySimilarity } from './identity-check'
 import { checkPoseConsistency } from './pose-consistency'
@@ -105,6 +105,10 @@ export interface AcceptanceInput {
   garmentOcrText?: string
   /** Safety ratings devolvidos pelo provider (Gemini hoje). */
   safetyRatings?: SafetyRating[]
+  /** Categoria da peça pra direcionar a região do patch de cor (P1.9). */
+  garmentCategory?: GarmentCategory
+  /** Foto da peça é flat-lay ou on-model (afeta seleção de patch no input). */
+  garmentPhotoType?: 'flat-lay' | 'model' | 'auto'
 }
 
 export async function runAcceptanceChecks(
@@ -378,6 +382,10 @@ async function garmentColorFidelity(input: AcceptanceInput): Promise<AcceptanceC
     const fid = await computeGarmentColorFidelity(
       input.garmentImageBuffer,
       input.resultImageBuffer,
+      {
+        category: input.garmentCategory ?? 'auto',
+        garmentPhotoType: input.garmentPhotoType ?? 'auto',
+      },
     )
     const maxDeltaE = ACCEPTANCE_THRESHOLDS.garmentColorMaxDeltaE
     return {
@@ -388,6 +396,7 @@ async function garmentColorFidelity(input: AcceptanceInput): Promise<AcceptanceC
         deltaE: Number(fid.deltaE.toFixed(3)),
         maxDeltaE,
         method: fid.method,
+        region: fid.region,
         sourceLab: roundLab(fid.sourceLab),
         resultLab: roundLab(fid.resultLab),
       },

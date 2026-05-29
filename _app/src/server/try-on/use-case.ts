@@ -430,6 +430,8 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       safetyRatings: result.safetyRatings,
       // Reusa OCR do best-of-N (evita chamada dupla ao Gemini) quando disponível
       garmentOcrText: bestOfN.garmentText,
+      garmentCategory: variables.garmentCategory,
+      garmentPhotoType,
     })
     if (acceptance) {
       logger.info('Try-on acceptance result', {
@@ -480,6 +482,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
             garmentUrl,
             safetyRatings: retryResult.safetyRatings,
             garmentOcrText: bestOfN.garmentText,
+            garmentCategory: variables.garmentCategory,
           })
           const originalScore = acceptance.checks.filter((c) => c.checked && c.pass).length
           const retryScore =
@@ -655,6 +658,8 @@ async function runAcceptancePostGen(args: {
   garmentUrl: string
   safetyRatings?: SafetyRating[]
   garmentOcrText?: string
+  garmentCategory?: TryOnPromptVariables['garmentCategory']
+  garmentPhotoType?: 'flat-lay' | 'model' | 'auto'
 }): Promise<AcceptanceResult | null> {
   try {
     const customerBuf = bufferFromDataUrl(args.customerPhotoDataUrl)
@@ -669,6 +674,8 @@ async function runAcceptancePostGen(args: {
       resultImageBuffer: resultBuf,
       safetyRatings: args.safetyRatings,
       garmentOcrText: args.garmentOcrText,
+      garmentCategory: args.garmentCategory,
+      garmentPhotoType: args.garmentPhotoType,
     })
   } catch (err) {
     logger.warn('Try-on acceptance: ignorando exceção', {
