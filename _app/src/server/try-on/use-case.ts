@@ -83,6 +83,16 @@ export interface RunTryOnInput {
   /** Cliente declarou consentimento extra pra peças sensíveis (P2.17 —
    *  swimwear/underwear). Sem isso, geração é bloqueada nessas categorias. */
   sensitiveGarmentConsentDeclared?: boolean
+  /**
+   * Bypass do AI gate (Gemini Vision validation) — segunda tentativa após
+   * o cliente ver uma rejeição "soft" (multiple_people, no_face) e optar
+   * por "Tentar mesmo assim". Útil pra contornar falso-positivos do Gemini
+   * com fotos em espelhos com manequins/posters no fundo.
+   *
+   * NÃO pula o quality gate baseado em client signals (MediaPipe) nem as
+   * outras camadas anti-abuso (kill switch, rate limit, turnstile, cota).
+   */
+  bypassAiGate?: boolean
 }
 
 /**
@@ -262,7 +272,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   // só por rate-limit/network — UX > paranoia.
   const customerPhotoBuf = bufferFromDataUrl(input.customerPhoto)
   const customerPhotoMime = mimeFromDataUrl(input.customerPhoto) ?? 'image/jpeg'
-  if (customerPhotoBuf) {
+  if (customerPhotoBuf && !input.bypassAiGate) {
     const aiValidation = await validateCustomerPhotoWithAi(
       customerPhotoBuf,
       customerPhotoMime,

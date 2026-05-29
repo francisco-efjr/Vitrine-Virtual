@@ -49,7 +49,7 @@ interface GeminiVisionVerdict {
   image_quality: 'good' | 'acceptable' | 'blurry' | 'too_dark' | 'too_bright'
 }
 
-const VISION_PROMPT = `Analyze this photo of a person. Respond with ONLY a single JSON object — no markdown, no prose, no explanation.
+const VISION_PROMPT = `Analyze this photo of a person taken for a virtual fashion try-on. Respond with ONLY a single JSON object — no markdown, no prose, no explanation.
 
 Schema (every key required, exact spelling, exact value vocabulary):
 {
@@ -60,12 +60,20 @@ Schema (every key required, exact spelling, exact value vocabulary):
   "image_quality": "good" | "acceptable" | "blurry" | "too_dark" | "too_bright"
 }
 
-Decision rules:
-- has_face = true ONLY if a human face is visible (not covered by mask, hands, phone, etc.).
+Decision rules — apply STRICTLY:
+- has_face = true ONLY if a real human face (skin, eyes, mouth) is visible. Not covered by mask, hands, phone, etc.
 - face_clarity "clear" = unambiguous facial features. "partial" = side angle or partially covered. "obscured" = present but hard to read. "none" = no face.
-- person_count counts distinct humans. Mannequins do NOT count. Background reflections do NOT count.
-- body_visibility describes the largest visible person.
-- image_quality "good" = sharp + well lit. "blurry" = motion blur or out of focus. "too_dark"/"too_bright" = uncorrectable exposure.
+- person_count counts ONLY DISTINCT LIVE HUMANS PHYSICALLY PRESENT in the foreground of the scene.
+  • DO NOT count: mannequins, dolls, statues, busts.
+  • DO NOT count: posters, billboards, magazine covers, framed photos, art prints, advertising images on walls.
+  • DO NOT count: people printed or drawn on garments (t-shirt graphics, brand logos with faces, animal prints).
+  • DO NOT count: reflections of the same person in mirrors, windows or glass — a person and their reflection = 1 person.
+  • DO NOT count: faces shown on a phone, tablet, TV, or computer screen.
+  • DO NOT count: people partially visible only in deep background (more than 5 meters away or blurry).
+  • Only count: a separate, real, foreground human standing/sitting/posing in the same physical scene as the main subject.
+  • When in doubt between 1 and 2, prefer 1 — false rejects hurt UX more than false accepts.
+- body_visibility describes the LARGEST visible foreground person.
+- image_quality "good" = sharp + well lit. "blurry" = motion blur or out of focus. "too_dark"/"too_bright" = uncorrectable exposure. "acceptable" = usable but not great.
 
 Output the JSON object only.`
 

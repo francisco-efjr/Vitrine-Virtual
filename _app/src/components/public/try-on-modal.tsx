@@ -94,6 +94,10 @@ export function TryOnModal({
   const [generationId, setGenerationId] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  // Código do erro retornado pelo /api/try-on (GATE_MULTIPLE_PEOPLE etc.) —
+  // usado pra decidir se ofereço "Tentar mesmo assim" pra códigos onde o
+  // Gemini Vision dá falso-positivo (fotos em espelho com manequins, posters).
+  const [errorCode, setErrorCode] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [rating, setRating] = useState<'sim' | 'nao' | null>(null)
   // Face warning: design v4 (chat7) — aviso amigável NÃO bloqueante quando o
@@ -205,11 +209,12 @@ export function TryOnModal({
     }
   }
 
-  async function handleGenerate() {
+  async function handleGenerate(opts?: { bypassAiGate?: boolean }) {
     if (!customerPhoto) return
     setStep('processing')
     setProgress(0)
     setErrorMsg(null)
+    setErrorCode(null)
 
     const interval = window.setInterval(() => {
       setProgress((value) => Math.min(92, value + Math.random() * 6 + 2))
@@ -227,6 +232,12 @@ export function TryOnModal({
       if (customerPhoto.signals) {
         formData.set('customer_signals', JSON.stringify(customerPhoto.signals))
       }
+      // Bypass do AI gate (Gemini Vision) quando o usuário clicou em
+      // "Tentar mesmo assim" depois de um falso-positivo (foto em espelho
+      // com manequim/poster contado como 2ª pessoa).
+      if (opts?.bypassAiGate) {
+        formData.set('bypass_ai_gate', 'true')
+      }
 
       const res = await fetch('/api/try-on', {
         method: 'POST',
@@ -236,15 +247,23 @@ export function TryOnModal({
         // WebKit que costuma matar uploads multipart no meio.
         cache: 'no-store',
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
       window.clearInterval(interval)
 
       if (!res.ok || !data?.ok) {
         // Gate hard-block (low_resolution / garment_unclear) e qualquer outro
         // erro caem aqui. Per design v4, NÃO mapeamos códigos GATE_* para copy
-        // específica — mostramos a mensagem genérica do servidor e o usuário
-        // pode tentar de novo. A copy do servidor já vem amigável em PT-BR.
-        setErrorMsg(data?.error?.message ?? 'Não foi possível gerar a visualização agora.')
+        // específica — mostramos a mensagem do servidor (já amigável em PT-BR)
+        // + o code estável (usado pra oferecer "Tentar mesmo assim" pra códigos
+        // de falso-positivo conhecido).
+        const message =
+          data?.error?.message ??
+          `Não foi possível gerar a visualização agora. (HTTP ${res.status})`
+        const code = typeof data?.error?.code === 'string' ? data.error.code : `HTTP_${res.status}`
+        // eslint-disable-next-line no-console
+        console.error('[try-on] gerada falhou', { status: res.status, code, message, data })
+        setErrorMsg(message)
+        setErrorCode(code)
         setStep('error')
         return
       }
@@ -267,6 +286,7 @@ export function TryOnModal({
       setErrorMsg(
         `Erro de conexão. Tente novamente em instantes.${detail ? ` (${detail})` : ''}`,
       )
+      setErrorCode('NETWORK_ERROR')
       setStep('error')
     }
   }
@@ -506,8 +526,10 @@ export function TryOnModal({
           {step === 'error' ? (
             <ErrorStep
               message={errorMsg}
+              errorCode={errorCode}
               onBack={() => setStep('upload')}
-              onRetry={handleGenerate}
+              onRetry={() => handleGenerate()}
+              onBypassRetry={() => handleGenerate({ bypassAiGate: true })}
               canRetry={!!customerPhoto}
             />
           ) : null}
@@ -1235,26 +1257,51 @@ function ProcessingStep({ progress, message }: { progress: number; message: stri
   )
 }
 
+// Códigos de gate cujo erro mais comum é falso-positivo (foto em espelho
+// com manequim, poster, segunda pessoa em foto na parede etc.). Pra esses,
+// damos ao cliente a opção "Tentar mesmo assim" — que bypassa só a etapa
+// do Gemini Vision; o resto das camadas anti-abuso segue valendo.
+const BYPASSABLE_GATE_CODES = new Set([
+  'GATE_MULTIPLE_PEOPLE',
+  'GATE_NO_FACE',
+  'GATE_TARGET_REGION_OCCLUDED',
+])
+
 function ErrorStep({
   message,
+  errorCode,
   onBack,
   onRetry,
+  onBypassRetry,
   canRetry,
 }: {
   message: string | null
+  errorCode: string | null
   onBack: () => void
   onRetry: () => void
+  onBypassRetry: () => void
   canRetry: boolean
 }) {
+  const isBypassable = !!errorCode && BYPASSABLE_GATE_CODES.has(errorCode)
   return (
-    <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 py-8 text-center">
+    <div
+      role="alert"
+      aria-live="polite"
+      className="flex min-h-[280px] flex-col items-center justify-center gap-3 py-8 text-center"
+    >
       <div className="font-serif text-[18px] font-semibold text-ink">
         Não foi possível gerar agora
       </div>
       <p className="max-w-[340px] text-[13px] leading-relaxed text-ink-3">
         {message ?? 'Tente novamente em instantes com outra foto.'}
       </p>
-      <div className="mt-4 flex gap-2.5">
+      {isBypassable ? (
+        <p className="max-w-[340px] text-[11.5px] italic leading-relaxed text-ink-3">
+          Se você é a única pessoa real na foto (e o que aparece atrás é um
+          manequim, espelho ou cartaz), pode tentar mesmo assim.
+        </p>
+      ) : null}
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
         <button
           type="button"
           onClick={onBack}
@@ -1270,7 +1317,20 @@ function ErrorStep({
         >
           Tentar novamente
         </button>
+        {isBypassable ? (
+          <button
+            type="button"
+            onClick={onBypassRetry}
+            disabled={!canRetry}
+            className="rounded-full border border-accent bg-accent-light px-5 py-2.5 font-sans text-[13px] font-medium text-accent-dark transition hover:bg-accent hover:text-white disabled:opacity-50"
+          >
+            Tentar mesmo assim
+          </button>
+        ) : null}
       </div>
+      {errorCode ? (
+        <div className="mt-3 font-mono text-[10.5px] text-ink-3/60">code · {errorCode}</div>
+      ) : null}
     </div>
   )
 }

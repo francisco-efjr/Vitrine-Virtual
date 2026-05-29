@@ -68,6 +68,15 @@ const fieldSchema = z.object({
     .optional(),
   customer_signals: z.string().optional(),
   garment_signals: z.string().optional(),
+  /**
+   * Bypass do AI gate (Gemini Vision) — quando o cliente já tentou e viu
+   * um erro de gate "soft" (multiple_people, no_face), pode decidir
+   * "tentar mesmo assim". O Gemini erra falso-positivo principalmente em
+   * fotos em espelho de loja com manequins/posters no fundo.
+   *
+   * Vem como string "true" no multipart porque FormData não tem boolean.
+   */
+  bypass_ai_gate: z.literal('true').optional(),
 })
 
 function parseSignals<T>(raw: string | undefined, schema: z.ZodType<T>): T | null {
@@ -138,6 +147,7 @@ export async function POST(req: NextRequest) {
     garmentImageUrlOverride: parsed.data.garment_url_override,
     customerSignals,
     garmentSignals,
+    bypassAiGate: parsed.data.bypass_ai_gate === 'true',
   })
 
   if (!result.ok) {
