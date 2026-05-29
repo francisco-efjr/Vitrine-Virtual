@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger'
 import { tierAPremium } from './tier-a-premium'
 import { tierBEconomy } from './tier-b-economy'
 import { tierCGemini } from './tier-c-gemini'
+import { tierSVertex } from './tier-s-vertex'
 import type {
   TryOnTier,
   TryOnTierHandler,
@@ -25,7 +26,7 @@ export type {
   TryOnTierResult,
 } from './types'
 
-const ALL_TIERS: readonly TryOnTierHandler[] = [tierAPremium, tierBEconomy, tierCGemini]
+const ALL_TIERS: readonly TryOnTierHandler[] = [tierSVertex, tierAPremium, tierBEconomy, tierCGemini]
 
 /**
  * Inputs the router uses to decide which tier to run.
@@ -57,6 +58,7 @@ export interface TierRouteContext {
     | 'outerwear'
     | 'swimwear'
     | 'accessories'
+    | 'footwear'
     | 'auto'
   backgroundMode: 'white' | 'store_background' | 'preserve_customer'
   quality: 'fast' | 'balanced' | 'quality'
@@ -84,6 +86,10 @@ export function chooseTier(ctx: TierRouteContext): TryOnTier {
   if (ctx.storeModelPreference && ctx.storeModelPreference !== 'auto') {
     return ctx.storeModelPreference
   }
+
+  // Tier S — calçados sempre vão pro Vertex AI VTO quando habilitado.
+  // Quando não habilitado, resolveEnabledTier cai pra Tier C.
+  if (ctx.garmentCategory === 'footwear') return 'tier_s_vertex'
 
   // On-model garment: prefer FASHN. When FASHN is disabled, resolveEnabledTier
   // routes back to Tier C — same as today, but with the stronger 'auto' /

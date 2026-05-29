@@ -49,7 +49,17 @@ export function composeFinalPrompt(vars: TryOnPromptVariables): ComposedPrompt {
 ${vars.garmentDescription}`
     : ''
 
-  const blocks = [master, ...variantBlocks, garmentDescriptionBlock, VIRTUAL_TRYON_NEGATIVE_PROMPT]
+  // Fabric hint injetada pré-prompt (P2.11) — quando disponível, empurra
+  // o modelo a renderizar drape/sheen/textura corretos pro material detectado.
+  const fabricBlock = vars.fabricPromptClause ?? ''
+
+  const blocks = [
+    master,
+    fabricBlock,
+    ...variantBlocks,
+    garmentDescriptionBlock,
+    VIRTUAL_TRYON_NEGATIVE_PROMPT,
+  ]
     .filter((b) => b && b.trim().length > 0)
     .join('\n\n')
 

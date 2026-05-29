@@ -3,16 +3,28 @@ import sharp from 'sharp'
 import { logger } from '@/lib/logger'
 import { ACCEPTANCE_THRESHOLDS } from '../quality-gate/thresholds'
 import type { SafetyRating } from '../types'
-import { computeGarmentColorFidelity } from './color-check'
+import { checkAnatomy } from './anatomy-sanity'
+import { computeGarmentColorFidelity, type GarmentCategory } from './color-check'
+import { detectGarmentText, editDistance } from './garment-text'
 import { computeIdentitySimilarity } from './identity-check'
+import { checkBackgroundChange } from './background-change'
+import { checkPatternAlignment } from './pattern-alignment'
+import { checkPoseConsistency } from './pose-consistency'
+import { checkShadowDirection } from './shadow-direction'
+import { countPersons } from './subject-count'
 
 /**
- * Threshold do dHash proxy. Diferente do `identitySimilarityMin` (0.55) que
- * o research projetou pra ArcFace cosine. Quando a checagem ArcFace real
- * for implementada (TODO em identity-check.ts), removemos este e voltamos
- * pro threshold canônico.
+ * Thresholds por método de identity check. ArcFace cosine usa o threshold
+ * canônico do research (0.55); dHash proxy usa 0.78 (calibração local).
  */
 const IDENTITY_DHASH_PROXY_MIN = 0.78
+const IDENTITY_DHASH_FACE_CROP_MIN = 0.7
+
+function identityThresholdForMethod(method: string): number {
+  if (method === 'arcface_cosine') return ACCEPTANCE_THRESHOLDS.identitySimilarityMin
+  if (method === 'dhash_face_crop') return IDENTITY_DHASH_FACE_CROP_MIN
+  return IDENTITY_DHASH_PROXY_MIN
+}
 
 /**
  * Generation acceptance checks — research deliverable section 14.
@@ -77,8 +89,10 @@ export interface AcceptanceCheck {
 
 export interface AcceptanceResult {
   pass: boolean
-  /** True iff the result MUST be retried before showing the customer. */
+  /** True iff o caller deveria tentar uma re-geração com prompt reforçado. */
   shouldRetry: boolean
+  /** Cláusulas de reforço a anexar ao prompt do retry. */
+  retryHints: string[]
   checks: AcceptanceCheck[]
 }
 
@@ -89,10 +103,17 @@ export interface AcceptanceInput {
   garmentImageBuffer: Buffer
   /** Bytes of the generated try-on result. */
   resultImageBuffer: Buffer
-  /** Optional text that was OCR'd on the garment input (from the gate). */
+  /** OCR text of the garment input. Quando provido (e.g. cache do best-of-N),
+   *  pula a chamada de OCR no input. */
   garmentOcrText?: string
   /** Safety ratings devolvidos pelo provider (Gemini hoje). */
   safetyRatings?: SafetyRating[]
+  /** Categoria da peça pra direcionar a região do patch de cor (P1.9). */
+  garmentCategory?: GarmentCategory
+  /** Foto da peça é flat-lay ou on-model (afeta seleção de patch no input). */
+  garmentPhotoType?: 'flat-lay' | 'model' | 'auto'
+  /** Background mode da geração — só roda shadowDirection em preserve_customer (P2.13). */
+  backgroundMode?: 'white' | 'store_background' | 'preserve_customer'
 }
 
 export async function runAcceptanceChecks(
@@ -104,19 +125,51 @@ export async function runAcceptanceChecks(
   checks.push(await resultSharpness(input))
   checks.push(await subjectCount(input))
   checks.push(await anatomySanity(input))
+  checks.push(await poseConsistency(input))
   checks.push(await identitySimilarity(input))
   checks.push(await garmentColorFidelity(input))
   checks.push(await garmentTextFidelity(input))
+  checks.push(await patternAlignment(input))
+  checks.push(await shadowDirection(input))
+  checks.push(await backgroundChange(input))
   checks.push(await nsfwClean(input))
 
   const failed = checks.filter((c) => c.checked && !c.pass)
   const pass = failed.length === 0
-  // Today: never auto-retry because we'd burn a second paid generation.
-  // When Tier A is wired, set `shouldRetry = true` for identity/color/text
-  // failures (those benefit from a retry with adjusted prompt).
-  const shouldRetry = false
 
-  return { pass, shouldRetry, checks }
+  // Retry hints — research §14 / P1.7. Apenas as falhas onde um prompt
+  // reforçado tem chance real de melhorar (cor, texto, identidade);
+  // anatomy/subject/sharpness são falhas do modelo, não do prompt.
+  const failedNames = new Set(failed.map((c) => c.name))
+  const retryHints: string[] = []
+  if (failedNames.has('garmentColorFidelity')) {
+    retryHints.push(
+      'STRICT: preserve the EXACT garment color from the product reference image. Match hue, saturation and value precisely.',
+    )
+  }
+  if (failedNames.has('garmentTextFidelity')) {
+    retryHints.push(
+      'STRICT: preserve the EXACT text, letters, and logo on the garment from the product reference image. Spelling, casing, and font weight must match.',
+    )
+  }
+  if (failedNames.has('identitySimilarity')) {
+    retryHints.push(
+      'STRICT: preserve the customer face from the customer photo. Do NOT change facial features, hair, or skin tone.',
+    )
+  }
+  if (failedNames.has('poseConsistency')) {
+    retryHints.push(
+      'STRICT: keep the customer in the SAME pose as in the customer photo. Do NOT change posture, stance, or body orientation.',
+    )
+  }
+  const shouldRetry = retryHints.length > 0
+
+  return { pass, shouldRetry, retryHints, checks }
+}
+
+export function composeRetryPrompt(originalPrompt: string, retryHints: string[]): string {
+  if (retryHints.length === 0) return originalPrompt
+  return `${originalPrompt}\n\n--- RETRY REINFORCEMENT ---\n${retryHints.join('\n')}`
 }
 
 // ─── Stubs ───────────────────────────────────────────────────────────────
@@ -216,14 +269,75 @@ async function resultSharpness(input: AcceptanceInput): Promise<AcceptanceCheck>
   }
 }
 
-async function subjectCount(_input: AcceptanceInput): Promise<AcceptanceCheck> {
-  // TODO: server-side person detection (yolov8n ou MediaPipe via tfjs-node).
-  return { name: 'subjectCount', pass: true, checked: false }
+async function subjectCount(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  try {
+    const res = await countPersons(input.resultImageBuffer)
+    if (res.method === 'unavailable') {
+      return {
+        name: 'subjectCount',
+        pass: true,
+        checked: false,
+        details: { reason: res.reason ?? 'unavailable' },
+      }
+    }
+    // Caminho feliz: exatamente 1 pessoa. 0 também é falha (modelo gerou
+    // cenário sem corpo) mas tratamos com mesmo verdict.
+    return {
+      name: 'subjectCount',
+      pass: res.count === 1,
+      checked: true,
+      details: {
+        count: res.count,
+        confidences: res.confidences,
+        method: res.method,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: subjectCount falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'subjectCount',
+      pass: true, // erro de medição não bloqueia
+      checked: false,
+      details: { error: 'detection_failed' },
+    }
+  }
 }
 
-async function anatomySanity(_input: AcceptanceInput): Promise<AcceptanceCheck> {
-  // TODO: MediaPipe Pose + Hands. Rejeitar membros extras / mãos extras.
-  return { name: 'anatomySanity', pass: true, checked: false }
+async function anatomySanity(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  try {
+    const res = await checkAnatomy(input.customerImageBuffer, input.resultImageBuffer)
+    if (res.method === 'unavailable') {
+      return {
+        name: 'anatomySanity',
+        pass: true,
+        checked: false,
+        details: { reason: res.reason ?? 'unavailable' },
+      }
+    }
+    return {
+      name: 'anatomySanity',
+      pass: res.pass,
+      checked: true,
+      details: {
+        method: res.method,
+        input: res.input,
+        output: res.output,
+        flags: res.flags,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: anatomySanity falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'anatomySanity',
+      pass: true,
+      checked: false,
+      details: { error: 'detection_failed' },
+    }
+  }
 }
 
 async function identitySimilarity(input: AcceptanceInput): Promise<AcceptanceCheck> {
@@ -232,19 +346,20 @@ async function identitySimilarity(input: AcceptanceInput): Promise<AcceptanceChe
       input.customerImageBuffer,
       input.resultImageBuffer,
     )
+    const threshold = identityThresholdForMethod(sim.method)
     return {
       name: 'identitySimilarity',
-      // dHash proxy: usa threshold local. ArcFace real virá depois (ver
-      // identity-check.ts TODO).
-      pass: sim.similarity >= IDENTITY_DHASH_PROXY_MIN,
+      pass: sim.similarity >= threshold,
       checked: true,
       details: {
         similarity: Number(sim.similarity.toFixed(4)),
         hammingDistance: sim.hammingDistance,
+        embeddingDim: sim.embeddingDim,
         method: sim.method,
-        proxyThreshold: IDENTITY_DHASH_PROXY_MIN,
-        // Mantemos o threshold canônico no log pra quando a substituição vier.
-        targetThresholdWhenArcface: ACCEPTANCE_THRESHOLDS.identitySimilarityMin,
+        faceCroppedByPose: sim.faceCroppedByPose,
+        threshold,
+        // Mantemos o threshold canônico no log pra dashboards de migração.
+        canonicalThreshold: ACCEPTANCE_THRESHOLDS.identitySimilarityMin,
       },
     }
   } catch (err) {
@@ -275,6 +390,10 @@ async function garmentColorFidelity(input: AcceptanceInput): Promise<AcceptanceC
     const fid = await computeGarmentColorFidelity(
       input.garmentImageBuffer,
       input.resultImageBuffer,
+      {
+        category: input.garmentCategory ?? 'auto',
+        garmentPhotoType: input.garmentPhotoType ?? 'auto',
+      },
     )
     const maxDeltaE = ACCEPTANCE_THRESHOLDS.garmentColorMaxDeltaE
     return {
@@ -285,6 +404,7 @@ async function garmentColorFidelity(input: AcceptanceInput): Promise<AcceptanceC
         deltaE: Number(fid.deltaE.toFixed(3)),
         maxDeltaE,
         method: fid.method,
+        region: fid.region,
         sourceLab: roundLab(fid.sourceLab),
         resultLab: roundLab(fid.resultLab),
       },
@@ -310,9 +430,222 @@ function roundLab(lab: { L: number; a: number; b: number }) {
   }
 }
 
-async function garmentTextFidelity(_input: AcceptanceInput): Promise<AcceptanceCheck> {
-  // TODO: lightweight OCR (tesseract.js or PaddleOCR REST), compare.
-  return { name: 'garmentTextFidelity', pass: true, checked: false }
+async function garmentTextFidelity(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  try {
+    // 1. Detecta texto na peça (reuso de cache do best-of-N quando passado)
+    let garmentText = input.garmentOcrText
+    if (garmentText === undefined) {
+      if (input.garmentImageBuffer.byteLength === 0) {
+        return {
+          name: 'garmentTextFidelity',
+          pass: true,
+          checked: false,
+          details: { reason: 'no_garment_buffer' },
+        }
+      }
+      const g = await detectGarmentText(input.garmentImageBuffer)
+      if (g.source === 'unavailable') {
+        return {
+          name: 'garmentTextFidelity',
+          pass: true,
+          checked: false,
+          details: { reason: g.detail ?? 'ocr_unavailable' },
+        }
+      }
+      garmentText = g.text
+    }
+
+    // 2. Sem texto na peça: skip
+    if (!garmentText.trim()) {
+      return {
+        name: 'garmentTextFidelity',
+        pass: true,
+        checked: false,
+        details: { reason: 'no_text_on_garment' },
+      }
+    }
+
+    // 3. OCR no resultado e compara
+    const r = await detectGarmentText(input.resultImageBuffer)
+    if (r.source === 'unavailable') {
+      return {
+        name: 'garmentTextFidelity',
+        pass: true,
+        checked: false,
+        details: { reason: r.detail ?? 'result_ocr_unavailable' },
+      }
+    }
+    const distance = editDistance(garmentText, r.text)
+    const maxDist = ACCEPTANCE_THRESHOLDS.ocrEditDistanceMax
+    return {
+      name: 'garmentTextFidelity',
+      pass: distance <= maxDist,
+      checked: true,
+      details: {
+        garmentText: garmentText.slice(0, 80),
+        resultText: r.text.slice(0, 80),
+        editDistance: distance,
+        maxEditDistance: maxDist,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: garmentTextFidelity falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'garmentTextFidelity',
+      pass: true,
+      checked: false,
+      details: { error: 'ocr_failed' },
+    }
+  }
+}
+
+async function patternAlignment(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  if (input.garmentImageBuffer.byteLength === 0) {
+    return {
+      name: 'patternAlignment',
+      pass: true,
+      checked: false,
+      details: { reason: 'no_garment_buffer' },
+    }
+  }
+  try {
+    const res = await checkPatternAlignment(input.garmentImageBuffer, input.resultImageBuffer)
+    return {
+      name: 'patternAlignment',
+      pass: res.pass,
+      checked: true,
+      details: {
+        distance: Number(res.distance.toFixed(4)),
+        threshold: res.threshold,
+        method: res.method,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: patternAlignment falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'patternAlignment',
+      pass: true,
+      checked: false,
+      details: { error: 'pattern_check_failed' },
+    }
+  }
+}
+
+async function backgroundChange(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  if (input.backgroundMode !== 'preserve_customer') {
+    return {
+      name: 'backgroundChange',
+      pass: true,
+      checked: false,
+      details: { reason: 'not_preserve_customer_mode' },
+    }
+  }
+  try {
+    const res = await checkBackgroundChange(input.customerImageBuffer, input.resultImageBuffer)
+    if (res.reason) {
+      return {
+        name: 'backgroundChange',
+        pass: true,
+        checked: false,
+        details: { reason: res.reason },
+      }
+    }
+    return {
+      name: 'backgroundChange',
+      pass: res.pass,
+      checked: true,
+      details: {
+        distance: Number(res.distance.toFixed(4)),
+        threshold: res.threshold,
+        method: res.method,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: backgroundChange falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'backgroundChange',
+      pass: true,
+      checked: false,
+      details: { error: 'bg_change_check_failed' },
+    }
+  }
+}
+
+async function shadowDirection(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  // Só faz sentido em preserve_customer mode (cliente é a fonte de iluminação)
+  if (input.backgroundMode !== 'preserve_customer') {
+    return {
+      name: 'shadowDirection',
+      pass: true,
+      checked: false,
+      details: { reason: 'not_preserve_customer_mode' },
+    }
+  }
+  try {
+    const res = await checkShadowDirection(input.customerImageBuffer, input.resultImageBuffer)
+    return {
+      name: 'shadowDirection',
+      pass: res.pass,
+      checked: true,
+      details: {
+        angleDegrees: Number(res.angleDegrees.toFixed(2)),
+        thresholdDegrees: (res.threshold * 180) / Math.PI,
+        method: res.method,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: shadowDirection falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'shadowDirection',
+      pass: true,
+      checked: false,
+      details: { error: 'shadow_check_failed' },
+    }
+  }
+}
+
+async function poseConsistency(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  try {
+    const res = await checkPoseConsistency(input.customerImageBuffer, input.resultImageBuffer)
+    if (res.method === 'unavailable') {
+      return {
+        name: 'poseConsistency',
+        pass: true,
+        checked: false,
+        details: { reason: res.reason ?? 'unavailable' },
+      }
+    }
+    return {
+      name: 'poseConsistency',
+      pass: res.pass,
+      checked: true,
+      details: {
+        method: res.method,
+        meanNormalizedDistance: res.meanNormalizedDistance
+          ? Number(res.meanNormalizedDistance.toFixed(4))
+          : null,
+        comparedKeypoints: res.comparedKeypoints,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: poseConsistency falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'poseConsistency',
+      pass: true,
+      checked: false,
+      details: { error: 'detection_failed' },
+    }
+  }
 }
 
 /**
@@ -339,6 +672,11 @@ const STRICT_CATEGORIES = new Set([
 
 async function nsfwClean(input: AcceptanceInput): Promise<AcceptanceCheck> {
   const ratings = input.safetyRatings ?? []
+  // P2.17 — categorias sensíveis exigem threshold mais rigoroso (MEDIUM em
+  // qualquer categoria estrita já falha; LOW em sexual já flag).
+  const isSensitiveCategory =
+    input.garmentCategory === 'swimwear' || input.garmentCategory === 'underwear'
+
   if (!ratings.length) {
     return {
       name: 'nsfwClean',
@@ -364,6 +702,7 @@ async function nsfwClean(input: AcceptanceInput): Promise<AcceptanceCheck> {
   }
 
   // Falha em HIGH em qualquer categoria, ou MEDIUM em categorias estritas.
+  // Categorias sensíveis (swimwear/underwear): LOW em sexual já falha.
   for (const r of ratings) {
     const level = PROBABILITY_ORDER[r.probability] ?? 0
     if (level >= PROBABILITY_ORDER.HIGH!) {
@@ -387,6 +726,23 @@ async function nsfwClean(input: AcceptanceInput): Promise<AcceptanceCheck> {
           reason: 'medium_in_strict_category',
           category: r.category,
           probability: r.probability,
+        },
+      }
+    }
+    if (
+      isSensitiveCategory &&
+      STRICT_CATEGORIES.has(r.category) &&
+      level >= PROBABILITY_ORDER.LOW!
+    ) {
+      return {
+        name: 'nsfwClean',
+        pass: false,
+        checked: true,
+        details: {
+          reason: 'low_in_strict_for_sensitive_garment',
+          category: r.category,
+          probability: r.probability,
+          garmentCategory: input.garmentCategory,
         },
       }
     }

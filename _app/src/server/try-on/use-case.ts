@@ -3,7 +3,16 @@ import { logger } from '@/lib/logger'
 import { hashIp } from '@/lib/security/ip-hash'
 import { isAllowedResultUrl } from '@/lib/security/url-allowlist'
 import { createServiceClient } from '@/lib/supabase/service'
-import { runAcceptanceChecks, type AcceptanceResult } from '@/lib/try-on/acceptance'
+import {
+  composeRetryPrompt,
+  runAcceptanceChecks,
+  type AcceptanceResult,
+} from '@/lib/try-on/acceptance'
+import { detectMirrorSelfie } from '@/lib/try-on/acceptance/mirror-selfie-detect'
+import { checkConflictingGarment } from '@/lib/try-on/acceptance/conflicting-garment-detect'
+import { classifyFabric, fabricPromptClause } from '@/lib/try-on/acceptance/fabric-classify'
+import { estimateAge, requiresParentalConsent } from '@/lib/try-on/acceptance/age-estimation'
+import { runTier } from '@/lib/try-on/tiers'
 import type { SafetyRating } from '@/lib/try-on/types'
 import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
 import { buildTryOnProviderInput } from '@/lib/try-on/payload'
@@ -21,11 +30,11 @@ import {
 import { checkTryOnRateLimit } from '@/lib/try-on/rate-limit'
 import {
   chooseTier,
-  runTier,
   type TierRouteContext,
   type TryOnPromptVariables,
   type TryOnTier,
 } from '@/lib/try-on/tiers'
+import { runWithBestOfN } from '@/lib/try-on/best-of-n'
 import { verifyTurnstileToken } from '@/lib/try-on/turnstile'
 import { resolveGoogleModel } from '@/lib/try-on/model-selection'
 import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
@@ -40,6 +49,8 @@ export type TryOnError =
   | { kind: 'quota_exceeded'; used: number; limit: number }
   | { kind: 'peca_unavailable' }
   | { kind: 'gate_rejected'; reason: RejectionReason }
+  | { kind: 'parental_consent_required'; bracket: 'minor' | 'uncertain' }
+  | { kind: 'sensitive_garment_consent_required'; category: 'swimwear' | 'underwear' }
   | { kind: 'provider_failed'; message: string }
 
 export interface TryOnSuccess {
@@ -66,6 +77,12 @@ export interface RunTryOnInput {
    * quando ausente, a geração roda como antes (compat. com clientes antigos). */
   customerSignals?: CustomerPhotoSignals | null
   garmentSignals?: GarmentPhotoSignals | null
+  /** Cliente declarou ter consentimento parental (P2.16 / LGPD).
+   *  Quando true, pula o age gate mesmo se a foto parece de menor. */
+  parentalConsentDeclared?: boolean
+  /** Cliente declarou consentimento extra pra peças sensíveis (P2.17 —
+   *  swimwear/underwear). Sem isso, geração é bloqueada nessas categorias. */
+  sensitiveGarmentConsentDeclared?: boolean
 }
 
 /**
@@ -102,7 +119,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
 
   const { data: peca } = await supabase
     .from('pecas')
-    .select('id, nome, status, loja_id, foto_principal_id')
+    .select('id, nome, status, loja_id, foto_principal_id, categoria_id')
     .eq('id', input.pecaId)
     .maybeSingle()
 
@@ -288,6 +305,111 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     logger.info('Try-on: AI validation aprovou foto do cliente', {
       source: aiValidation.source,
     })
+
+    // Mirror selfie detection (cenário C05). Não bloqueia — só loga + anexa
+    // ao gateSignals pra dashboard de calibração. UI notification fica como
+    // follow-up (precisa de campo `clientHints` no TryOnSuccess).
+    const mirrorRes = await detectMirrorSelfie(customerPhotoBuf)
+    if (mirrorRes.detected) {
+      logger.info('Try-on: mirror selfie detectado (warning)', {
+        phoneCount: mirrorRes.phoneCount,
+        closestPx: mirrorRes.closestPhoneToWristPx,
+      })
+    }
+    gateSignalsForLog = {
+      ...(gateSignalsForLog ?? {}),
+      mirror_selfie: mirrorRes,
+    }
+  }
+
+  // ─── Sensitive garment consent gate (P2.17) ─────────────────────────────
+  //
+  // Swimwear/underwear exigem consentimento extra do cliente antes da
+  // geração. Categoria é inferida de peca.categoria_id (string livre).
+  const sensitiveCategory = inferSensitiveGarmentCategory(peca.categoria_id)
+  if (sensitiveCategory && !input.sensitiveGarmentConsentDeclared) {
+    logger.info('Try-on: sensitive garment consent não declarado', {
+      category: sensitiveCategory,
+      categoria_id: peca.categoria_id,
+    })
+    return {
+      ok: false,
+      error: { kind: 'sensitive_garment_consent_required', category: sensitiveCategory },
+    }
+  }
+
+  // ─── Age gate (P2.16 / LGPD) ────────────────────────────────────────────
+  //
+  // Quando ativado, estima faixa etária. Se parecer minor (ou uncertain
+  // alta confiança) E o cliente não declarou consentimento parental,
+  // bloqueia com erro `parental_consent_required` pra que a UI mostre
+  // o checkbox de consentimento.
+  if (
+    customerPhotoBuf &&
+    process.env.TRY_ON_AGE_GATE === 'true' &&
+    !input.parentalConsentDeclared
+  ) {
+    try {
+      const age = await estimateAge(customerPhotoBuf)
+      if (requiresParentalConsent(age)) {
+        logger.info('Try-on: age gate exigindo consentimento parental', {
+          bracket: age.bracket,
+          confidence: age.confidence,
+        })
+        await recordGeneration({
+          lojaId: loja.id,
+          pecaId: peca.id,
+          sessionId: input.sessionId ?? null,
+          ipHash,
+          aiImageModel: (loja.ai_image_model ?? null) as AiImageModel | null,
+          status: 'error',
+          errorCode: 'age_gate_consent_required',
+          gateVerdict: 'reject',
+          gateReason: null,
+          gateSignals: {
+            ...(gateSignalsForLog ?? {}),
+            age_estimation: { bracket: age.bracket, confidence: age.confidence },
+          },
+        })
+        return {
+          ok: false,
+          error: {
+            kind: 'parental_consent_required',
+            bracket: age.bracket === 'minor' ? 'minor' : 'uncertain',
+          },
+        }
+      }
+      gateSignalsForLog = {
+        ...(gateSignalsForLog ?? {}),
+        age_estimation: { bracket: age.bracket, confidence: age.confidence },
+      }
+    } catch {
+      // best-effort — falha de infra não bloqueia
+    }
+  }
+
+  // ─── Conflicting garment detection (P1.10 / C19) ────────────────────────
+  //
+  // Quando o cliente já está vestindo uma peça da mesma categoria da nova
+  // (e.g. blusa atual + nova blusa), o try-on tende a misturar as duas.
+  // Não bloqueia — loga + grava no gateSignals.conflicting_garment.
+  // UI notification ("Sua foto mostra outra blusa...") fica como follow-up.
+  if (customerPhotoBuf && process.env.TRY_ON_CONFLICTING_GARMENT_DETECTION !== 'false') {
+    try {
+      const conflictRes = await checkConflictingGarment(customerPhotoBuf, 'auto')
+      if (conflictRes.conflict) {
+        logger.info('Try-on: conflicting garment detectado (warning)', {
+          currentOutfit: conflictRes.currentOutfit,
+          newGarment: conflictRes.newGarment,
+        })
+      }
+      gateSignalsForLog = {
+        ...(gateSignalsForLog ?? {}),
+        conflicting_garment: conflictRes,
+      }
+    } catch {
+      // best-effort
+    }
   }
 
   const provadorFundoUrl =
@@ -323,16 +445,22 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   // The client-side `garmentSignals.detectedPhotoType` is reserved for the
   // admin's upload form; the public try-on flow doesn't have it because the
   // garment comes straight from store storage.
+  // Fetcha o buffer da peça uma vez — reusado pelo classifier de garmentPhotoType
+  // E pelo best-of-N OCR-gating (research §4.1 P0.4).
+  let garmentBuffer: Buffer | null = null
+  try {
+    garmentBuffer = await fetch(garmentUrl, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .then((buf) => (buf ? Buffer.from(buf) : null))
+  } catch {
+    // best-effort
+  }
+
   let garmentPhotoType: 'flat-lay' | 'model' | 'auto' =
     input.garmentSignals?.detectedPhotoType ?? 'auto'
-  if (garmentPhotoType === 'auto') {
+  if (garmentPhotoType === 'auto' && garmentBuffer) {
     try {
-      const garmentBuf = await fetch(garmentUrl, { cache: 'no-store' })
-        .then((r) => (r.ok ? r.arrayBuffer() : null))
-        .then((buf) => (buf ? Buffer.from(buf) : null))
-      if (garmentBuf) {
-        garmentPhotoType = (await detectGarmentHasPerson(garmentBuf)) ? 'model' : 'flat-lay'
-      }
+      garmentPhotoType = (await detectGarmentHasPerson(garmentBuffer)) ? 'model' : 'flat-lay'
     } catch {
       // Best-effort — falls back to 'auto' which still gets the strengthened
       // 'auto' delta in the prompt composer.
@@ -355,6 +483,25 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   }
   const tierChosen: TryOnTier = chooseTier(routeCtx)
 
+  // Fabric classifier (P2.11) — best-effort. Quando detecta material com
+  // confidence ≥ 0.6, gera cláusula de prompt sobre drape/sheen.
+  let fabricClause: string | undefined
+  if (garmentBuffer && process.env.TRY_ON_FABRIC_CLASSIFIER !== 'false') {
+    try {
+      const fabric = await classifyFabric(garmentBuffer, 'image/jpeg')
+      const clause = fabricPromptClause(fabric.fabric, fabric.confidence)
+      if (clause) {
+        fabricClause = clause
+        logger.info('Try-on: fabric classifier', {
+          fabric: fabric.fabric,
+          confidence: fabric.confidence,
+        })
+      }
+    } catch {
+      // best-effort
+    }
+  }
+
   const variables: TryOnPromptVariables = {
     customerPhotoType,
     garmentPhotoType,
@@ -364,8 +511,11 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     storeBackgroundReference: provadorFundoUrl ?? undefined,
     quality: 'quality',
     outputStyle: 'premium_studio',
-    promptVariantId: 'v1.1-garment-first+variants+negative',
+    promptVariantId: fabricClause
+      ? 'v1.1-garment-first+variants+negative+fabric'
+      : 'v1.1-garment-first+variants+negative',
     safetyLevel: 'conservative',
+    fabricPromptClause: fabricClause,
   }
   const composedPrompt = composeFinalPrompt(variables)
 
@@ -379,27 +529,108 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   })
 
   try {
-    const result = await runTier(tierChosen, { provider: providerInput, variables })
-    const tierEffective = result.tier
+    const bestOfN = await runWithBestOfN(
+      { provider: providerInput, variables },
+      {
+        tier: tierChosen,
+        garmentBuffer: garmentBuffer ?? Buffer.alloc(0),
+        garmentMimeType: 'image/jpeg',
+      },
+    )
+    let result = bestOfN.result
+    let tierEffective = result.tier
+    logger.info('Try-on best-of-N gating', {
+      reason: bestOfN.reason,
+      samplesGenerated: bestOfN.samplesGenerated,
+      winnerScore: bestOfN.winnerScore ?? null,
+    })
 
     // Acceptance checks (research §14) — best-effort, NUNCA bloqueia o cliente.
-    // Hoje só logamos (sem retry pago). Os números servem pra dashboard de
-    // qualidade — quando ArcFace e Tier A chegarem, plumbamos retry.
-    const acceptance = await runAcceptancePostGen({
+    let acceptance = await runAcceptancePostGen({
       customerPhotoDataUrl: input.customerPhoto,
       resultUrl: result.resultUrl,
       garmentUrl,
       safetyRatings: result.safetyRatings,
+      // Reusa OCR do best-of-N (evita chamada dupla ao Gemini) quando disponível
+      garmentOcrText: bestOfN.garmentText,
+      garmentCategory: variables.garmentCategory,
+      garmentPhotoType,
+      backgroundMode: tierBackgroundMode,
     })
     if (acceptance) {
       logger.info('Try-on acceptance result', {
         pass: acceptance.pass,
+        shouldRetry: acceptance.shouldRetry,
         checks: acceptance.checks.map((c) => ({
           name: c.name,
           pass: c.pass,
           checked: c.checked,
         })),
       })
+    }
+
+    // ─── Retry inteligente (P1.7) ────────────────────────────────────────
+    //
+    // Quando o acceptance pede retry (cor/texto/identidade falharam) e a
+    // feature flag está ligada, gera uma segunda tentativa com prompt
+    // reforçado e fica com o melhor (mais checks passing). Limitado a 1
+    // retry pra não estourar orçamento.
+    let retryReason: 'not_attempted' | 'disabled' | 'no_hints' | 'retry_picked' | 'retry_rejected' =
+      'not_attempted'
+    if (acceptance?.shouldRetry) {
+      if (process.env.TRY_ON_RETRY_ENABLED !== 'true') {
+        retryReason = 'disabled'
+      } else if (acceptance.retryHints.length === 0) {
+        retryReason = 'no_hints'
+      } else {
+        const reinforced = composeRetryPrompt(composedPrompt.prompt, acceptance.retryHints)
+        logger.info('Try-on retry: regenerando com prompt reforçado', {
+          hints: acceptance.retryHints.length,
+        })
+        try {
+          const retryProviderInput = buildTryOnProviderInput({
+            customerPhoto: input.customerPhoto,
+            productImage: garmentUrl,
+            background: providerBackground,
+            googleModelOverride,
+            promptOverride: reinforced,
+            promptVariantId: `${composedPrompt.promptVariantId}+retry`,
+          })
+          const retryResult = await runTier(tierChosen, {
+            provider: retryProviderInput,
+            variables,
+          })
+          const retryAcceptance = await runAcceptancePostGen({
+            customerPhotoDataUrl: input.customerPhoto,
+            resultUrl: retryResult.resultUrl,
+            garmentUrl,
+            safetyRatings: retryResult.safetyRatings,
+            garmentOcrText: bestOfN.garmentText,
+            garmentCategory: variables.garmentCategory,
+          })
+          const originalScore = acceptance.checks.filter((c) => c.checked && c.pass).length
+          const retryScore =
+            retryAcceptance?.checks.filter((c) => c.checked && c.pass).length ?? 0
+          if (retryAcceptance && retryScore > originalScore) {
+            result = retryResult
+            tierEffective = retryResult.tier
+            acceptance = retryAcceptance
+            retryReason = 'retry_picked'
+          } else {
+            retryReason = 'retry_rejected'
+          }
+          logger.info('Try-on retry: resultado', {
+            retryReason,
+            originalScore,
+            retryScore,
+          })
+        } catch (err) {
+          logger.warn('Try-on retry: falhou — mantendo geração original', {
+            message: err instanceof Error ? err.message : String(err),
+          })
+          retryReason = 'retry_rejected'
+        }
+      }
     }
 
     await supabase.from('try_on_uses').insert({
@@ -425,7 +656,11 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       providerRequestId: result.requestId,
       modelResolved: result.modelUsed ?? googleModelOverride,
       finalPrompt: result.finalPrompt ?? null,
-      generationParams: mergeAcceptanceIntoParams(result.generationParams ?? null, acceptance),
+      generationParams: mergeAcceptanceIntoParams(
+        result.generationParams ?? null,
+        acceptance,
+        retryReason,
+      ),
       resultBucket: result.resultBucket ?? null,
       resultPath: result.resultPath ?? null,
       durationMs: result.durationMs,
@@ -490,6 +725,29 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   }
 }
 
+// ─── Sensitive category helpers (P2.17) ────────────────────────────────
+
+/**
+ * Mapeia o `categoria_id` (string livre da lojista) pra detectar peças
+ * sensíveis (swimwear, underwear). Retorna null quando não há match.
+ */
+export function inferSensitiveGarmentCategory(
+  categoriaId: string | null | undefined,
+): 'swimwear' | 'underwear' | null {
+  if (!categoriaId) return null
+  // Normaliza acentos pra match consistente
+  const c = categoriaId
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+  const swimwearTerms = ['swim', 'biquini', 'bikini', 'sunga', 'maio', 'praia']
+  if (swimwearTerms.some((t) => c.includes(t))) return 'swimwear'
+  const underwearTerms = ['lingerie', 'underwear', 'calcinha', 'cueca', 'sutia', 'intima']
+  if (underwearTerms.some((t) => c.includes(t))) return 'underwear'
+  return null
+}
+
 // ─── Acceptance helpers ─────────────────────────────────────────────────
 
 /** Decodifica `data:<mime>;base64,...` em Buffer. Retorna null se inválido. */
@@ -546,6 +804,10 @@ async function runAcceptancePostGen(args: {
   resultUrl: string
   garmentUrl: string
   safetyRatings?: SafetyRating[]
+  garmentOcrText?: string
+  garmentCategory?: TryOnPromptVariables['garmentCategory']
+  garmentPhotoType?: 'flat-lay' | 'model' | 'auto'
+  backgroundMode?: 'white' | 'store_background' | 'preserve_customer'
 }): Promise<AcceptanceResult | null> {
   try {
     const customerBuf = bufferFromDataUrl(args.customerPhotoDataUrl)
@@ -559,6 +821,10 @@ async function runAcceptancePostGen(args: {
       garmentImageBuffer: garmentBuf ?? Buffer.alloc(0),
       resultImageBuffer: resultBuf,
       safetyRatings: args.safetyRatings,
+      garmentOcrText: args.garmentOcrText,
+      garmentCategory: args.garmentCategory,
+      garmentPhotoType: args.garmentPhotoType,
+      backgroundMode: args.backgroundMode,
     })
   } catch (err) {
     logger.warn('Try-on acceptance: ignorando exceção', {
@@ -572,14 +838,19 @@ async function runAcceptancePostGen(args: {
 function mergeAcceptanceIntoParams(
   existing: Record<string, unknown> | null,
   acceptance: AcceptanceResult | null,
+  retryReason?: string,
 ): Record<string, unknown> | null {
-  if (!acceptance) return existing
+  if (!acceptance) {
+    return retryReason ? { ...(existing ?? {}), retry: { reason: retryReason } } : existing
+  }
   return {
     ...(existing ?? {}),
     acceptance: {
       pass: acceptance.pass,
       shouldRetry: acceptance.shouldRetry,
+      retryHints: acceptance.retryHints,
       checks: acceptance.checks,
     },
+    ...(retryReason ? { retry: { reason: retryReason } } : {}),
   }
 }

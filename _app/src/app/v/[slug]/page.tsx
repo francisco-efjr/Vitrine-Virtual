@@ -5,8 +5,10 @@ import { PublicLiveRefresh } from '@/components/public/public-live-refresh'
 import { VitrineGrid } from '@/components/public/vitrine-grid'
 import { ContactLinks } from '@/components/public/contact-links'
 import { LojaMark, VVLogo } from '@/components/brand/vv-logo'
+import { CGHVitrinePage } from '@/components/themes/casa-gaby-harb/vitrine-page'
 import { buildVitrineMessage, buildWhatsAppUrl } from '@/lib/whatsapp/link'
 import { buildLojaAssetPublicUrl } from '@/server/lojas/assets'
+import type { VitrineTheme } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +24,7 @@ interface VitrineData {
     tagline: string | null
     logo_url: string | null
     cabine_backdrop_url: string | null
+    vitrine_theme: VitrineTheme
   }
   pecas: Array<{
     peca_id: string
@@ -95,6 +98,7 @@ async function loadVitrine(slug: string): Promise<VitrineData | null> {
       tagline: loja.tagline ?? null,
       logo_url: buildLojaAssetPublicUrl(loja.logo_storage_path ?? null),
       cabine_backdrop_url: cabineBackdropUrl,
+      vitrine_theme: (loja.vitrine_theme ?? 'default') as VitrineTheme,
     },
     pecas,
   }
@@ -117,6 +121,18 @@ export default async function VitrinePage({ params }: { params: { slug: string }
   const wa = data.loja.whatsapp_e164
     ? buildWhatsAppUrl(data.loja.whatsapp_e164, buildVitrineMessage({ lojaNome: data.loja.nome }))
     : null
+
+  // Tema visual escolhido pelo super-admin para esta loja. Quando a loja
+  // tem identidade dedicada (ex: CasaGabyHarb), aplicamos o layout sob
+  // medida — caso contrário, mantemos o look padrão da Vitrine Virtual.
+  if (data.loja.vitrine_theme === 'CasaGabyHarb') {
+    return (
+      <>
+        <PublicLiveRefresh />
+        <CGHVitrinePage loja={data.loja} pecas={data.pecas} whatsappUrl={wa} />
+      </>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-bg">

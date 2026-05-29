@@ -15,7 +15,7 @@ import type { TryOnProvider, TryOnProviderInput, TryOnProviderResult } from '../
  * - tier_b_economy  → Single FASHN call. Not wired. Same reason.
  * - tier_c_gemini   → Single Gemini call. **ACTIVE.**
  */
-export type TryOnTier = 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini'
+export type TryOnTier = 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex'
 
 export type CustomerPhotoType =
   | 'full_body'
@@ -38,7 +38,9 @@ export type GarmentCategory =
   | 'one-pieces'
   | 'outerwear'
   | 'swimwear'
+  | 'underwear'
   | 'accessories'
+  | 'footwear'
   | 'auto'
 
 /**
@@ -61,6 +63,9 @@ export interface TryOnPromptVariables {
   seed?: number
   /** Reserved for FASHN content moderation parameter when Tier A is wired. */
   safetyLevel: 'conservative' | 'permissive'
+  /** Cláusula de prompt opcional sobre o material da peça (P2.11). Quando
+   *  presente é injetada no compose pra empurrar drape/sheen/textura corretos. */
+  fabricPromptClause?: string
 }
 
 export interface TryOnTierInput {

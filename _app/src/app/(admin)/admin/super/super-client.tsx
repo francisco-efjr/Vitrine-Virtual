@@ -12,13 +12,14 @@ import { Modal } from '@/components/ui/modal'
 import { Spinner } from '@/components/ui/spinner'
 import { LojaMark } from '@/components/brand/vv-logo'
 import { AIModelToggle } from '@/components/admin/ai-model-toggle'
+import { VitrineThemeToggle } from '@/components/admin/vitrine-theme-toggle'
 import {
   nomeToSlug,
   sanitizeSlug,
   trimSlugHyphens,
   validateSlug,
 } from '@/lib/validators/loja'
-import type { AiImageModel } from '@/types/database'
+import type { AiImageModel, VitrineTheme } from '@/types/database'
 import type { LojaWithStats } from '@/server/lojas/list'
 
 const PUBLIC_HOST = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000')
@@ -66,6 +67,17 @@ export function SuperAdminClient({
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ai_image_model }),
+    })
+    if (!r.ok) setLojas(prev)
+  }
+
+  async function changeLojaTheme(id: string, vitrine_theme: VitrineTheme) {
+    const prev = lojas
+    setLojas((l) => l.map((x) => (x.id === id ? { ...x, vitrine_theme } : x)))
+    const r = await fetch(`/api/super-admin/lojas/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vitrine_theme }),
     })
     if (!r.ok) setLojas(prev)
   }
@@ -154,6 +166,7 @@ export function SuperAdminClient({
             <ColHead className="min-w-[52px]">Contatos</ColHead>
             <ColHead className="min-w-[100px]">Simulações</ColHead>
             <ColHead className="min-w-[128px]">Modelo IA</ColHead>
+            <ColHead className="min-w-[168px]">Tema da vitrine</ColHead>
             <div className="min-w-[104px] shrink-0" />
           </div>
         ) : null}
@@ -217,6 +230,11 @@ export function SuperAdminClient({
                 <AIModelToggle
                   value={loja.ai_image_model}
                   onChange={(v) => changeLojaModel(loja.id, v)}
+                  size="sm"
+                />
+                <VitrineThemeToggle
+                  value={loja.vitrine_theme}
+                  onChange={(v) => changeLojaTheme(loja.id, v)}
                   size="sm"
                 />
                 <Toggle

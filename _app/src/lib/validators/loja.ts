@@ -83,6 +83,8 @@ export function validateSlug(slug: string): { ok: boolean; msg: string } {
 
 export const aiImageModelSchema = z.enum(['high', 'medium'])
 
+export const vitrineThemeSchema = z.enum(['default', 'CasaGabyHarb'])
+
 function normalizeSocialHandle(value: unknown): unknown {
   if (typeof value !== 'string') return value
   return value.trim().replace(/^@+/, '')

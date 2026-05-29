@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { lojaUpdateSchema, type LojaUpdateInput } from '@/lib/validators/loja'
 import { LojaError } from './errors'
 import { logger } from '@/lib/logger'
-import type { AiImageModel, LojaRow } from '@/types/database'
+import type { AiImageModel, LojaRow, VitrineTheme } from '@/types/database'
 
 /**
  * Atualiza dados da loja do usuário logado.
@@ -58,6 +58,23 @@ export async function setLojaAiModel(
   const { error } = await supabase
     .from('lojas')
     .update({ ai_image_model: aiImageModel })
+    .eq('id', lojaId)
+  if (error) throw error
+}
+
+/**
+ * Define o tema visual da vitrine pública (default ou um look dedicado, ex:
+ * CasaGabyHarb). Super-admin only — escolha estratégica de identidade, não
+ * configuração da lojista.
+ */
+export async function setLojaVitrineTheme(
+  lojaId: string,
+  vitrineTheme: VitrineTheme,
+): Promise<void> {
+  const supabase = createServiceClient()
+  const { error } = await supabase
+    .from('lojas')
+    .update({ vitrine_theme: vitrineTheme })
     .eq('id', lojaId)
   if (error) throw error
 }

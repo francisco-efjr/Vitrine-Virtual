@@ -58,6 +58,12 @@ const ContentSecurityPolicy = `
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Inclui modelos ONNX no bundle do API route que roda os acceptance checks
+  // server-side (acceptance/subject-count.ts). Sem isso o Vercel não copia o
+  // .onnx para o ambiente da função e a inferência fica indisponível.
+  outputFileTracingIncludes: {
+    '/api/try-on': ['./models/**/*'],
+  },
   // Security headers (OWASP-aligned — veja comentários acima para decisões de CSP)
   async headers() {
     return [

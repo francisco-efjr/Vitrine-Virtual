@@ -44,9 +44,9 @@ interface RecordGenerationInput {
   /** Signals brutos enviados pelo cliente, para tuning. */
   gateSignals?: Record<string, unknown> | null
   /** Tier ideal (chooseTier). */
-  tierChosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+  tierChosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
   /** Tier efetivamente executado. */
-  tierEffective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+  tierEffective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
 }
 
 function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null {

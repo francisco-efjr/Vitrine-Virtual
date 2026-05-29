@@ -28,6 +28,7 @@ export interface Database {
           tiktok: string | null
           updated_at: string
           vitrine_publica_visivel: boolean
+          vitrine_theme: 'default' | 'CasaGabyHarb'
           whatsapp_e164: string | null
         }
         Insert: {
@@ -48,6 +49,7 @@ export interface Database {
           tiktok?: string | null
           updated_at?: string
           vitrine_publica_visivel?: boolean
+          vitrine_theme?: 'default' | 'CasaGabyHarb'
           whatsapp_e164?: string | null
         }
         Update: {
@@ -68,6 +70,7 @@ export interface Database {
           tiktok?: string | null
           updated_at?: string
           vitrine_publica_visivel?: boolean
+          vitrine_theme?: 'default' | 'CasaGabyHarb'
           whatsapp_e164?: string | null
         }
         Relationships: []
@@ -139,8 +142,8 @@ export interface Database {
           result_path: string | null
           session_id: string | null
           status: 'success' | 'error' | 'fallback'
-          tier_chosen: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
-          tier_effective: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+          tier_chosen: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
+          tier_effective: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
           user_id: string | null
         }
         Insert: {
@@ -170,8 +173,8 @@ export interface Database {
           result_path?: string | null
           session_id?: string | null
           status?: 'success' | 'error' | 'fallback'
-          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
-          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
+          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
           user_id?: string | null
         }
         Update: {
@@ -201,8 +204,8 @@ export interface Database {
           result_path?: string | null
           session_id?: string | null
           status?: 'success' | 'error' | 'fallback'
-          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
-          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
+          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
           user_id?: string | null
         }
         Relationships: []
@@ -436,7 +439,9 @@ export interface Database {
           loja_id: string
           nome: string
           slug: string
+          tagline: string
           tiktok: string
+          vitrine_theme: 'default' | 'CasaGabyHarb'
           whatsapp_e164: string
         }[]
       }
@@ -467,3 +472,5 @@ export type ContactClickRow = Tables<'contact_clicks'>
 export type TryOnGenerationRow = Tables<'try_on_generations'>
 export type AiImageModel = 'high' | 'medium'
 export type ContactChannel = 'instagram' | 'tiktok' | 'whatsapp'
+export type VitrineTheme = 'default' | 'CasaGabyHarb'
+export const VITRINE_THEMES = ['default', 'CasaGabyHarb'] as const
