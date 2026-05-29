@@ -92,14 +92,26 @@ async function download(model) {
 }
 
 async function main() {
+  const failures = []
   for (const m of MODELS) {
     try {
       await download(m)
     } catch (err) {
       console.error(`✗ ${m.name}: ${err instanceof Error ? err.message : err}`)
-      // Não falha o processo todo; outros modelos seguem.
-      process.exitCode = 1
+      failures.push(m.name)
+      // Não-fatal por design: o acceptance check correspondente degrada para
+      // `checked:false` em runtime quando o .onnx está ausente. Antes este
+      // bloco setava process.exitCode = 1, o que matava o `next build` no
+      // pipeline `node scripts/download-models.mjs && next build`. Agora o
+      // build segue mesmo com mirror fora do ar — o feature flagga sozinho.
     }
+  }
+  if (failures.length > 0) {
+    console.warn(
+      `\n⚠ ${failures.length} modelo(s) não baixado(s): ${failures.join(', ')}. ` +
+        `Acceptance checks dependentes vão reportar checked:false em runtime. ` +
+        `Defina MODELS_*_URL ou rode pnpm models:download localmente quando o mirror voltar.`,
+    )
   }
 }
 
