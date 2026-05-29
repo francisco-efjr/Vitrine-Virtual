@@ -12,6 +12,7 @@ import {
 } from '@/lib/try-on/kill-switch'
 import { ContactAnalytics } from '@/components/admin/contact-analytics'
 import { QualityDashboard } from '@/components/admin/quality-dashboard'
+import { ScenariosDashboard } from '@/components/admin/scenarios-dashboard'
 import { SuperAdminClient } from './super-client'
 
 export const dynamic = 'force-dynamic'
@@ -86,6 +87,8 @@ export default async function SuperAdminPage() {
         />
 
         <QualityDashboard />
+
+        <ScenariosDashboard />
 
         <SuperAdminClient
           initialLojas={lojas}
