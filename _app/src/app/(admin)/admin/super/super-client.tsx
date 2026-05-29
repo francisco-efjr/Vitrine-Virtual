@@ -233,7 +233,7 @@ export function SuperAdminClient({
                   size="sm"
                 />
                 <VitrineThemeToggle
-                  value={loja.vitrine_theme}
+                  value={loja.vitrine_theme ?? 'default'}
                   onChange={(v) => changeLojaTheme(loja.id, v)}
                   size="sm"
                 />
