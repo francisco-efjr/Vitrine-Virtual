@@ -139,8 +139,8 @@ export interface Database {
           result_path: string | null
           session_id: string | null
           status: 'success' | 'error' | 'fallback'
-          tier_chosen: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
-          tier_effective: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+          tier_chosen: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
+          tier_effective: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
           user_id: string | null
         }
         Insert: {
@@ -170,8 +170,8 @@ export interface Database {
           result_path?: string | null
           session_id?: string | null
           status?: 'success' | 'error' | 'fallback'
-          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
-          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
+          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
           user_id?: string | null
         }
         Update: {
@@ -201,8 +201,8 @@ export interface Database {
           result_path?: string | null
           session_id?: string | null
           status?: 'success' | 'error' | 'fallback'
-          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
-          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | null
+          tier_chosen?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
+          tier_effective?: 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex' | null
           user_id?: string | null
         }
         Relationships: []

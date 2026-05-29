@@ -26,6 +26,7 @@ export type GarmentCategory =
   | 'outerwear'
   | 'swimwear'
   | 'accessories'
+  | 'footwear'
   | 'auto'
 
 export type GarmentPhotoType = 'flat-lay' | 'model' | 'auto'
@@ -80,6 +81,7 @@ export function regionForCategory(category: GarmentCategory): GarmentRegion {
     case 'outerwear':
       return 'upper-center'
     case 'bottoms':
+    case 'footwear':
       return 'lower-center'
     case 'one-pieces':
     case 'swimwear':

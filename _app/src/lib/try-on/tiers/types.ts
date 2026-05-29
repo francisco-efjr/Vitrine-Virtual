@@ -15,7 +15,7 @@ import type { TryOnProvider, TryOnProviderInput, TryOnProviderResult } from '../
  * - tier_b_economy  → Single FASHN call. Not wired. Same reason.
  * - tier_c_gemini   → Single Gemini call. **ACTIVE.**
  */
-export type TryOnTier = 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini'
+export type TryOnTier = 'tier_a_premium' | 'tier_b_economy' | 'tier_c_gemini' | 'tier_s_vertex'
 
 export type CustomerPhotoType =
   | 'full_body'
@@ -39,6 +39,7 @@ export type GarmentCategory =
   | 'outerwear'
   | 'swimwear'
   | 'accessories'
+  | 'footwear'
   | 'auto'
 
 /**
