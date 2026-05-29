@@ -7,6 +7,7 @@ import { checkAnatomy } from './anatomy-sanity'
 import { computeGarmentColorFidelity, type GarmentCategory } from './color-check'
 import { detectGarmentText, editDistance } from './garment-text'
 import { computeIdentitySimilarity } from './identity-check'
+import { checkBackgroundChange } from './background-change'
 import { checkPatternAlignment } from './pattern-alignment'
 import { checkPoseConsistency } from './pose-consistency'
 import { checkShadowDirection } from './shadow-direction'
@@ -130,6 +131,7 @@ export async function runAcceptanceChecks(
   checks.push(await garmentTextFidelity(input))
   checks.push(await patternAlignment(input))
   checks.push(await shadowDirection(input))
+  checks.push(await backgroundChange(input))
   checks.push(await nsfwClean(input))
 
   const failed = checks.filter((c) => c.checked && !c.pass)
@@ -529,6 +531,48 @@ async function patternAlignment(input: AcceptanceInput): Promise<AcceptanceCheck
       pass: true,
       checked: false,
       details: { error: 'pattern_check_failed' },
+    }
+  }
+}
+
+async function backgroundChange(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  if (input.backgroundMode !== 'preserve_customer') {
+    return {
+      name: 'backgroundChange',
+      pass: true,
+      checked: false,
+      details: { reason: 'not_preserve_customer_mode' },
+    }
+  }
+  try {
+    const res = await checkBackgroundChange(input.customerImageBuffer, input.resultImageBuffer)
+    if (res.reason) {
+      return {
+        name: 'backgroundChange',
+        pass: true,
+        checked: false,
+        details: { reason: res.reason },
+      }
+    }
+    return {
+      name: 'backgroundChange',
+      pass: res.pass,
+      checked: true,
+      details: {
+        distance: Number(res.distance.toFixed(4)),
+        threshold: res.threshold,
+        method: res.method,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: backgroundChange falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'backgroundChange',
+      pass: true,
+      checked: false,
+      details: { error: 'bg_change_check_failed' },
     }
   }
 }
