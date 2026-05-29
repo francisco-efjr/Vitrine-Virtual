@@ -7,6 +7,7 @@ import { checkAnatomy } from './anatomy-sanity'
 import { computeGarmentColorFidelity, type GarmentCategory } from './color-check'
 import { detectGarmentText, editDistance } from './garment-text'
 import { computeIdentitySimilarity } from './identity-check'
+import { checkPatternAlignment } from './pattern-alignment'
 import { checkPoseConsistency } from './pose-consistency'
 import { countPersons } from './subject-count'
 
@@ -124,6 +125,7 @@ export async function runAcceptanceChecks(
   checks.push(await identitySimilarity(input))
   checks.push(await garmentColorFidelity(input))
   checks.push(await garmentTextFidelity(input))
+  checks.push(await patternAlignment(input))
   checks.push(await nsfwClean(input))
 
   const failed = checks.filter((c) => c.checked && !c.pass)
@@ -489,6 +491,40 @@ async function garmentTextFidelity(input: AcceptanceInput): Promise<AcceptanceCh
       pass: true,
       checked: false,
       details: { error: 'ocr_failed' },
+    }
+  }
+}
+
+async function patternAlignment(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  if (input.garmentImageBuffer.byteLength === 0) {
+    return {
+      name: 'patternAlignment',
+      pass: true,
+      checked: false,
+      details: { reason: 'no_garment_buffer' },
+    }
+  }
+  try {
+    const res = await checkPatternAlignment(input.garmentImageBuffer, input.resultImageBuffer)
+    return {
+      name: 'patternAlignment',
+      pass: res.pass,
+      checked: true,
+      details: {
+        distance: Number(res.distance.toFixed(4)),
+        threshold: res.threshold,
+        method: res.method,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: patternAlignment falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'patternAlignment',
+      pass: true,
+      checked: false,
+      details: { error: 'pattern_check_failed' },
     }
   }
 }
