@@ -480,6 +480,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
       garmentOcrText: bestOfN.garmentText,
       garmentCategory: variables.garmentCategory,
       garmentPhotoType,
+      backgroundMode: tierBackgroundMode,
     })
     if (acceptance) {
       logger.info('Try-on acceptance result', {
@@ -708,6 +709,7 @@ async function runAcceptancePostGen(args: {
   garmentOcrText?: string
   garmentCategory?: TryOnPromptVariables['garmentCategory']
   garmentPhotoType?: 'flat-lay' | 'model' | 'auto'
+  backgroundMode?: 'white' | 'store_background' | 'preserve_customer'
 }): Promise<AcceptanceResult | null> {
   try {
     const customerBuf = bufferFromDataUrl(args.customerPhotoDataUrl)
@@ -724,6 +726,7 @@ async function runAcceptancePostGen(args: {
       garmentOcrText: args.garmentOcrText,
       garmentCategory: args.garmentCategory,
       garmentPhotoType: args.garmentPhotoType,
+      backgroundMode: args.backgroundMode,
     })
   } catch (err) {
     logger.warn('Try-on acceptance: ignorando exceção', {

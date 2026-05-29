@@ -9,6 +9,7 @@ import { detectGarmentText, editDistance } from './garment-text'
 import { computeIdentitySimilarity } from './identity-check'
 import { checkPatternAlignment } from './pattern-alignment'
 import { checkPoseConsistency } from './pose-consistency'
+import { checkShadowDirection } from './shadow-direction'
 import { countPersons } from './subject-count'
 
 /**
@@ -110,6 +111,8 @@ export interface AcceptanceInput {
   garmentCategory?: GarmentCategory
   /** Foto da peça é flat-lay ou on-model (afeta seleção de patch no input). */
   garmentPhotoType?: 'flat-lay' | 'model' | 'auto'
+  /** Background mode da geração — só roda shadowDirection em preserve_customer (P2.13). */
+  backgroundMode?: 'white' | 'store_background' | 'preserve_customer'
 }
 
 export async function runAcceptanceChecks(
@@ -126,6 +129,7 @@ export async function runAcceptanceChecks(
   checks.push(await garmentColorFidelity(input))
   checks.push(await garmentTextFidelity(input))
   checks.push(await patternAlignment(input))
+  checks.push(await shadowDirection(input))
   checks.push(await nsfwClean(input))
 
   const failed = checks.filter((c) => c.checked && !c.pass)
@@ -525,6 +529,41 @@ async function patternAlignment(input: AcceptanceInput): Promise<AcceptanceCheck
       pass: true,
       checked: false,
       details: { error: 'pattern_check_failed' },
+    }
+  }
+}
+
+async function shadowDirection(input: AcceptanceInput): Promise<AcceptanceCheck> {
+  // Só faz sentido em preserve_customer mode (cliente é a fonte de iluminação)
+  if (input.backgroundMode !== 'preserve_customer') {
+    return {
+      name: 'shadowDirection',
+      pass: true,
+      checked: false,
+      details: { reason: 'not_preserve_customer_mode' },
+    }
+  }
+  try {
+    const res = await checkShadowDirection(input.customerImageBuffer, input.resultImageBuffer)
+    return {
+      name: 'shadowDirection',
+      pass: res.pass,
+      checked: true,
+      details: {
+        angleDegrees: Number(res.angleDegrees.toFixed(2)),
+        thresholdDegrees: (res.threshold * 180) / Math.PI,
+        method: res.method,
+      },
+    }
+  } catch (err) {
+    logger.warn('Acceptance: shadowDirection falhou', {
+      message: err instanceof Error ? err.message : String(err),
+    })
+    return {
+      name: 'shadowDirection',
+      pass: true,
+      checked: false,
+      details: { error: 'shadow_check_failed' },
     }
   }
 }
