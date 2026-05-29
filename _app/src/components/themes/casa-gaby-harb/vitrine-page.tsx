@@ -48,6 +48,7 @@ interface Loja {
   tagline: string | null
   logo_url: string | null
   cabine_backdrop_url: string | null
+  hero_image_url: string | null
 }
 
 const MES = [
@@ -76,6 +77,12 @@ export function CGHVitrinePage({
 }) {
   const heroPiece = pecas[0] ?? null
   const curadoriaMes = `Curadoria de ${MES[new Date().getMonth()]}`
+  // Foto editorial do hero: lojista configura no painel (preferida) →
+  // senão cai na foto da primeira peça da curadoria (legado).
+  const heroImageUrl = loja.hero_image_url ?? heroPiece?.foto_principal_url ?? null
+  // Caption do arch-frame só faz sentido quando a foto VEM de uma peça.
+  // Quando é a foto editorial fixa (sem ligação a peça), escondemos.
+  const showHeroPieceCaption = !loja.hero_image_url && !!heroPiece
 
   return (
     <div
@@ -184,8 +191,8 @@ export function CGHVitrinePage({
                   style={{
                     width: '100%',
                     aspectRatio: '4 / 5',
-                    background: heroPiece?.foto_principal_url
-                      ? `center / cover no-repeat url('${heroPiece.foto_principal_url}'), ${CGH.musgoDeep}`
+                    background: heroImageUrl
+                      ? `center / cover no-repeat url('${heroImageUrl}'), ${CGH.musgoDeep}`
                       : `
                         radial-gradient(120% 90% at 30% 18%, rgba(201,169,97,0.10) 0%, transparent 55%),
                         radial-gradient(140% 120% at 85% 110%, rgba(0,0,0,0.32) 0%, transparent 60%),
@@ -207,7 +214,7 @@ export function CGHVitrinePage({
                     pointerEvents: 'none',
                   }}
                 />
-                {heroPiece ? (
+                {showHeroPieceCaption && heroPiece ? (
                   <div
                     style={{
                       position: 'absolute',

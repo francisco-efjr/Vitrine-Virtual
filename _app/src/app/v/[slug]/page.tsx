@@ -24,6 +24,7 @@ interface VitrineData {
     tagline: string | null
     logo_url: string | null
     cabine_backdrop_url: string | null
+    hero_image_url: string | null
     vitrine_theme: VitrineTheme
   }
   pecas: Array<{
@@ -98,6 +99,9 @@ async function loadVitrine(slug: string): Promise<VitrineData | null> {
       tagline: loja.tagline ?? null,
       logo_url: buildLojaAssetPublicUrl(loja.logo_storage_path ?? null),
       cabine_backdrop_url: cabineBackdropUrl,
+      hero_image_url: buildLojaAssetPublicUrl(
+        loja.hero_image_storage_path ?? null,
+      ),
       vitrine_theme: (loja.vitrine_theme ?? 'default') as VitrineTheme,
     },
     pecas,

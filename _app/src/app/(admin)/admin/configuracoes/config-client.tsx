@@ -15,6 +15,7 @@ interface ConfigClientProps {
   initialLoja: LojaRow
   initialLogoUrl: string | null
   initialFundoUrl: string | null
+  initialHeroImageUrl: string | null
 }
 
 /**
@@ -31,6 +32,7 @@ export function ConfigClient({
   initialLoja,
   initialLogoUrl,
   initialFundoUrl,
+  initialHeroImageUrl,
 }: ConfigClientProps) {
   const [loja, setLoja] = useState(initialLoja)
   const [saving, setSaving] = useState(false)
@@ -38,23 +40,28 @@ export function ConfigClient({
   const [err, setErr] = useState<string | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(initialLogoUrl)
   const [fundoUrl, setFundoUrl] = useState<string | null>(initialFundoUrl)
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(initialHeroImageUrl)
   const [logoBusy, setLogoBusy] = useState(false)
   const [fundoBusy, setFundoBusy] = useState(false)
+  const [heroBusy, setHeroBusy] = useState(false)
   const [logoErr, setLogoErr] = useState<string | null>(null)
   const [fundoErr, setFundoErr] = useState<string | null>(null)
+  const [heroErr, setHeroErr] = useState<string | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const fundoInputRef = useRef<HTMLInputElement>(null)
+  const heroInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     return () => {
       if (logoUrl?.startsWith('blob:')) URL.revokeObjectURL(logoUrl)
       if (fundoUrl?.startsWith('blob:')) URL.revokeObjectURL(fundoUrl)
+      if (heroImageUrl?.startsWith('blob:')) URL.revokeObjectURL(heroImageUrl)
     }
-  }, [logoUrl, fundoUrl])
+  }, [logoUrl, fundoUrl, heroImageUrl])
 
   async function uploadAsset(
     file: File,
-    kind: 'logo' | 'provador_fundo',
+    kind: 'logo' | 'provador_fundo' | 'hero_image',
   ): Promise<{ public_url: string; storage_path: string; loja: LojaRow }> {
     const prepared = await preparePreviewableImage(file)
     const dataUrl = await fileToDataUrl(prepared.file)
@@ -108,6 +115,37 @@ export function ConfigClient({
       setFundoErr(error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE)
     } finally {
       setFundoBusy(false)
+    }
+  }
+
+  async function handleHeroFile(file: File | null) {
+    if (!file || !file.type.startsWith('image/')) return
+    setHeroBusy(true)
+    setHeroErr(null)
+    try {
+      const result = await uploadAsset(file, 'hero_image')
+      setLoja(result.loja)
+      setHeroImageUrl(`${result.public_url}?t=${Date.now()}`)
+    } catch (error) {
+      setHeroErr(error instanceof Error ? error.message : IMAGE_INVALID_FORMAT_MESSAGE)
+    } finally {
+      setHeroBusy(false)
+    }
+  }
+
+  async function clearHeroImage() {
+    setHeroBusy(true)
+    setHeroErr(null)
+    try {
+      const res = await fetch('/api/loja/assets?kind=hero_image', { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(data?.error?.message ?? 'Falha ao remover')
+      setLoja(data.data as LojaRow)
+      setHeroImageUrl(null)
+    } catch (error) {
+      setHeroErr(error instanceof Error ? error.message : 'Falha ao remover imagem.')
+    } finally {
+      setHeroBusy(false)
     }
   }
 
@@ -499,6 +537,103 @@ export function ConfigClient({
             />
           </div>
           {fundoErr ? <p className="mb-3 font-sans text-xs text-danger">{fundoErr}</p> : null}
+        </Reveal>
+
+        <div className="my-7 h-px bg-border" />
+
+        {/* ── Foto editorial do hero ── */}
+        <Reveal delay={200}>
+          <SectionLabel>Foto editorial da vitrine</SectionLabel>
+          <p className="mb-3.5 font-sans text-xs text-ink-2">
+            Imagem que aparece no destaque do hero da sua vitrine pública.
+            Recomendado: foto vertical (proporção 4:5), 1080×1350px,
+            iluminação editorial.
+            {loja.vitrine_theme !== 'CasaGabyHarb' ? (
+              <span className="mt-1 block text-[11px] italic text-ink-3">
+                (Aplica em temas que honram esta configuração — hoje, apenas
+                Casa Gaby Harb. Lojas no tema padrão exibem a foto da primeira
+                peça.)
+              </span>
+            ) : null}
+          </p>
+          <div className="flex flex-wrap items-start gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (heroBusy) return
+                if (!heroImageUrl) heroInputRef.current?.click()
+              }}
+              disabled={heroBusy}
+              className="group flex flex-col items-center transition disabled:cursor-not-allowed"
+            >
+              <div
+                className={`relative flex h-[150px] w-[120px] items-center justify-center overflow-hidden rounded-[10px] border-2 bg-surface-2 transition ${
+                  heroImageUrl
+                    ? 'border-accent shadow-card'
+                    : 'border-dashed border-border group-hover:border-border-2'
+                }`}
+              >
+                {heroBusy ? (
+                  <div className="flex h-full w-full items-center justify-center bg-white/70 font-sans text-[10px] text-ink-2">
+                    Enviando…
+                  </div>
+                ) : heroImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={heroImageUrl}
+                    alt="Foto editorial"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-1.5 text-ink-3">
+                    <ImageIcon size={20} />
+                    <span className="font-sans text-[10.5px] uppercase tracking-wider">
+                      Enviar foto
+                    </span>
+                  </div>
+                )}
+              </div>
+              <span className="mt-2 font-sans text-xs text-ink-2">
+                {heroImageUrl ? 'Foto fixa' : 'Sem foto'}
+              </span>
+            </button>
+
+            {heroImageUrl ? (
+              <div className="flex flex-col gap-1.5 self-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => heroInputRef.current?.click()}
+                  disabled={heroBusy}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-2.5 py-1 font-sans text-[11.5px] text-ink-2 transition hover:border-accent hover:text-accent disabled:opacity-60"
+                >
+                  <RefreshCw size={11} />
+                  Trocar
+                </button>
+                <button
+                  type="button"
+                  onClick={clearHeroImage}
+                  disabled={heroBusy}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 font-sans text-[11.5px] text-ink-3 transition hover:text-danger disabled:opacity-60"
+                >
+                  <Trash2 size={11} />
+                  Remover
+                </button>
+              </div>
+            ) : null}
+
+            <input
+              ref={heroInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null
+                e.target.value = ''
+                handleHeroFile(file)
+              }}
+            />
+          </div>
+          {heroErr ? <p className="mt-3 font-sans text-xs text-danger">{heroErr}</p> : null}
         </Reveal>
 
         <div className="mt-9 flex items-center gap-3">

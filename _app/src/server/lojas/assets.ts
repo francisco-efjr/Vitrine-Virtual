@@ -11,18 +11,18 @@ import { LojaError } from './errors'
 import type { LojaRow } from '@/types/database'
 
 /**
- * Upload de assets da loja (logo + fundo da Cabine) para o bucket público
- * `lojas-logos`. O path é determinístico: `{loja_id}/{kind}-{uuid}.{ext}`,
- * o que casa com as policies do bucket (apenas o dono insere/remove,
- * leitura é pública).
+ * Upload de assets da loja (logo + fundo da Cabine + foto editorial do hero)
+ * para o bucket público `lojas-logos`. O path é determinístico:
+ * `{loja_id}/{kind}-{uuid}.{ext}`, o que casa com as policies do bucket
+ * (apenas o dono insere/remove, leitura é pública).
  *
- * Pós-upload, o storage_path é gravado em `lojas.logo_storage_path` ou
- * `lojas.provador_fundo_storage_path`. O blob anterior (se houver) é
- * removido em background — falha aqui só vira warning, nunca quebra o
- * fluxo do usuário.
+ * Pós-upload, o storage_path é gravado em `lojas.logo_storage_path`,
+ * `lojas.provador_fundo_storage_path` ou `lojas.hero_image_storage_path`.
+ * O blob anterior (se houver) é removido em background — falha aqui só vira
+ * warning, nunca quebra o fluxo do usuário.
  */
 
-export const LOJA_ASSET_KINDS = ['logo', 'provador_fundo'] as const
+export const LOJA_ASSET_KINDS = ['logo', 'provador_fundo', 'hero_image'] as const
 export type LojaAssetKind = (typeof LOJA_ASSET_KINDS)[number]
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const
@@ -106,8 +106,12 @@ export async function uploadLojaAsset(
   // Atualiza o caminho na tabela `lojas` e (se for fundo) marca o tipo
   // como personalizado para que a tile já reflita visualmente o estado.
   const supabase = createServerSupabase()
-  const column =
-    data.kind === 'logo' ? 'logo_storage_path' : 'provador_fundo_storage_path'
+  const KIND_TO_COLUMN: Record<LojaAssetKind, keyof LojaRow> = {
+    logo: 'logo_storage_path',
+    provador_fundo: 'provador_fundo_storage_path',
+    hero_image: 'hero_image_storage_path',
+  }
+  const column = KIND_TO_COLUMN[data.kind]
 
   const update: Partial<LojaRow> = { [column]: storagePath } as Partial<LojaRow>
   if (data.kind === 'provador_fundo') {
@@ -231,6 +235,46 @@ export async function removeLojaLogo(lojaId: string): Promise<LojaRow> {
       .remove([prev.logo_storage_path])
       .catch((e) =>
         logger.warn('Falha ao remover blob da logo', { code: String(e) }),
+      )
+  }
+
+  return updated
+}
+
+/**
+ * Limpa a foto editorial do hero: remove o blob do storage e zera a coluna.
+ * Usado quando a lojista clica "Remover" no card de personalização do hero.
+ */
+export async function removeLojaHeroImage(lojaId: string): Promise<LojaRow> {
+  const supabase = createServerSupabase()
+  const service = createServiceClient()
+
+  const { data: prev } = await supabase
+    .from('lojas')
+    .select('hero_image_storage_path')
+    .eq('id', lojaId)
+    .maybeSingle()
+
+  const { data: updated, error: updateError } = await supabase
+    .from('lojas')
+    .update({ hero_image_storage_path: null })
+    .eq('id', lojaId)
+    .select('*')
+    .single()
+
+  if (updateError || !updated) {
+    logger.error('Erro ao remover hero image da loja', {
+      code: updateError?.message,
+    })
+    throw new LojaError('Falha ao remover imagem', 'CLEAR_HERO_FAIL', 500)
+  }
+
+  if (prev?.hero_image_storage_path) {
+    await service.storage
+      .from(BUCKET)
+      .remove([prev.hero_image_storage_path])
+      .catch((e) =>
+        logger.warn('Falha ao remover blob da hero image', { code: String(e) }),
       )
   }
 

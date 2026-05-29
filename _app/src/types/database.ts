@@ -29,6 +29,7 @@ export interface Database {
           updated_at: string
           vitrine_publica_visivel: boolean
           vitrine_theme: 'default' | 'CasaGabyHarb'
+          hero_image_storage_path: string | null
           whatsapp_e164: string | null
         }
         Insert: {
@@ -50,6 +51,7 @@ export interface Database {
           updated_at?: string
           vitrine_publica_visivel?: boolean
           vitrine_theme?: 'default' | 'CasaGabyHarb'
+          hero_image_storage_path?: string | null
           whatsapp_e164?: string | null
         }
         Update: {
@@ -71,6 +73,7 @@ export interface Database {
           updated_at?: string
           vitrine_publica_visivel?: boolean
           vitrine_theme?: 'default' | 'CasaGabyHarb'
+          hero_image_storage_path?: string | null
           whatsapp_e164?: string | null
         }
         Relationships: []
@@ -442,6 +445,7 @@ export interface Database {
           tagline: string
           tiktok: string
           vitrine_theme: 'default' | 'CasaGabyHarb'
+          hero_image_storage_path: string | null
           whatsapp_e164: string
         }[]
       }

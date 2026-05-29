@@ -13,6 +13,9 @@ export default async function ConfiguracoesPage() {
       initialFundoUrl={buildLojaAssetPublicUrl(
         session.loja.provador_fundo_storage_path,
       )}
+      initialHeroImageUrl={buildLojaAssetPublicUrl(
+        session.loja.hero_image_storage_path,
+      )}
     />
   )
 }
