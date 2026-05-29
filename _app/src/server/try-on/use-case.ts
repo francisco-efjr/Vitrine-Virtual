@@ -9,6 +9,7 @@ import {
   type AcceptanceResult,
 } from '@/lib/try-on/acceptance'
 import { detectMirrorSelfie } from '@/lib/try-on/acceptance/mirror-selfie-detect'
+import { checkConflictingGarment } from '@/lib/try-on/acceptance/conflicting-garment-detect'
 import { runTier } from '@/lib/try-on/tiers'
 import type { SafetyRating } from '@/lib/try-on/types'
 import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
@@ -308,6 +309,30 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     gateSignalsForLog = {
       ...(gateSignalsForLog ?? {}),
       mirror_selfie: mirrorRes,
+    }
+  }
+
+  // ─── Conflicting garment detection (P1.10 / C19) ────────────────────────
+  //
+  // Quando o cliente já está vestindo uma peça da mesma categoria da nova
+  // (e.g. blusa atual + nova blusa), o try-on tende a misturar as duas.
+  // Não bloqueia — loga + grava no gateSignals.conflicting_garment.
+  // UI notification ("Sua foto mostra outra blusa...") fica como follow-up.
+  if (customerPhotoBuf && process.env.TRY_ON_CONFLICTING_GARMENT_DETECTION !== 'false') {
+    try {
+      const conflictRes = await checkConflictingGarment(customerPhotoBuf, 'auto')
+      if (conflictRes.conflict) {
+        logger.info('Try-on: conflicting garment detectado (warning)', {
+          currentOutfit: conflictRes.currentOutfit,
+          newGarment: conflictRes.newGarment,
+        })
+      }
+      gateSignalsForLog = {
+        ...(gateSignalsForLog ?? {}),
+        conflicting_garment: conflictRes,
+      }
+    } catch {
+      // best-effort
     }
   }
 
