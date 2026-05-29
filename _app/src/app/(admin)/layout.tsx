@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { AdminShell } from '@/components/admin/admin-shell'
 import { getSession } from '@/server/auth/session'
@@ -15,7 +16,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // ("Application error: a server-side exception has occurred") era confundida
   // com bug. A correção de origem é redirecionar antes de carregar qualquer
   // painel de lojista. O error.tsx do grupo trata o caso residual.
-  if (session.isSuperAdmin && !session.loja) {
+  //
+  // ATENÇÃO: /admin/super está DENTRO do grupo (admin) — ou seja, este mesmo
+  // layout envolve a página /admin/super. Sem checar o pathname atual o
+  // redirect aponta pra rota onde já estamos, gerando ERR_TOO_MANY_REDIRECTS.
+  // O pathname vem do header `x-vv-pathname` setado pelo middleware.
+  const currentPath = headers().get('x-vv-pathname') ?? ''
+  if (
+    session.isSuperAdmin &&
+    !session.loja &&
+    !currentPath.startsWith('/admin/super')
+  ) {
     redirect('/admin/super')
   }
 
