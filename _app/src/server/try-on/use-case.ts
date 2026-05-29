@@ -11,6 +11,7 @@ import {
 import { detectMirrorSelfie } from '@/lib/try-on/acceptance/mirror-selfie-detect'
 import { checkConflictingGarment } from '@/lib/try-on/acceptance/conflicting-garment-detect'
 import { classifyFabric, fabricPromptClause } from '@/lib/try-on/acceptance/fabric-classify'
+import { estimateAge, requiresParentalConsent } from '@/lib/try-on/acceptance/age-estimation'
 import { runTier } from '@/lib/try-on/tiers'
 import type { SafetyRating } from '@/lib/try-on/types'
 import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
@@ -48,6 +49,7 @@ export type TryOnError =
   | { kind: 'quota_exceeded'; used: number; limit: number }
   | { kind: 'peca_unavailable' }
   | { kind: 'gate_rejected'; reason: RejectionReason }
+  | { kind: 'parental_consent_required'; bracket: 'minor' | 'uncertain' }
   | { kind: 'provider_failed'; message: string }
 
 export interface TryOnSuccess {
@@ -74,6 +76,9 @@ export interface RunTryOnInput {
    * quando ausente, a geração roda como antes (compat. com clientes antigos). */
   customerSignals?: CustomerPhotoSignals | null
   garmentSignals?: GarmentPhotoSignals | null
+  /** Cliente declarou ter consentimento parental (P2.16 / LGPD).
+   *  Quando true, pula o age gate mesmo se a foto parece de menor. */
+  parentalConsentDeclared?: boolean
 }
 
 /**
@@ -310,6 +315,56 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     gateSignalsForLog = {
       ...(gateSignalsForLog ?? {}),
       mirror_selfie: mirrorRes,
+    }
+  }
+
+  // ─── Age gate (P2.16 / LGPD) ────────────────────────────────────────────
+  //
+  // Quando ativado, estima faixa etária. Se parecer minor (ou uncertain
+  // alta confiança) E o cliente não declarou consentimento parental,
+  // bloqueia com erro `parental_consent_required` pra que a UI mostre
+  // o checkbox de consentimento.
+  if (
+    customerPhotoBuf &&
+    process.env.TRY_ON_AGE_GATE === 'true' &&
+    !input.parentalConsentDeclared
+  ) {
+    try {
+      const age = await estimateAge(customerPhotoBuf)
+      if (requiresParentalConsent(age)) {
+        logger.info('Try-on: age gate exigindo consentimento parental', {
+          bracket: age.bracket,
+          confidence: age.confidence,
+        })
+        await recordGeneration({
+          lojaId: loja.id,
+          pecaId: peca.id,
+          sessionId: input.sessionId ?? null,
+          ipHash,
+          aiImageModel: (loja.ai_image_model ?? null) as AiImageModel | null,
+          status: 'error',
+          errorCode: 'age_gate_consent_required',
+          gateVerdict: 'reject',
+          gateReason: null,
+          gateSignals: {
+            ...(gateSignalsForLog ?? {}),
+            age_estimation: { bracket: age.bracket, confidence: age.confidence },
+          },
+        })
+        return {
+          ok: false,
+          error: {
+            kind: 'parental_consent_required',
+            bracket: age.bracket === 'minor' ? 'minor' : 'uncertain',
+          },
+        }
+      }
+      gateSignalsForLog = {
+        ...(gateSignalsForLog ?? {}),
+        age_estimation: { bracket: age.bracket, confidence: age.confidence },
+      }
+    } catch {
+      // best-effort — falha de infra não bloqueia
     }
   }
 

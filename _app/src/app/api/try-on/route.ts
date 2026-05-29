@@ -176,7 +176,15 @@ export async function POST(req: NextRequest) {
         const mapped = mapProviderFailure(detail)
         return fail(mapped.message, mapped.code, mapped.status)
       }
+      case 'parental_consent_required':
+        return fail(
+          'Detectamos que a pessoa na foto pode ser menor de idade. Marque o consentimento parental para continuar.',
+          `PARENTAL_CONSENT_REQUIRED_${result.error.bracket.toUpperCase()}`,
+          422,
+        )
     }
+    // Falha de tipagem se algum case ficou de fora
+    return fail('Erro desconhecido', 'UNKNOWN_ERROR', 500)
   }
 
   return ok({
