@@ -61,6 +61,9 @@ export interface TryOnPromptVariables {
   seed?: number
   /** Reserved for FASHN content moderation parameter when Tier A is wired. */
   safetyLevel: 'conservative' | 'permissive'
+  /** Cláusula de prompt opcional sobre o material da peça (P2.11). Quando
+   *  presente é injetada no compose pra empurrar drape/sheen/textura corretos. */
+  fabricPromptClause?: string
 }
 
 export interface TryOnTierInput {

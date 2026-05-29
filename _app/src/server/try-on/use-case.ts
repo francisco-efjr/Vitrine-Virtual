@@ -10,6 +10,7 @@ import {
 } from '@/lib/try-on/acceptance'
 import { detectMirrorSelfie } from '@/lib/try-on/acceptance/mirror-selfie-detect'
 import { checkConflictingGarment } from '@/lib/try-on/acceptance/conflicting-garment-detect'
+import { classifyFabric, fabricPromptClause } from '@/lib/try-on/acceptance/fabric-classify'
 import { runTier } from '@/lib/try-on/tiers'
 import type { SafetyRating } from '@/lib/try-on/types'
 import { isTryOnEnabled } from '@/lib/try-on/kill-switch'
@@ -407,6 +408,25 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
   }
   const tierChosen: TryOnTier = chooseTier(routeCtx)
 
+  // Fabric classifier (P2.11) — best-effort. Quando detecta material com
+  // confidence ≥ 0.6, gera cláusula de prompt sobre drape/sheen.
+  let fabricClause: string | undefined
+  if (garmentBuffer && process.env.TRY_ON_FABRIC_CLASSIFIER !== 'false') {
+    try {
+      const fabric = await classifyFabric(garmentBuffer, 'image/jpeg')
+      const clause = fabricPromptClause(fabric.fabric, fabric.confidence)
+      if (clause) {
+        fabricClause = clause
+        logger.info('Try-on: fabric classifier', {
+          fabric: fabric.fabric,
+          confidence: fabric.confidence,
+        })
+      }
+    } catch {
+      // best-effort
+    }
+  }
+
   const variables: TryOnPromptVariables = {
     customerPhotoType,
     garmentPhotoType,
@@ -416,8 +436,11 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
     storeBackgroundReference: provadorFundoUrl ?? undefined,
     quality: 'quality',
     outputStyle: 'premium_studio',
-    promptVariantId: 'v1.1-garment-first+variants+negative',
+    promptVariantId: fabricClause
+      ? 'v1.1-garment-first+variants+negative+fabric'
+      : 'v1.1-garment-first+variants+negative',
     safetyLevel: 'conservative',
+    fabricPromptClause: fabricClause,
   }
   const composedPrompt = composeFinalPrompt(variables)
 
