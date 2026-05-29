@@ -5,8 +5,9 @@
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/download-models.mjs && next build",
+    "build": "node scripts/strip-onnx-gpu.mjs && node scripts/download-models.mjs && next build",
     "models:download": "node scripts/download-models.mjs",
+    "models:strip-gpu": "node scripts/strip-onnx-gpu.mjs",
     "start": "next start",
     "lint": "next lint --max-warnings=0",
     "typecheck": "tsc --noEmit",
