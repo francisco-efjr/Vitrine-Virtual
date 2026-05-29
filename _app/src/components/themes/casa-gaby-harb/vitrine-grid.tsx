@@ -11,9 +11,10 @@
  * /api/v/{slug}/pecas?offset=N e acumula no state. Total vem do RPC pra
  * UI saber quando o botão some.
  */
-import { useState } from 'react'
-import { TryOnModal } from '@/components/public/try-on-modal'
+import { useMemo, useState } from 'react'
+import { CATEGORIAS, getCategoriaLabel } from '@/lib/categorias'
 import { CGHPieceCard } from './piece-card'
+import { CGHTryOnModal } from './try-on-modal'
 import { CGH } from './tokens'
 import { FF, Btn } from './atoms'
 
@@ -45,8 +46,32 @@ export function CGHVitrineGrid({
   const [cabinePeca, setCabinePeca] = useState<Peca | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreErr, setLoadMoreErr] = useState<string | null>(null)
+  const [catFilter, setCatFilter] = useState<string>('todas')
   const total = totalPecas ?? pecas.length
   const hasMore = pecas.length < total
+
+  // Chips de categoria — filtra in-memory sobre as peças carregadas.
+  // Quando filtro está ativo, escondemos "Carregar mais" porque a próxima
+  // página pode trazer peças de qualquer categoria; melhor seguir essa
+  // estratégia até paginar server-side por categoria.
+  const availableCats = useMemo(() => {
+    const ids = new Set<string>()
+    for (const p of pecas) {
+      if (p.categoria_id) ids.add(p.categoria_id)
+    }
+    return [
+      { id: 'todas', label: 'Tudo' },
+      ...CATEGORIAS.filter((c) => ids.has(c.id)).map((c) => ({ id: c.id, label: c.label })),
+      ...Array.from(ids)
+        .filter((id) => !CATEGORIAS.some((c) => c.id === id))
+        .map((id) => ({ id, label: getCategoriaLabel(id) })),
+    ]
+  }, [pecas])
+
+  const filtered = useMemo(() => {
+    if (catFilter === 'todas') return pecas
+    return pecas.filter((p) => p.categoria_id === catFilter)
+  }, [pecas, catFilter])
 
   async function loadMore() {
     if (loadingMore || !hasMore) return
@@ -85,8 +110,52 @@ export function CGHVitrineGrid({
 
   return (
     <>
+      {availableCats.length > 1 ? (
+        <div
+          style={{
+            display: 'flex',
+            gap: 9,
+            marginBottom: 28,
+            overflowX: 'auto',
+            paddingBottom: 4,
+            WebkitOverflowScrolling: 'touch',
+          }}
+          className="cgh-cat-chips"
+        >
+          {availableCats.map((c) => {
+            const on = catFilter === c.id
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCatFilter(c.id)}
+                style={{
+                  flexShrink: 0,
+                  padding: '8px 14px',
+                  borderRadius: 999,
+                  whiteSpace: 'nowrap',
+                  fontFamily: FF.sans,
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  border: on
+                    ? '1px solid transparent'
+                    : '1px solid rgba(31,58,42,0.18)',
+                  background: on ? CGH.musgo : 'transparent',
+                  color: on ? CGH.cream : 'rgba(31,58,42,0.62)',
+                  cursor: 'pointer',
+                }}
+              >
+                {c.label}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+
       <div className="cgh-grid">
-        {pecas.map((p) => (
+        {filtered.map((p) => (
           <CGHPieceCard
             key={p.peca_id}
             peca={p}
@@ -96,7 +165,22 @@ export function CGHVitrineGrid({
         ))}
       </div>
 
-      {hasMore ? (
+      {filtered.length === 0 ? (
+        <div
+          style={{
+            padding: '40px 24px',
+            textAlign: 'center',
+            fontFamily: FF.serif,
+            fontStyle: 'italic',
+            fontSize: 18,
+            color: 'rgba(31,58,42,0.55)',
+          }}
+        >
+          Nenhuma peça nessa categoria por enquanto.
+        </div>
+      ) : null}
+
+      {catFilter === 'todas' && hasMore ? (
         <div
           style={{
             display: 'flex',
@@ -131,7 +215,7 @@ export function CGHVitrineGrid({
       ) : null}
 
       {cabinePeca ? (
-        <TryOnModal
+        <CGHTryOnModal
           open={!!cabinePeca}
           onClose={() => setCabinePeca(null)}
           pecaId={cabinePeca.peca_id}

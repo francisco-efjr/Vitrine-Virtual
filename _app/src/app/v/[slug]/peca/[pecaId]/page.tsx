@@ -6,6 +6,7 @@ import { PublicLiveRefresh } from '@/components/public/public-live-refresh'
 import { TryOnButton } from '@/components/public/try-on-button'
 import { GaleriaFotos } from '@/components/public/galeria-fotos'
 import { LojaMark } from '@/components/brand/vv-logo'
+import { CGHPecaPage } from '@/components/themes/casa-gaby-harb/peca-page'
 import { formatPreco } from '@/lib/validators/peca'
 import { formatSizes } from '@/lib/sizes'
 import { getCategoriaLabel } from '@/lib/categorias'
@@ -150,6 +151,40 @@ export default async function PecaPublicaPage({
     : null
 
   const logoUrl = buildLojaAssetPublicUrl(loja.logo_storage_path ?? null)
+
+  // Tema CGH: layout editorial dedicado (DetalheScreen + MDetalhe).
+  // Outros temas usam o layout padrão abaixo.
+  if (loja.vitrine_theme === 'CasaGabyHarb') {
+    return (
+      <>
+        <PublicLiveRefresh />
+        <CGHPecaPage
+          loja={{
+            loja_id: loja.loja_id,
+            nome: loja.nome,
+            slug: loja.slug,
+            instagram: loja.instagram,
+            tiktok: loja.tiktok,
+            whatsapp_e164: loja.whatsapp_e164,
+            exibir_preco_publico: loja.exibir_preco_publico,
+            tagline: loja.tagline ?? null,
+            logo_url: logoUrl,
+            cabine_backdrop_url: cabineBackdropUrl,
+          }}
+          peca={{
+            peca_id: peca.peca_id,
+            nome: peca.nome,
+            tamanho: peca.tamanho,
+            preco_centavos: peca.preco_centavos,
+          }}
+          fotos={fotosComUrl.map((f) => ({ id: f.id, url: f.url }))}
+          categoriaLabel={categoriaLabel}
+          garmentImageUrl={garmentSignedUrl}
+          whatsappUrl={wa}
+        />
+      </>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-bg pb-[88px] sm:pb-0">
