@@ -141,6 +141,7 @@ export function CGHPieceCard({
         }}
       >
         <span
+          className="cgh-card-name"
           style={{
             fontFamily: FF.serif,
             fontStyle: 'italic',
@@ -153,6 +154,7 @@ export function CGHPieceCard({
         </span>
         {exibirPreco && peca.preco_centavos != null ? (
           <span
+            className="cgh-card-price"
             style={{
               fontFamily: FF.sans,
               fontWeight: 400,
@@ -176,6 +178,7 @@ export function CGHPieceCard({
         }}
       >
         <span
+          className="cgh-card-cta"
           style={{
             fontFamily: FF.sans,
             fontSize: 10.5,

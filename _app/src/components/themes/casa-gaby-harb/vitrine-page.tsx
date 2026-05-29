@@ -117,7 +117,7 @@ export function CGHVitrinePage({
                   fontFamily: FF.serif,
                   fontStyle: 'italic',
                   fontWeight: 500,
-                  fontSize: 'clamp(56px, 8vw, 92px)',
+                  fontSize: 'clamp(48px, 7.5vw, 88px)',
                   lineHeight: 0.98,
                   color: CGH.cream,
                   letterSpacing: '-0.015em',
@@ -126,29 +126,24 @@ export function CGHVitrinePage({
                   textWrap: 'balance',
                 }}
               >
-                {loja.tagline ? (
-                  loja.tagline
-                ) : (
-                  <>
-                    Para mulheres
-                    <br />
-                    de <span style={{ color: CGH.gold }}>presença.</span>
-                  </>
-                )}
+                Para mulheres
+                <br />
+                de <span style={{ color: CGH.gold }}>presença.</span>
               </h1>
               <p
                 style={{
                   fontFamily: FF.serif,
-                  fontSize: 22,
+                  fontSize: 21,
                   fontStyle: 'italic',
                   lineHeight: 1.5,
                   color: CGH.onDarkMut,
-                  marginTop: 28,
-                  maxWidth: 440,
+                  marginTop: 26,
+                  maxWidth: 460,
                 }}
               >
-                Curadoria assinada por Gaby Harb. Peças escolhidas a dedo, para você que inspira
-                pelo estilo.
+                {/* Tagline da loja se tiver — senão usa copy padrão CGH */}
+                {loja.tagline ||
+                  'Curadoria assinada por Gaby Harb. Peças escolhidas a dedo, para você que inspira pelo estilo.'}
               </p>
               <div className="cgh-hero-ctas">
                 <Btn variant="gold" size="lg" href="#curadoria">
@@ -254,11 +249,11 @@ export function CGHVitrinePage({
       {/* ── A CASA ─────────────────────────────────────────────────── */}
       <section
         id="a-casa"
+        className="cgh-section-casa"
         style={{
           background: CGH.musgoDeep,
           position: 'relative',
           overflow: 'hidden',
-          padding: '88px 0',
         }}
       >
         <div
@@ -330,7 +325,7 @@ export function CGHVitrinePage({
       </section>
 
       {/* ── A CURADORIA ─────────────────────────────────────────────── */}
-      <section id="curadoria" style={{ background: CGH.cream, padding: '72px 0 88px' }}>
+      <section id="curadoria" className="cgh-section-curadoria" style={{ background: CGH.cream }}>
         <div className="cgh-container">
           <div className="cgh-curadoria-head">
             <div>
@@ -379,32 +374,87 @@ export function CGHVitrinePage({
       <footer
         style={{
           background: CGH.musgoDeep,
-          padding: '64px 0 56px',
+          padding: '56px 0 40px',
           textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <div className="cgh-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'radial-gradient(70% 40% at 50% 0%, rgba(201,169,97,0.08) 0%, transparent 55%)',
+          }}
+        />
+        <div
+          className="cgh-container"
+          style={{
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+          }}
+        >
           <GHMono size={56} />
           <Wordmark color={CGH.cream} size={11} />
           <p
             style={{
               fontFamily: FF.serif,
-              fontSize: 17,
+              fontSize: 18,
               fontStyle: 'italic',
               color: CGH.onDarkMut,
               maxWidth: 420,
-              margin: 0,
+              margin: '14px 0 0',
+              lineHeight: 1.5,
             }}
           >
-            Curadoria assinada · Manaus, AM
+            Curadoria assinada por quem inspira pelo estilo.
+            <br />
+            Para mulheres de presença.
           </p>
+
+          {/* Ornamento — divisor com floron dourado central */}
+          <div style={{ margin: '22px 0 4px', width: '100%', display: 'flex', justifyContent: 'center' }}>
+            <GoldRule floron width={240} opacity={0.4} />
+          </div>
+
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              color: CGH.gold,
+              marginTop: 6,
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              maxWidth: 320,
+            }}
+          >
+            <Icon name="pin" size={17} />
+            <span
+              style={{
+                fontFamily: FF.sans,
+                fontSize: 13,
+                color: CGH.cream,
+                letterSpacing: '0.04em',
+                textAlign: 'center',
+              }}
+            >
+              Av. André Araújo, 2479 — Aleixo, Manaus
+            </span>
+          </div>
+
           <div
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 18,
-              color: CGH.gold,
-              marginTop: 4,
+              marginTop: 18,
+              color: CGH.onDarkMut,
             }}
           >
             {loja.instagram ? (
@@ -412,41 +462,74 @@ export function CGHVitrinePage({
                 href={`https://instagram.com/${loja.instagram}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  color: CGH.cream,
-                  textDecoration: 'none',
-                  fontFamily: FF.sans,
-                  fontSize: 12,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                }}
+                aria-label={`Instagram @${loja.instagram}`}
+                style={{ color: CGH.onDarkMut, textDecoration: 'none', display: 'inline-flex' }}
               >
-                <Icon name="instagram" size={18} color={CGH.gold} />@{loja.instagram}
+                <Icon name="instagram" size={22} />
               </a>
             ) : null}
-            {whatsappUrl ? <WhatsBtn size="sm" href={whatsappUrl} /> : null}
+            {whatsappUrl ? (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Falar no WhatsApp"
+                style={{ color: CGH.onDarkMut, textDecoration: 'none', display: 'inline-flex' }}
+              >
+                <Icon name="whatsapp" size={22} />
+              </a>
+            ) : null}
           </div>
-          <div style={{ marginTop: 18, opacity: 0.8 }}>
+
+          {loja.instagram ? (
+            <div
+              style={{
+                display: 'inline-flex',
+                gap: 14,
+                marginTop: 12,
+                fontFamily: FF.sans,
+                fontSize: 12,
+                color: CGH.onDarkMut,
+                letterSpacing: '0.04em',
+              }}
+            >
+              <span>@{loja.instagram}</span>
+              <span>·</span>
+              <span>@gabyharb_</span>
+            </div>
+          ) : null}
+
+          {whatsappUrl ? (
+            <div style={{ marginTop: 18 }}>
+              <WhatsBtn size="sm" href={whatsappUrl} />
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 22, opacity: 0.7 }}>
             <LojaMark
               loja={{ nome: loja.nome, logo_url: loja.logo_url }}
-              size={38}
+              size={36}
               radius={10}
             />
           </div>
+
           <div
             style={{
               fontFamily: FF.mono,
-              fontSize: 10,
+              fontSize: 9.5,
               letterSpacing: '0.18em',
               color: CGH.onDarkFaint,
               textTransform: 'uppercase',
-              marginTop: 6,
+              marginTop: 10,
+              textAlign: 'center',
+              lineHeight: 1.7,
             }}
           >
-            vitrine virtual · /v/{loja.slug}
+            Casa Gaby Harb · Curadoria assinada · Manaus, AM
+            <br />
+            <span style={{ opacity: 0.6 }}>
+              vitrine virtual · /v/{loja.slug}
+            </span>
           </div>
         </div>
       </footer>
@@ -480,8 +563,8 @@ function CGHStyles() {
       .cgh-hero {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 48px;
-        padding: 56px 24px 72px;
+        gap: 36px;
+        padding: 28px 22px 56px;
         max-width: 1280px;
         margin: 0 auto;
         align-items: center;
@@ -500,8 +583,18 @@ function CGHStyles() {
       .cgh-hero-ctas {
         display: flex;
         flex-wrap: wrap;
-        gap: 14px;
-        margin-top: 38px;
+        gap: 12px;
+        margin-top: 28px;
+      }
+      @media (min-width: 900px) {
+        .cgh-hero-ctas { gap: 14px; margin-top: 38px; }
+      }
+      /* Em mobile, CTAs full-width pra serem mais tocáveis */
+      @media (max-width: 599px) {
+        .cgh-hero-ctas > * {
+          flex: 1 1 100%;
+          justify-content: center;
+        }
       }
       .cgh-nav-links { display: none; }
       .cgh-nav-sep { display: none; }
@@ -523,7 +616,7 @@ function CGHStyles() {
       .cgh-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 28px 16px;
+        gap: 24px 12px;
       }
       @media (min-width: 768px) {
         .cgh-grid {
@@ -534,6 +627,19 @@ function CGHStyles() {
       .cgh-card:hover .cgh-card-img,
       .cgh-card:focus-visible .cgh-card-img {
         transform: scale(1.035);
+      }
+      /* Em mobile aperta tipografia/badges do card pra caber bem em 2 colunas a 375px */
+      @media (max-width: 599px) {
+        .cgh-card .cgh-card-name { font-size: 18px !important; }
+        .cgh-card .cgh-card-price { font-size: 11.5px !important; }
+        .cgh-card .cgh-card-cta { font-size: 10px !important; }
+      }
+      /* ── Padding vertical das seções: aperta mobile, abre desktop ── */
+      .cgh-section-casa { padding: 56px 0; }
+      .cgh-section-curadoria { padding: 48px 0 64px; }
+      @media (min-width: 768px) {
+        .cgh-section-casa { padding: 88px 0; }
+        .cgh-section-curadoria { padding: 72px 0 88px; }
       }
     `}</style>
   )
