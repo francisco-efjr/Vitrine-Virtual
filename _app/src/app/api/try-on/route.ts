@@ -138,17 +138,38 @@ export async function POST(req: NextRequest) {
     garmentSignalsSchema,
   )
 
-  const result = await runTryOn({
-    pecaId: parsed.data.peca_id,
-    turnstileToken: parsed.data.turnstile_token,
-    customerPhoto: customerPhotoDataUrl,
-    ip,
-    sessionId: parsed.data.session_id,
-    garmentImageUrlOverride: parsed.data.garment_url_override,
-    customerSignals,
-    garmentSignals,
-    bypassAiGate: parsed.data.bypass_ai_gate === 'true',
-  })
+  let result: Awaited<ReturnType<typeof runTryOn>>
+  try {
+    result = await runTryOn({
+      pecaId: parsed.data.peca_id,
+      turnstileToken: parsed.data.turnstile_token,
+      customerPhoto: customerPhotoDataUrl,
+      ip,
+      sessionId: parsed.data.session_id,
+      garmentImageUrlOverride: parsed.data.garment_url_override,
+      customerSignals,
+      garmentSignals,
+      bypassAiGate: parsed.data.bypass_ai_gate === 'true',
+    })
+  } catch (err) {
+    // Exception fora do contrato `{ok:false, error:...}` — schema novo
+    // faltando em prod, provider key vazio, sub-call quebrada, etc.
+    // Antes virava "Application error" 500 do Next sem contexto. Agora
+    // logamos a classe + mensagem (sem stack, sem PII) e devolvemos
+    // JSON estruturado que o frontend renderiza no error step.
+    const errName = err instanceof Error ? err.name : 'UnknownError'
+    const errMsg = err instanceof Error ? err.message : String(err)
+    logger.error('runTryOn exception (out-of-contract)', {
+      name: errName,
+      message: errMsg,
+      peca_id: parsed.data.peca_id,
+    })
+    return fail(
+      `Não foi possível gerar a visualização. (${errName})`,
+      'TRY_ON_INTERNAL_ERROR',
+      500,
+    )
+  }
 
   if (!result.ok) {
     switch (result.error.kind) {
