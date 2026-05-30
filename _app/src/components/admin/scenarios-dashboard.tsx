@@ -26,8 +26,17 @@ export function ScenariosDashboard() {
     setError(null)
     try {
       const r = await fetch(`/api/super-admin/try-on/scenarios?days=${p}`)
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      setReport(await r.json())
+      const json = (await r.json()) as
+        | { ok: true; data: ScenariosReport }
+        | { ok: false; error: { message: string; code: string } }
+      if (!r.ok || !json.ok) {
+        const msg = !json.ok ? json.error?.message : `HTTP ${r.status}`
+        throw new Error(msg ?? 'Falha ao carregar relatório')
+      }
+      // Mesmo bug do QualityDashboard: handleRoute envelopa em
+      // { ok, data } e antes guardávamos o wrapper inteiro,
+      // perdendo report.byDay/totals/etc. em runtime.
+      setReport(json.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar relatório.')
     } finally {

@@ -27,8 +27,17 @@ export function QualityDashboard() {
     setError(null)
     try {
       const r = await fetch(`/api/super-admin/try-on/quality?days=${p}`)
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      setReport(await r.json())
+      const json = (await r.json()) as
+        | { ok: true; data: QualityReport }
+        | { ok: false; error: { message: string; code: string } }
+      if (!r.ok || !json.ok) {
+        const msg = !json.ok ? json.error?.message : `HTTP ${r.status}`
+        throw new Error(msg ?? 'Falha ao carregar relatório')
+      }
+      // handleRoute envelopa em { ok, data }. Antes guardávamos o wrapper
+      // inteiro em `report` e acessos a report.provider_stats vinham
+      // undefined, derrubando o componente com TypeError em .length.
+      setReport(json.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Falha ao carregar relatório.')
     } finally {
