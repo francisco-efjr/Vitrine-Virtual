@@ -82,6 +82,21 @@ export function ScenariosDashboard() {
         <Card className="flex items-center gap-2 p-5 font-sans text-[12.5px] text-red-600">
           <AlertTriangle size={13} /> {error}
         </Card>
+      ) : report && !report.available ? (
+        <Card className="flex items-start gap-3 p-5 font-sans text-[12.5px] text-ink-2">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
+          <div>
+            <strong className="font-semibold text-ink">
+              Dashboard de cenários indisponível
+            </strong>
+            <p className="mt-1 leading-relaxed">
+              A view <code className="rounded bg-surface-2 px-1 py-0.5 text-[11.5px]">try_on_scenarios_summary</code> ainda
+              não foi criada no Supabase de produção. Aplique a migration{' '}
+              <code className="rounded bg-surface-2 px-1 py-0.5 text-[11.5px]">20260529000016_scenarios_view.sql</code>{' '}
+              no SQL Editor pra ativar.
+            </p>
+          </div>
+        </Card>
       ) : report ? (
         <div className="space-y-4">
           <Card className="p-5">

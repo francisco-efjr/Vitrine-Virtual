@@ -1,5 +1,6 @@
 import 'server-only'
 import { createServiceClient } from '@/lib/supabase/service'
+import { logger } from '@/lib/logger'
 
 /**
  * Scenarios dashboard data — research §4.3 P2.18.
@@ -32,6 +33,12 @@ export interface ScenariosReport {
   periodDays: number
   totals: Omit<ScenarioDayRow, 'day'>
   byDay: ScenarioDayRow[]
+  /**
+   * Quando true, indica que a view subjacente não está disponível em prod
+   * (migration 20260529000016 ainda não rodou) — o dashboard recebe um
+   * relatório vazio com `available:false` em vez de quebrar.
+   */
+  available: boolean
 }
 
 const NUMERIC_KEYS: ReadonlyArray<keyof Omit<ScenarioDayRow, 'day'>> = [
@@ -69,7 +76,7 @@ export async function computeScenariosReport(days = 30): Promise<ScenariosReport
         gte(col: string, val: string): {
           order(col: string, opts: { ascending: boolean }): Promise<{
             data: Record<string, unknown>[] | null
-            error: { message: string } | null
+            error: { message: string; code?: string } | null
           }>
         }
       }
@@ -81,7 +88,29 @@ export async function computeScenariosReport(days = 30): Promise<ScenariosReport
     .order('day', { ascending: false })
 
   if (error) {
-    throw new Error(`scenarios: query falhou: ${error.message}`)
+    // Degrade gracefully quando a view subjacente não existe (migration
+    // 20260529000016 ainda pendente em prod). Em vez de derrubar o
+    // /admin/super inteiro com INTERNAL_ERROR, retornamos relatório
+    // vazio com available:false — o widget no super-admin trata como
+    // "sem dados ainda" e o resto do painel segue funcionando.
+    const code = error.code ?? ''
+    const msg = error.message ?? ''
+    const isMissingRelation =
+      code === '42P01' ||
+      /relation .* does not exist|does not exist/i.test(msg)
+    if (isMissingRelation) {
+      logger.warn('scenarios view ausente em prod — pulando dashboard', {
+        code,
+        message: msg,
+      })
+      return {
+        periodDays: days,
+        totals: emptyTotals(),
+        byDay: [],
+        available: false,
+      }
+    }
+    throw new Error(`scenarios: query falhou: ${msg}`)
   }
 
   const rows: ScenarioDayRow[] = (data ?? []).map((row) => ({
@@ -113,5 +142,6 @@ export async function computeScenariosReport(days = 30): Promise<ScenariosReport
     periodDays: days,
     totals,
     byDay: rows,
+    available: true,
   }
 }
