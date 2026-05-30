@@ -1,10 +1,15 @@
-import { Check, ListChecks, Sparkles, Store } from 'lucide-react'
+import { AlertTriangle, Check, ListChecks, Sparkles, Store } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { CountUp } from '@/components/motion'
 import { VVLogo } from '@/components/brand/vv-logo'
+import { logger } from '@/lib/logger'
 import { requireSuperAdmin } from '@/server/auth/session'
-import { listLojasWithStats, SUPER_ADMIN_PAGE_SIZE } from '@/server/lojas/list'
+import {
+  listLojasWithStats,
+  SUPER_ADMIN_PAGE_SIZE,
+  type LojasPage,
+} from '@/server/lojas/list'
 import {
   getDefaultAiImageModel,
   getTryOnBudget,
@@ -25,12 +30,42 @@ export default async function SuperAdminPage({
   const session = await requireSuperAdmin()
   const page = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
   const offset = (page - 1) * SUPER_ADMIN_PAGE_SIZE
-  const [lojasPage, killEnabled, budget, defaultAiModel] = await Promise.all([
+
+  // Promise.allSettled em vez de Promise.all: se UMA chamada quebra (ex:
+  // listLojasWithStats com count exato falhando em RLS, ou system_settings
+  // sem row), o painel ainda renderiza com defaults seguros + banner de
+  // aviso. Antes a tela toda caía no error.tsx do (admin).
+  const results = await Promise.allSettled([
     listLojasWithStats({ offset, limit: SUPER_ADMIN_PAGE_SIZE }),
     isTryOnEnabled(),
     getTryOnBudget(),
     getDefaultAiImageModel(),
   ])
+
+  const failures: Array<{ key: string; error: string }> = []
+  function unwrap<T>(idx: number, key: string, fallback: T): T {
+    const r = results[idx]
+    if (r?.status === 'fulfilled') return r.value as T
+    const err = r?.status === 'rejected' ? r.reason : new Error('unknown')
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    logger.error('SuperAdminPage SSR call failed', { key, error: msg })
+    failures.push({ key, error: msg })
+    return fallback
+  }
+
+  const lojasPage = unwrap<LojasPage>(0, 'listLojasWithStats', {
+    items: [],
+    total: 0,
+    offset,
+    limit: SUPER_ADMIN_PAGE_SIZE,
+  })
+  const killEnabled = unwrap<boolean>(1, 'isTryOnEnabled', true)
+  const budget = unwrap<{ budgetUsd: number; costPerGen: number }>(2, 'getTryOnBudget', {
+    budgetUsd: 0,
+    costPerGen: 0,
+  })
+  const defaultAiModel = unwrap<'high' | 'medium'>(3, 'getDefaultAiImageModel', 'medium')
+
   // KPIs no header agregam só a página atual — pra agregação geral, futuro
   // RPC `super_admin_kpis()` resolve sem trazer 50+ lojas pro Node.
   const lojas = lojasPage.items
@@ -62,6 +97,30 @@ export default async function SuperAdminPage({
         <h1 className="mb-5 font-serif text-[24px] font-semibold tracking-tight text-ink sm:text-[26px]">
           Visão geral da plataforma
         </h1>
+
+        {failures.length > 0 ? (
+          <Card className="mb-5 flex items-start gap-3 p-4 font-sans text-[12.5px] text-ink-2">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
+            <div className="min-w-0 flex-1">
+              <strong className="font-semibold text-ink">
+                {failures.length} chamada(s) SSR falharam — painel parcial
+              </strong>
+              <ul className="mt-1 space-y-0.5 break-words text-[11.5px]">
+                {failures.map((f) => (
+                  <li key={f.key}>
+                    <code className="rounded bg-surface-2 px-1 py-0.5">{f.key}</code>
+                    {' — '}
+                    {f.error}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[11.5px]">
+                Normalmente é migration pendente em prod (RPC/coluna ausente).
+                Os widgets com fallback continuam funcionando.
+              </p>
+            </div>
+          </Card>
+        ) : null}
 
         <section className="mb-7 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
           <KpiBlock
