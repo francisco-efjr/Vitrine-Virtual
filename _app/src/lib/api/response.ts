@@ -39,10 +39,28 @@ export async function handleRoute<T>(fn: () => Promise<NextResponse | T>): Promi
     if (err instanceof LojaError || err instanceof PecaError) {
       return fail(err.message, err.code, err.status)
     }
+    // Erro out-of-contract: ajuda debug levando o NOME da classe da exception
+    // pra resposta (sem stack, sem PII) em vez de só "INTERNAL_ERROR" plano.
+    // Antes o frontend só via "Erro interno" e o suporte tinha que abrir
+    // Vercel Logs pra cada caso. Agora a primeira pista vem no response.
+    const errName = err instanceof Error ? err.name : 'UnknownError'
+    const errMessage = err instanceof Error ? err.message : String(err)
+    // Postgres errors do Supabase costumam vir com shape { code, details, hint, message }
+    // que NÃO é Error subclass. Olhamos por campos esperados pra dar contexto.
+    let pgCode: string | undefined
+    if (err && typeof err === 'object' && 'code' in err && typeof err.code === 'string') {
+      pgCode = err.code
+    }
     logger.error('Erro não tratado em rota', {
-      message: err instanceof Error ? err.message : String(err),
+      name: errName,
+      message: errMessage,
+      pg_code: pgCode,
     })
-    return fail('Erro interno', 'INTERNAL_ERROR', 500)
+    return fail(
+      'Erro interno',
+      pgCode ? `INTERNAL_ERROR_PG_${pgCode}` : `INTERNAL_ERROR_${errName}`,
+      500,
+    )
   }
 }
 

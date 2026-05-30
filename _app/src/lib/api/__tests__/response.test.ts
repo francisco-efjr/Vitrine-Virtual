@@ -90,7 +90,33 @@ describe('handleRoute()', () => {
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error.message).toBe('Erro interno')
-    expect(body.error.code).toBe('INTERNAL_ERROR')
+    // O code preserva o nome da classe da exception pra debug.
+    // Pra Error puro, vira INTERNAL_ERROR_Error.
+    expect(body.error.code).toMatch(/^INTERNAL_ERROR(_|$)/)
+    // Mensagem do stacktrace nunca vaza pro body.
     expect(JSON.stringify(body)).not.toContain('detalhe-secreto')
+  })
+
+  it('preserva o nome da classe da exception no code', async () => {
+    class CustomBoom extends Error {
+      constructor(msg: string) {
+        super(msg)
+        this.name = 'CustomBoom'
+      }
+    }
+    const res = await handleRoute(async () => {
+      throw new CustomBoom('algo deu ruim')
+    })
+    const body = await res.json()
+    expect(body.error.code).toBe('INTERNAL_ERROR_CustomBoom')
+  })
+
+  it('expõe o pg_code do Postgres quando a exception vem do Supabase', async () => {
+    const res = await handleRoute(async () => {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      throw { code: '23514', message: 'check_violation', details: 'oops' }
+    })
+    const body = await res.json()
+    expect(body.error.code).toBe('INTERNAL_ERROR_PG_23514')
   })
 })
