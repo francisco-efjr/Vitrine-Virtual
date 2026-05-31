@@ -179,6 +179,8 @@ type IconName =
   | 'refresh'
   | 'alert'
   | 'ruler'
+  | 'check'
+  | 'scan'
   | 'bag'
 
 export function Icon({
@@ -288,6 +290,16 @@ export function Icon({
         <path {...p} d="M7 8v3m4-3v4m4-4v3m4-3v4" />
       </>
     ),
+    check: <path {...p} d="M5 12.5l4.2 4.5L19 7" />,
+    scan: (
+      <>
+        <path
+          {...p}
+          d="M4 8V6.5A2.5 2.5 0 0 1 6.5 4H8M16 4h1.5A2.5 2.5 0 0 1 20 6.5V8M20 16v1.5a2.5 2.5 0 0 1-2.5 2.5H16M8 20H6.5A2.5 2.5 0 0 1 4 17.5V16"
+        />
+        <path {...p} d="M4 12h16" />
+      </>
+    ),
     bag: (
       <>
         <path {...p} d="M6 8h12l-1 12H7z" />
@@ -310,19 +322,23 @@ export function Btn({
   children,
   variant = 'gold',
   icon,
+  iconR,
   size = 'md',
   full = false,
   href,
   onClick,
+  ariaLabel,
   style = {},
 }: {
-  children: ReactNode
+  children?: ReactNode
   variant?: BtnVariant
   icon?: IconName
+  iconR?: IconName
   size?: BtnSize
   full?: boolean
   href?: string
   onClick?: () => void
+  ariaLabel?: string
   style?: CSSProperties
 }) {
   const pad = size === 'lg' ? '16px 30px' : size === 'sm' ? '9px 16px' : '13px 24px'
@@ -375,17 +391,29 @@ export function Btn({
     <>
       {icon ? <Icon name={icon} size={fs + 4} stroke={1.5} /> : null}
       {children}
+      {iconR ? <Icon name={iconR} size={fs + 4} stroke={1.5} /> : null}
     </>
   )
   if (href) {
     return (
-      <a href={href} style={common} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+      <a
+        href={href}
+        style={common}
+        aria-label={ariaLabel}
+        target={href.startsWith('http') ? '_blank' : undefined}
+        rel="noreferrer"
+      >
         {inner}
       </a>
     )
   }
   return (
-    <button type="button" onClick={onClick} style={{ ...common, border: variants[variant].border }}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      style={{ ...common, border: variants[variant].border }}
+    >
       {inner}
     </button>
   )

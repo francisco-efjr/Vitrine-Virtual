@@ -4,16 +4,17 @@
  * Executar: npx playwright test tests/qa/auth.spec.ts
  *
  * Variáveis de ambiente:
- *   SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD
+ *   SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD (necessárias para cenários super-admin)
  *   LOJISTA_EMAIL, LOJISTA_PASSWORD
  *   BASE_URL (default: http://localhost:3000)
  */
 
 import { test, expect, type Page } from '@playwright/test'
 
-const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000'
-const SUPER_EMAIL = process.env.SUPER_ADMIN_EMAIL ?? 'francisco.efjr@gmail.com'
-const SUPER_PASS = process.env.SUPER_ADMIN_PASSWORD ?? '123'
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:3000'
+const SUPER_EMAIL = process.env.SUPER_ADMIN_EMAIL ?? ''
+const SUPER_PASS = process.env.SUPER_ADMIN_PASSWORD ?? ''
+const HAS_SUPER_CREDENTIALS = Boolean(SUPER_EMAIL && SUPER_PASS)
 const LOJISTA_EMAIL = process.env.LOJISTA_EMAIL ?? 'teste@me.com'
 const LOJISTA_PASS = process.env.LOJISTA_PASSWORD ?? '123'
 
@@ -33,6 +34,10 @@ async function submitLogin(page: Page) {
   await page.click('button[type="submit"]')
 }
 
+async function expectPathname(page: Page, pathname: string) {
+  await expect.poll(() => new URL(page.url()).pathname).toBe(pathname)
+}
+
 // ─── Grupo: Página de Login ────────────────────────────────────────────────────
 
 test.describe('Página de Login — Estrutura', () => {
@@ -44,7 +49,7 @@ test.describe('Página de Login — Estrutura', () => {
     await expect(page.locator('input[type="email"]')).toBeVisible()
     await expect(page.locator('input[type="password"]')).toBeVisible()
     await expect(page.locator('button[type="submit"]')).toBeVisible()
-    await expect(page.getByText('Entrar')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible()
   })
 
   test('Exibe link para recuperação de senha', async ({ page }) => {
@@ -65,10 +70,14 @@ test.describe('Página de Login — Estrutura', () => {
 
 test.describe('Login — Credenciais', () => {
   test('CT-AUTH-001: Login super admin válido → redireciona para /admin', async ({ page }) => {
+    test.skip(
+      !HAS_SUPER_CREDENTIALS,
+      'Defina SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD para validar super-admin',
+    )
     await goToLogin(page)
     await fillLoginForm(page, SUPER_EMAIL, SUPER_PASS)
     await submitLogin(page)
-    await expect(page).toHaveURL(/\/admin/, { timeout: 10_000 })
+    await expectPathname(page, '/admin/super')
   })
 
   test('CT-AUTH-002: Login lojista válido → redireciona para /admin', async ({ page }) => {
@@ -80,7 +89,7 @@ test.describe('Login — Credenciais', () => {
 
   test('CT-AUTH-003: Senha incorreta → mensagem de erro genérica', async ({ page }) => {
     await goToLogin(page)
-    await fillLoginForm(page, SUPER_EMAIL, 'senha_errada_123!')
+    await fillLoginForm(page, LOJISTA_EMAIL, 'senha_errada_123!')
     await submitLogin(page)
     // Aguardar resposta
     await page.waitForTimeout(2000)
@@ -102,13 +111,15 @@ test.describe('Login — Credenciais', () => {
 
   test('Loading state durante login', async ({ page }) => {
     await goToLogin(page)
-    await fillLoginForm(page, SUPER_EMAIL, SUPER_PASS)
+    await fillLoginForm(page, LOJISTA_EMAIL, LOJISTA_PASS)
     const submitBtn = page.locator('button[type="submit"]')
     await submitBtn.click()
     // Deve mostrar "Entrando..." e ficar desabilitado brevemente
-    await expect(submitBtn).toBeDisabled({ timeout: 2000 }).catch(() => {
-      // Se a resposta for rápida, pode já ter navegado — OK
-    })
+    await expect(submitBtn)
+      .toBeDisabled({ timeout: 2000 })
+      .catch(() => {
+        // Se a resposta for rápida, pode já ter navegado — OK
+      })
   })
 })
 
@@ -127,18 +138,20 @@ test.describe('Proteção de Rotas — Middleware', () => {
     await expect(page).toHaveURL(/\/login/)
   })
 
-  test('CT-AUTH-007-C: Middleware preserva parâmetro ?next= na URL de login', async ({
-    page,
-  }) => {
+  test('CT-AUTH-007-C: Middleware preserva parâmetro ?next= na URL de login', async ({ page }) => {
     await page.goto(`${BASE_URL}/admin/super`)
     await expect(page).toHaveURL(/next=%2Fadmin%2Fsuper|next=\/admin\/super/)
   })
 
   test('CT-AUTH-005: Login com ?next= redireciona para o destino correto', async ({ page }) => {
+    test.skip(
+      !HAS_SUPER_CREDENTIALS,
+      'Defina SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD para validar super-admin',
+    )
     await page.goto(`${BASE_URL}/login?next=/admin/super`)
     await fillLoginForm(page, SUPER_EMAIL, SUPER_PASS)
     await submitLogin(page)
-    await expect(page).toHaveURL(/\/admin\/super/, { timeout: 10_000 })
+    await expectPathname(page, '/admin/super')
   })
 
   test('CT-AUTH-008: Lojista em /admin/super → redirecionado para /admin', async ({ page }) => {
@@ -159,22 +172,20 @@ test.describe('[BUG-007] Open Redirect em ?next=', () => {
   test('CT-AUTH-006: URL externa em ?next= deve ser ignorada', async ({ page }) => {
     // Login com ?next= apontando para URL externa
     await page.goto(`${BASE_URL}/login?next=https://evil-site.com`)
-    await fillLoginForm(page, SUPER_EMAIL, SUPER_PASS)
+    await fillLoginForm(page, LOJISTA_EMAIL, LOJISTA_PASS)
     await submitLogin(page)
-    await page.waitForTimeout(2000)
 
     // Deve redirecionar para /admin (fallback), NÃO para evil-site.com
-    const currentUrl = page.url()
-    expect(currentUrl).not.toContain('evil-site.com')
-    expect(currentUrl).toMatch(/\/admin/)
+    await expectPathname(page, '/admin')
+    expect(page.url()).not.toContain('evil-site.com')
     // Se este teste FALHAR, o open redirect está ativo — BUG confirmado
   })
 
   test('CT-AUTH-006-B: URL com // em ?next= deve ser ignorada', async ({ page }) => {
     await page.goto(`${BASE_URL}/login?next=//evil-site.com`)
-    await fillLoginForm(page, SUPER_EMAIL, SUPER_PASS)
+    await fillLoginForm(page, LOJISTA_EMAIL, LOJISTA_PASS)
     await submitLogin(page)
-    await page.waitForTimeout(2000)
+    await expectPathname(page, '/admin')
     expect(page.url()).not.toContain('evil-site.com')
   })
 })
@@ -194,7 +205,7 @@ test.describe('Recuperação de Senha', () => {
   })
 
   test('CT-AUTH-009: E-mail existente → mensagem genérica de sucesso', async ({ page }) => {
-    await page.fill('input[type="email"]', SUPER_EMAIL)
+    await page.fill('input[type="email"]', LOJISTA_EMAIL)
     await page.click('button[type="submit"]')
 
     // Deve mostrar mensagem de "verifique seu e-mail"
@@ -202,9 +213,7 @@ test.describe('Recuperação de Senha', () => {
     await expect(page.getByText(/Se existe uma conta com/)).toBeVisible()
   })
 
-  test('CT-AUTH-009-B: E-mail inexistente → mesma mensagem (anti-enumeração)', async ({
-    page,
-  }) => {
+  test('CT-AUTH-009-B: E-mail inexistente → mesma mensagem (anti-enumeração)', async ({ page }) => {
     await page.fill('input[type="email"]', 'nao_existe@qa-test.invalid')
     await page.click('button[type="submit"]')
 
@@ -214,7 +223,7 @@ test.describe('Recuperação de Senha', () => {
   })
 
   test('Botão "Usar outro e-mail" restaura o formulário', async ({ page }) => {
-    await page.fill('input[type="email"]', SUPER_EMAIL)
+    await page.fill('input[type="email"]', LOJISTA_EMAIL)
     await page.click('button[type="submit"]')
     await expect(page.getByText('Verifique seu e-mail')).toBeVisible({ timeout: 5000 })
 
@@ -258,12 +267,12 @@ test.describe('Logout', () => {
   test('CT-AUTH-011: Logout → redireciona para /login e invalida sessão', async ({ page }) => {
     // Login
     await goToLogin(page)
-    await fillLoginForm(page, SUPER_EMAIL, SUPER_PASS)
+    await fillLoginForm(page, LOJISTA_EMAIL, LOJISTA_PASS)
     await submitLogin(page)
-    await expect(page).toHaveURL(/\/admin/, { timeout: 10_000 })
+    await expectPathname(page, '/admin')
 
     // Logout via botão "Sair"
-    await page.getByRole('link', { name: /sair/i }).click()
+    await page.getByRole('button', { name: /sair/i }).click()
 
     // Deve redirecionar para login
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 })
@@ -285,13 +294,13 @@ test.describe('Logout', () => {
 test.describe('Persistência de Sessão', () => {
   test('CT-AUTH-012: Sessão persiste após reload da página', async ({ page }) => {
     await goToLogin(page)
-    await fillLoginForm(page, SUPER_EMAIL, SUPER_PASS)
+    await fillLoginForm(page, LOJISTA_EMAIL, LOJISTA_PASS)
     await submitLogin(page)
-    await expect(page).toHaveURL(/\/admin/, { timeout: 10_000 })
+    await expectPathname(page, '/admin')
 
     // Reload
     await page.reload()
-    await expect(page).toHaveURL(/\/admin/)
+    await expectPathname(page, '/admin')
     // Não deve redirecionar para login
     await expect(page).not.toHaveURL(/\/login/)
   })

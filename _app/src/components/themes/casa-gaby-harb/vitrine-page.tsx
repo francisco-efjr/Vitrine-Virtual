@@ -329,6 +329,13 @@ export function CGHVitrinePage({
                 Av. André Araújo, 2479 — Aleixo, Manaus
               </span>
             </div>
+            {whatsappUrl ? (
+              <div style={{ marginTop: 28 }}>
+                <Btn variant="ghostDark" size="md" iconR="arrowR" href={whatsappUrl}>
+                  Conhecer a casa física
+                </Btn>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
