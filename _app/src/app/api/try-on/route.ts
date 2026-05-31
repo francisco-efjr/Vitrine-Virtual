@@ -11,10 +11,7 @@ import { mapProviderFailure } from '@/server/try-on/provider-errors'
 import { fail, ok } from '@/lib/api/response'
 import { logger } from '@/lib/logger'
 import { REJECTION_MESSAGES } from '@/lib/try-on/quality-gate'
-import type {
-  CustomerPhotoSignals,
-  GarmentPhotoSignals,
-} from '@/lib/try-on/quality-gate'
+import type { CustomerPhotoSignals, GarmentPhotoSignals } from '@/lib/try-on/quality-gate'
 
 /**
  * Rota do provador virtual.
@@ -69,10 +66,10 @@ const fieldSchema = z.object({
   customer_signals: z.string().optional(),
   garment_signals: z.string().optional(),
   /**
-   * Bypass do AI gate (Gemini Vision) — quando o cliente já tentou e viu
-   * um erro de gate "soft" (multiple_people, no_face), pode decidir
-   * "tentar mesmo assim". O Gemini erra falso-positivo principalmente em
-   * fotos em espelho de loja com manequins/posters no fundo.
+   * Bypass apenas de aviso leve do AI gate (Gemini Vision) — quando o
+   * cliente já tentou e viu uma interrupção continuável, pode decidir
+   * "tentar mesmo assim". O servidor ainda valida de novo e nunca libera
+   * hard-block de sem rosto/sem pessoa.
    *
    * Vem como string "true" no multipart porque FormData não tem boolean.
    */
@@ -164,11 +161,7 @@ export async function POST(req: NextRequest) {
       message: errMsg,
       peca_id: parsed.data.peca_id,
     })
-    return fail(
-      `Não foi possível gerar a visualização. (${errName})`,
-      'TRY_ON_INTERNAL_ERROR',
-      500,
-    )
+    return fail(`Não foi possível gerar a visualização. (${errName})`, 'TRY_ON_INTERNAL_ERROR', 500)
   }
 
   if (!result.ok) {

@@ -12,6 +12,11 @@
  *   conscientes de que ele enfraquece a proteção XSS via script, mas os outros
  *   atributos (object-src, base-uri, connect-src) ainda oferecem defesa real.
  *
+ * script-src 'unsafe-eval' em development:
+ *   O Next dev usa eval/source maps para servir os bundles. Sem isso, a CSP
+ *   bloqueia a hidratação e formulários client-side param de funcionar no local.
+ *   Produção continua sem 'unsafe-eval'.
+ *
  * frame-ancestors 'none':
  *   Redundante com X-Frame-Options: DENY mas protege navegadores modernos que
  *   ignoram X-Frame-Options em favor de CSP.
@@ -27,10 +32,21 @@
  * font-src 'self':
  *   next/font/google baixa as fontes em build-time e serve de /_next/static/
  *   — nenhuma requisição a fonts.googleapis.com em runtime.
+ *
+ * upgrade-insecure-requests:
+ *   Útil em deploy HTTPS, mas quebra WebKit local porque ele tenta buscar
+ *   assets em https://localhost durante testes HTTP. Ativamos em Vercel ou
+ *   quando ENABLE_CSP_UPGRADE_INSECURE_REQUESTS=1.
  */
+const devUnsafeEval = process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"
+const upgradeInsecureRequests =
+  process.env.VERCEL === '1' || process.env.ENABLE_CSP_UPGRADE_INSECURE_REQUESTS === '1'
+    ? 'upgrade-insecure-requests;'
+    : ''
+
 const ContentSecurityPolicy = `
   default-src 'self';
-  script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com;
+  script-src 'self' 'unsafe-inline'${devUnsafeEval} https://challenges.cloudflare.com;
   style-src 'self' 'unsafe-inline';
   font-src 'self';
   img-src 'self' data: blob:
@@ -49,7 +65,7 @@ const ContentSecurityPolicy = `
   base-uri 'self';
   form-action 'self';
   frame-ancestors 'none';
-  upgrade-insecure-requests;
+  ${upgradeInsecureRequests}
 `
   .replace(/\n/g, ' ')
   .replace(/ {2,}/g, ' ')

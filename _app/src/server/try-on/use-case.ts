@@ -84,13 +84,13 @@ export interface RunTryOnInput {
    *  swimwear/underwear). Sem isso, geração é bloqueada nessas categorias. */
   sensitiveGarmentConsentDeclared?: boolean
   /**
-   * Bypass do AI gate (Gemini Vision validation) — segunda tentativa após
-   * o cliente ver uma rejeição "soft" (multiple_people, no_face) e optar
-   * por "Tentar mesmo assim". Útil pra contornar falso-positivos do Gemini
-   * com fotos em espelhos com manequins/posters no fundo.
+   * Bypass apenas de avisos leves do AI gate (Gemini Vision validation) —
+   * segunda tentativa após o cliente ver uma interrupção continuável
+   * (uncertain/multiple_people) e optar por "Tentar mesmo assim".
    *
-   * NÃO pula o quality gate baseado em client signals (MediaPipe) nem as
-   * outras camadas anti-abuso (kill switch, rate limit, turnstile, cota).
+   * NÃO pula hard-block de sem rosto/sem pessoa, NÃO pula o quality gate
+   * baseado em client signals (MediaPipe) nem as outras camadas anti-abuso
+   * (kill switch, rate limit, turnstile, cota).
    */
   bypassAiGate?: boolean
 }
@@ -259,27 +259,37 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
 
   // ─── AI server-side validation (request v6) ───────────────────────────
   //
-  // Validação server-side por Gemini Vision (com fallback pros client signals
-  // se Gemini falhar). Bloqueia HARD quando o AI confirma foto inválida
-  // (sem rosto, várias pessoas, corpo cortado, blur).
+  // Validação server-side por Gemini Vision forte (com fallback pros client
+  // signals se Gemini falhar). A regra agora é:
+  //   - sem pessoa/sem rosto visível: bloqueio real;
+  //   - rosto/corpo/iluminação pouco claros: aviso continuável;
+  //   - foto válida: segue sem interromper.
   //
   // Diferente do quality gate acima (que é soft-by-default), este é
   // hard-by-design — o usuário pediu explicitamente: "preciso que o sistema
   // realmente valide se o upload do cliente é válido… caso contrário,
   // retornar a mensagem para o usuário". Qualidade > performance.
   //
-  // Erro de infra do Gemini Vision = passa permissivo. Nunca rejeitamos
-  // só por rate-limit/network — UX > paranoia.
+  // Mesmo quando o cliente clica "tentar mesmo assim", o servidor valida de
+  // novo: o bypass só libera avisos leves, nunca um hard-block de sem rosto.
+  // Erro de infra do Gemini Vision = passa permissivo. Nunca rejeitamos só por
+  // rate-limit/network — UX > paranoia.
   const customerPhotoBuf = bufferFromDataUrl(input.customerPhoto)
   const customerPhotoMime = mimeFromDataUrl(input.customerPhoto) ?? 'image/jpeg'
-  if (customerPhotoBuf && !input.bypassAiGate) {
+  if (customerPhotoBuf) {
     const aiValidation = await validateCustomerPhotoWithAi(
       customerPhotoBuf,
       customerPhotoMime,
       input.customerSignals ?? null,
     )
 
-    if (!aiValidation.valid && aiValidation.reason) {
+    if (
+      !aiValidation.valid &&
+      aiValidation.reason &&
+      (aiValidation.severity === 'hard_reject' || !input.bypassAiGate)
+    ) {
+      const gateVerdictForLog =
+        aiValidation.severity === 'soft_warning' ? 'proceed_with_warning' : 'reject'
       await recordGeneration({
         lojaId: loja.id,
         pecaId: peca.id,
@@ -287,12 +297,16 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
         ipHash,
         aiImageModel: (loja.ai_image_model ?? null) as AiImageModel | null,
         status: 'error',
-        errorCode: `ai_gate_${aiValidation.reason}`,
-        gateVerdict: 'reject',
+        errorCode:
+          aiValidation.severity === 'soft_warning'
+            ? `ai_gate_warning_${aiValidation.reason}`
+            : `ai_gate_${aiValidation.reason}`,
+        gateVerdict: gateVerdictForLog,
         gateReason: aiValidation.reason,
         gateSignals: {
           ai_validation: {
             source: aiValidation.source,
+            severity: aiValidation.severity,
             reason: aiValidation.reason,
             detail: aiValidation.detail ?? null,
             raw: aiValidation.raw ?? null,
@@ -301,8 +315,9 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
         },
       })
 
-      logger.info('Try-on: AI gate hard-block antes do provider', {
+      logger.info('Try-on: AI gate interrompeu antes do provider', {
         source: aiValidation.source,
+        severity: aiValidation.severity,
         reason: aiValidation.reason,
         detail: aiValidation.detail,
       })
@@ -314,7 +329,25 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
 
     logger.info('Try-on: AI validation aprovou foto do cliente', {
       source: aiValidation.source,
+      severity: aiValidation.severity,
+      bypassedSoftWarning: input.bypassAiGate && aiValidation.severity === 'soft_warning',
     })
+
+    if (aiValidation.severity === 'soft_warning') {
+      gateVerdict = 'proceed_with_warning'
+      gateReason = aiValidation.reason ?? 'uncertain'
+      gateSignalsForLog = {
+        ...(gateSignalsForLog ?? {}),
+        ai_validation: {
+          source: aiValidation.source,
+          severity: aiValidation.severity,
+          reason: aiValidation.reason ?? null,
+          detail: aiValidation.detail ?? null,
+          raw: aiValidation.raw ?? null,
+          bypassed: input.bypassAiGate,
+        },
+      }
+    }
 
     // Mirror selfie detection (cenário C05). Não bloqueia — só loga + anexa
     // ao gateSignals pra dashboard de calibração. UI notification fica como
@@ -619,8 +652,7 @@ export async function runTryOn(input: RunTryOnInput): Promise<TryOnResult> {
             garmentCategory: variables.garmentCategory,
           })
           const originalScore = acceptance.checks.filter((c) => c.checked && c.pass).length
-          const retryScore =
-            retryAcceptance?.checks.filter((c) => c.checked && c.pass).length ?? 0
+          const retryScore = retryAcceptance?.checks.filter((c) => c.checked && c.pass).length ?? 0
           if (retryAcceptance && retryScore > originalScore) {
             result = retryResult
             tierEffective = retryResult.tier
@@ -746,11 +778,7 @@ export function inferSensitiveGarmentCategory(
 ): 'swimwear' | 'underwear' | null {
   if (!categoriaId) return null
   // Normaliza acentos pra match consistente
-  const c = categoriaId
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+  const c = categoriaId.toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '')
   const swimwearTerms = ['swim', 'biquini', 'bikini', 'sunga', 'maio', 'praia']
   if (swimwearTerms.some((t) => c.includes(t))) return 'swimwear'
   const underwearTerms = ['lingerie', 'underwear', 'calcinha', 'cueca', 'sutia', 'intima']
@@ -788,7 +816,13 @@ async function fetchAsBuffer(url: string): Promise<Buffer | null> {
   // Defesa contra SSRF: nunca faça fetch de URLs externas sem validar domínio.
   if (!isAllowedResultUrl(url)) {
     logger.warn('fetchAsBuffer: URL fora do allowlist bloqueada', {
-      host: (() => { try { return new URL(url).hostname } catch { return 'invalid' } })(),
+      host: (() => {
+        try {
+          return new URL(url).hostname
+        } catch {
+          return 'invalid'
+        }
+      })(),
     })
     return null
   }

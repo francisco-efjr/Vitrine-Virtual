@@ -4,16 +4,17 @@
  * Executar: npx playwright test tests/qa/super-admin.spec.ts
  *
  * Variáveis de ambiente necessárias:
- *   SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD
+ *   SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD (necessárias para cenários super-admin)
  *   LOJISTA_EMAIL, LOJISTA_PASSWORD
  *   BASE_URL (default: http://localhost:3000)
  */
 
 import { test, expect, type Page } from '@playwright/test'
 
-const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000'
-const SUPER_EMAIL = process.env.SUPER_ADMIN_EMAIL ?? 'francisco.efjr@gmail.com'
-const SUPER_PASS = process.env.SUPER_ADMIN_PASSWORD ?? '123'
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? process.env.BASE_URL ?? 'http://localhost:3000'
+const SUPER_EMAIL = process.env.SUPER_ADMIN_EMAIL ?? ''
+const SUPER_PASS = process.env.SUPER_ADMIN_PASSWORD ?? ''
+const HAS_SUPER_CREDENTIALS = Boolean(SUPER_EMAIL && SUPER_PASS)
 const LOJISTA_EMAIL = process.env.LOJISTA_EMAIL ?? 'teste@me.com'
 const LOJISTA_PASS = process.env.LOJISTA_PASSWORD ?? '123'
 
@@ -28,6 +29,10 @@ async function loginAs(page: Page, email: string, password: string) {
 }
 
 async function loginAsSuperAdmin(page: Page) {
+  test.skip(
+    !HAS_SUPER_CREDENTIALS,
+    'Defina SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD para validar super-admin',
+  )
   await loginAs(page, SUPER_EMAIL, SUPER_PASS)
   await page.goto(`${BASE_URL}/admin/super`)
   await page.waitForLoadState('networkidle')
@@ -78,6 +83,11 @@ test.describe('API Super Admin — autorização', () => {
 // ─── Grupo: Lista de Lojas ────────────────────────────────────────────────────
 
 test.describe('Lista de Lojas', () => {
+  test.skip(
+    !HAS_SUPER_CREDENTIALS,
+    'Defina SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD para validar super-admin',
+  )
+
   test.beforeEach(async ({ page }) => {
     await loginAsSuperAdmin(page)
   })
@@ -94,7 +104,7 @@ test.describe('Lista de Lojas', () => {
   test('CT-SA-005: Toggle de loja ativa/inativa dispara PATCH correto', async ({ page }) => {
     // Monitora network
     const requestPromise = page.waitForRequest(
-      (req) => req.url().includes('/api/super-admin/lojas/') && req.method() === 'PATCH'
+      (req) => req.url().includes('/api/super-admin/lojas/') && req.method() === 'PATCH',
     )
 
     // Clica no primeiro toggle de loja
@@ -113,7 +123,7 @@ test.describe('Lista de Lojas', () => {
 
   test('CT-SA-005-B: Toggle de loja — resposta bem-sucedida do servidor', async ({ page }) => {
     const responsePromise = page.waitForResponse(
-      (res) => res.url().includes('/api/super-admin/lojas/') && res.request().method() === 'PATCH'
+      (res) => res.url().includes('/api/super-admin/lojas/') && res.request().method() === 'PATCH',
     )
 
     await page.locator('button[role="switch"]').first().click()
@@ -128,6 +138,11 @@ test.describe('Lista de Lojas', () => {
 // ─── Grupo: Kill Switch ───────────────────────────────────────────────────────
 
 test.describe('Kill Switch Global', () => {
+  test.skip(
+    !HAS_SUPER_CREDENTIALS,
+    'Defina SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD para validar super-admin',
+  )
+
   test.beforeEach(async ({ page }) => {
     await loginAsSuperAdmin(page)
   })
@@ -141,12 +156,13 @@ test.describe('Kill Switch Global', () => {
 
   test('CT-SA-006-B: Toggle kill switch envia PATCH para settings', async ({ page }) => {
     const requestPromise = page.waitForRequest(
-      (req) => req.url().includes('/api/super-admin/settings') && req.method() === 'PATCH'
+      (req) => req.url().includes('/api/super-admin/settings') && req.method() === 'PATCH',
     )
 
     // Encontrar o toggle do kill switch (não o de loja)
-    const killToggle = page.locator('[aria-label*="kill"], [aria-label*="Kill"]').first()
-      ?? page.getByText('Kill switch — Cabine').locator('..').locator('button[role="switch"]')
+    const killToggle =
+      page.locator('[aria-label*="kill"], [aria-label*="Kill"]').first() ??
+      page.getByText('Kill switch — Cabine').locator('..').locator('button[role="switch"]')
 
     await killToggle.click()
 
@@ -157,11 +173,13 @@ test.describe('Kill Switch Global', () => {
 
   test('CT-SA-006-C: Kill switch salvo no servidor com sucesso', async ({ page }) => {
     const responsePromise = page.waitForResponse(
-      (res) => res.url().includes('/api/super-admin/settings') && res.request().method() === 'PATCH'
+      (res) =>
+        res.url().includes('/api/super-admin/settings') && res.request().method() === 'PATCH',
     )
 
     // Clicar no toggle do kill switch
-    await page.getByText('Kill switch — Cabine')
+    await page
+      .getByText('Kill switch — Cabine')
       .locator('..')
       .locator('button[role="switch"]')
       .click()
@@ -170,7 +188,8 @@ test.describe('Kill Switch Global', () => {
     expect(response.status()).toBe(200)
 
     // Clicar novamente para restaurar estado
-    await page.getByText('Kill switch — Cabine')
+    await page
+      .getByText('Kill switch — Cabine')
       .locator('..')
       .locator('button[role="switch"]')
       .click()
@@ -180,6 +199,11 @@ test.describe('Kill Switch Global', () => {
 // ─── Grupo: Orçamento (Bug Documentado) ───────────────────────────────────────
 
 test.describe('Orçamento Mensal — Bug conhecidos', () => {
+  test.skip(
+    !HAS_SUPER_CREDENTIALS,
+    'Defina SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD para validar super-admin',
+  )
+
   test.beforeEach(async ({ page }) => {
     await loginAsSuperAdmin(page)
   })
@@ -195,8 +219,7 @@ test.describe('Orçamento Mensal — Bug conhecidos', () => {
   // PATCH /api/super-admin/settings com o orçamento, e o backend persiste.
   test('CT-SA-007-FIX: Botão "Salvar" persiste o orçamento via PATCH', async ({ page }) => {
     const requestPromise = page.waitForRequest(
-      (req) =>
-        req.url().includes('/api/super-admin/settings') && req.method() === 'PATCH',
+      (req) => req.url().includes('/api/super-admin/settings') && req.method() === 'PATCH',
     )
 
     await page.locator('input[type="number"]').first().fill('999')
@@ -211,6 +234,11 @@ test.describe('Orçamento Mensal — Bug conhecidos', () => {
 // ─── Grupo: Criação de Nova Loja ──────────────────────────────────────────────
 
 test.describe('Criação de Nova Loja', () => {
+  test.skip(
+    !HAS_SUPER_CREDENTIALS,
+    'Defina SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD para validar super-admin',
+  )
+
   test.beforeEach(async ({ page }) => {
     await loginAsSuperAdmin(page)
   })

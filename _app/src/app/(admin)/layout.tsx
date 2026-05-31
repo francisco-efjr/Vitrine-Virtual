@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { AdminShell } from '@/components/admin/admin-shell'
@@ -22,26 +21,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // redirect aponta pra rota onde já estamos, gerando ERR_TOO_MANY_REDIRECTS.
   // O pathname vem do header `x-vv-pathname` setado pelo middleware.
   const currentPath = headers().get('x-vv-pathname') ?? ''
-  if (
-    session.isSuperAdmin &&
-    !session.loja &&
-    !currentPath.startsWith('/admin/super')
-  ) {
+  if (session.isSuperAdmin && !session.loja && !currentPath.startsWith('/admin/super')) {
     redirect('/admin/super')
   }
 
   // Lojista ainda sem loja (caso raro pós-convite) → manda para definir senha / espera
   if (!session.loja && !session.isSuperAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-6">
-        <div className="max-w-md text-center space-y-4">
+      <div className="flex min-h-screen items-center justify-center px-6">
+        <div className="max-w-md space-y-4 text-center">
           <h1 className="font-serif text-2xl font-semibold">Sua loja ainda está sendo criada</h1>
           <p className="text-sm text-ink-2">
             Aguarde a confirmação por e-mail ou contate o administrador.
           </p>
-          <Link href="/login" className="text-sm text-accent">
-            Sair
-          </Link>
+          <form action="/api/auth/sign-out" method="post">
+            <button type="submit" className="text-sm text-accent">
+              Sair
+            </button>
+          </form>
         </div>
       </div>
     )

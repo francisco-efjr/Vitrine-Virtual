@@ -232,9 +232,9 @@ export function TryOnModal({
       if (customerPhoto.signals) {
         formData.set('customer_signals', JSON.stringify(customerPhoto.signals))
       }
-      // Bypass do AI gate (Gemini Vision) quando o usuário clicou em
-      // "Tentar mesmo assim" depois de um falso-positivo (foto em espelho
-      // com manequim/poster contado como 2ª pessoa).
+      // Bypass de aviso leve do AI gate quando o usuário clicou em
+      // "Tentar mesmo assim". O servidor ainda bloqueia hard cases
+      // como ausência real de rosto/pessoa.
       if (opts?.bypassAiGate) {
         formData.set('bypass_ai_gate', 'true')
       }
@@ -283,9 +283,7 @@ export function TryOnModal({
         fileSize: customerPhoto.file.size,
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
       })
-      setErrorMsg(
-        `Erro de conexão. Tente novamente em instantes.${detail ? ` (${detail})` : ''}`,
-      )
+      setErrorMsg(`Erro de conexão. Tente novamente em instantes.${detail ? ` (${detail})` : ''}`)
       setErrorCode('NETWORK_ERROR')
       setStep('error')
     }
@@ -329,8 +327,7 @@ export function TryOnModal({
               aspectRatio: '9 / 16',
               height: 'min(64vh, 720px)',
               maxWidth: 'min(92vw, 405px)',
-              boxShadow:
-                '0 22px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
+              boxShadow: '0 22px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
               animation: 'vv-fade-up 0.5s var(--e-out) 0.2s both',
             }}
           >
@@ -1259,11 +1256,11 @@ function ProcessingStep({ progress, message }: { progress: number; message: stri
 
 // Códigos de gate cujo erro mais comum é falso-positivo (foto em espelho
 // com manequim, poster, segunda pessoa em foto na parede etc.). Pra esses,
-// damos ao cliente a opção "Tentar mesmo assim" — que bypassa só a etapa
-// do Gemini Vision; o resto das camadas anti-abuso segue valendo.
+// damos ao cliente a opção "Tentar mesmo assim". O servidor valida de novo
+// e só libera avisos leves; hard-block de sem rosto/sem pessoa continua.
 const BYPASSABLE_GATE_CODES = new Set([
   'GATE_MULTIPLE_PEOPLE',
-  'GATE_NO_FACE',
+  'GATE_UNCERTAIN',
   'GATE_TARGET_REGION_OCCLUDED',
 ])
 
@@ -1283,6 +1280,8 @@ function ErrorStep({
   canRetry: boolean
 }) {
   const isBypassable = !!errorCode && BYPASSABLE_GATE_CODES.has(errorCode)
+  const needsNewPhoto = errorCode === 'GATE_NO_FACE' || errorCode === 'GATE_NO_PERSON'
+  const showRetry = canRetry && !needsNewPhoto
   return (
     <div
       role="alert"
@@ -1297,8 +1296,8 @@ function ErrorStep({
       </p>
       {isBypassable ? (
         <p className="max-w-[340px] text-[11.5px] italic leading-relaxed text-ink-3">
-          Se você é a única pessoa real na foto (e o que aparece atrás é um
-          manequim, espelho ou cartaz), pode tentar mesmo assim.
+          Se você é a única pessoa real na foto (e o que aparece atrás é um manequim, espelho ou
+          cartaz), pode tentar mesmo assim.
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
@@ -1307,16 +1306,17 @@ function ErrorStep({
           onClick={onBack}
           className="rounded-full border border-border bg-transparent px-5 py-2.5 font-sans text-[13px] text-ink transition hover:bg-surface-2"
         >
-          Voltar
+          {needsNewPhoto ? 'Enviar nova foto' : 'Voltar'}
         </button>
-        <button
-          type="button"
-          onClick={onRetry}
-          disabled={!canRetry}
-          className="rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-medium text-white transition hover:bg-[#2d2825] disabled:opacity-50"
-        >
-          Tentar novamente
-        </button>
+        {showRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-medium text-white transition hover:bg-[#2d2825]"
+          >
+            Tentar novamente
+          </button>
+        ) : null}
         {isBypassable ? (
           <button
             type="button"
